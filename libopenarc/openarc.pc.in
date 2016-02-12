@@ -1,0 +1,15 @@
+# Process this file with autoconf to produce a pkg-config metadata file.
+
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+includedir=@includedir@/openarc
+
+Name: OpenARC Library
+Description: Library for performing ARC signing and verification
+URL: http://trusteddomain.org/openarc
+Version: @VERSION@
+Libs: -L${libdir} @PTHREAD_CFLAGS@ -lopenarc
+Libs.private: @LIBOPENARC_LIBS_PKG@ @PTHREAD_LIBS@
+Cflags: -I${includedir} @PTHREAD_CFLAGS@
+

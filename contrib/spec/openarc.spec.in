@@ -1,0 +1,141 @@
+# Copyright (c) 2010, 2011, 2016, The Trusted Domain Project.
+# All rights reserved.
+
+Summary: An open source library and milter for providing ARC service
+Name: openarc
+Version: @VERSION@
+Release: 1
+License: BSD
+Group: System Environment/Daemons
+Requires: libopenarc = %{version}-%{release}
+BuildRequires: sendmail-devel, openssl-devel
+@SPECREQUIRES@
+@SPECBUILDREQUIRES@
+Source: openarc-%{version}.tar.gz
+BuildRoot: %{_tmppath}/%{name}-%{version}-root
+Prefix: %{_prefix}
+
+%description
+The Trusted Domain Project is a community effort to develop and maintain a
+C library for producing ARC-aware applications and an open source milter for
+providing ARC service through milter-enabled MTAs.
+
+%package -n libopenarc
+Summary: An open source ARC library
+Group: System Environment/Libraries
+
+%description -n libopenarc
+This package contains the library files required for running services built
+using libopenarc.
+
+%package -n libopenarc-devel
+Summary: Development files for libopenarc
+Group: Development/Libraries
+Requires: libopenarc
+
+%description -n libopenarc-devel
+This package contains the static libraries, headers, and other support files
+required for developing applications against libopenarc.
+
+%prep
+%setup
+
+%build
+# Required for proper OpenSSL support on some versions of RedHat
+if [ -d /usr/include/kerberos ]; then
+	INCLUDES="$INCLUDES -I/usr/include/kerberos"
+fi
+./configure --prefix=%{_prefix} --sysconfdir=%{_sysconfdir} --libdir=%{_libdir} --mandir=%{_mandir} @SPECCONFIGURE@ CPPFLAGS="$INCLUDES"
+
+make
+
+%install
+make install DESTDIR="$RPM_BUILD_ROOT"
+mkdir -p "$RPM_BUILD_ROOT"%{_sysconfdir}
+mkdir -p "$RPM_BUILD_ROOT"%{_initrddir}
+install -m 0755 contrib/init/generic/openarc "$RPM_BUILD_ROOT"%{_initrddir}/%{name}
+echo '## Basic OpenARC config file for verification only
+## See openarc.conf(5) or %{_docdir}/%{name}-%{version}/openarc.conf.sample for more
+PidFile %{_localstatedir}/run/openarc/openarc.pid
+Mode	v
+Syslog	yes
+#Umask   002
+#UserID  openarc:mail
+#Socket	local:%{_localstatedir}/run/openarc/openarc.socket
+Socket  inet:8891@localhost
+
+## After setting Mode to "sv", running
+## openarc-genkey -D %{_sysconfdir}/openarc -s key -d `hostname --domain`
+## and putting %{_sysconfdir}/openarc
+#Canonicalization        relaxed/simple
+#Domain                  example.com # change to domain
+#Selector                key
+#KeyFile                 %{_sysconfdir}/openarc/key.private
+' > "$RPM_BUILD_ROOT"%{_sysconfdir}/openarc.conf
+rm -r "$RPM_BUILD_ROOT"%{_prefix}/share/doc/openarc
+
+%post
+if ! getent passwd openarc >/dev/null 2>&1; then
+	%{_sbindir}/useradd -M -d %{_localstatedir}/lib -r -s /bin/false openarc
+	if ! getent group openarc >/dev/null; then
+		%{_sbindir}/groupadd openarc
+		%{_sbindir}/usermod -g openarc openarc
+	fi
+	if getent group mail >/dev/null; then
+		%{_sbindir}/usermod -G mail openarc
+	fi
+fi
+test -d %{_localstatedir}/run/openarc || mkdir %{_localstatedir}/run/openarc
+chown openarc:openarc %{_localstatedir}/run/openarc
+if [ ! -d %{_sysconfdir}/openarc ]; then
+	mkdir %{_sysconfdir}/openarc
+	chmod o-rx %{_sysconfdir}/openarc
+	openarc-genkey -D %{_sysconfdir}/openarc -s key -d `hostname --domain`
+	chown -R openarc:openarc %{_sysconfdir}/openarc
+fi
+if [ -x /sbin/chkconfig ]; then
+	/sbin/chkconfig --add openarc
+elif [ -x /usr/lib/lsb/install_initd ]; then
+	/usr/lib/lsb/install_initd openarc
+fi
+
+%preun
+if [ $1 = 0 ]; then
+	service openarc stop && rm -f %{_localstatedir}/run/openarc/openarc.sock && rmdir %{_localstatedir}/run/openarc 2>/dev/null
+	if [ -x /sbin/chkconfig ]; then
+		/sbin/chkconfig --del openarc
+	elif [ -x /usr/lib/lsb/remove_initd ]; then
+		/usr/lib/lsb/remove_initd openarc
+	fi
+	userdel openarc
+	if getent group openarc >/dev/null; then
+		groupdel openarc
+	fi
+fi
+
+%clean
+if [ "$RPM_BUILD_ROOT" != "/" ]; then
+	rm -r "$RPM_BUILD_ROOT"
+fi
+
+%files
+%defattr(-,root,root)
+%doc FEATURES KNOWNBUGS LICENSE LICENSE.Sendmail README RELEASE_NOTES RELEASE_NOTES.Sendmail
+%config(noreplace) %{_sysconfdir}/openarc.conf
+%config %{_initrddir}/%{name}
+%{_mandir}/*/*
+%{_sbindir}/*
+@SPECBINDIR@
+
+%files -n libopenarc
+%defattr(-,root,root)
+%{_libdir}/*.so.*
+
+%files -n libopenarc-devel
+%defattr(-,root,root)
+%doc libopenarc/docs/*.html
+%{_includedir}/*
+%{_libdir}/*.a
+%{_libdir}/*.la
+%{_libdir}/*.so
+%{_libdir}/pkgconfig/*.pc

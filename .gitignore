@@ -30,3 +30,14 @@
 
 # Debug files
 *.dSYM/
+
+# other nonsense
+aclocal.m4
+autom4te.cache
+build-aux
+build-config.h
+build-config.h.in
+configure
+libtool
+Makefile
+Makefile.in

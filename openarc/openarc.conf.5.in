@@ -1,0 +1,211 @@
+.TH openarc.conf 5 "The Trusted Domain Project"
+
+.SH NAME
+.B openarc.conf
+\- Configuration file for openarc
+
+.SH LOCATION
+.I @SYSCONFDIR@/openarc.conf
+
+.SH DESCRIPTION
+.I openarc(8)
+implements the
+.B ARC
+(Authenticated Received Chain)
+specification for verifying authentication and handling of messages as
+they are routed to their destinations.  This file is its configuration file.
+
+Blank lines are ignored.  Lines containing a hash ("#") character are
+truncated at the hash character to allow for comments in the file.
+
+Other content should be the name of a parameter, followed by white space,
+followed by the value of that parameter, each on a separate line.
+
+For parameters that are Boolean in nature, only the first byte of
+the value is processed.  For positive values, the following are accepted:
+"T", "t", "Y", "y", "1".  For negative values, the following are accepted:
+"F", "f", "N", "n", "0".
+
+See the 
+.I openarc(8)
+man page for details about how and when the configuration file contents
+are reloaded.
+
+Unless otherwise stated, Boolean values default to "false", integer values
+default to 0, and string and dataset values default to being undefined.
+
+.SH PARAMETERS
+.TP
+.I AutoRestart (Boolean)
+Automatically re-start on failures.  Use with caution; if the filter
+fails instantly after it starts, this can cause a tight
+.I fork(2)
+loop.
+
+.TP
+.I AutoRestartCount (integer)
+Sets the maximum automatic restart count.  After this number of
+automatic restarts, the filter will give up and terminate.
+A value of 0 implies no limit; this is the default.
+
+.TP
+.I AutoRestartRate (string)
+Sets the maximum automatic restart rate.  If the filter begins restarting
+faster than the rate defined here, it will give up and terminate.
+This is a string of the form
+.I n/t[u]
+where
+.I n
+is an integer limiting the count of restarts in the given interval and
+.I t[u]
+defines the time interval through which the rate is calculated;
+.I t
+is an integer and
+.I u
+defines the units thus represented ("s" or "S" for seconds, the default;
+"m" or "M" for minutes; "h" or "H" for hours; "d" or "D" for days).  For
+example, a value of "10/1h" limits the restarts to 10 in one hour.  There
+is no default, meaning restart rate is not limited.
+
+.TP
+.I Background (Boolean)
+Causes
+.I openarc
+to fork and exits immediately, leaving the service running in the background.
+The default is "true".
+
+.TP
+.I ChangeRootDirectory (string)
+Requests that the operating system change the effective root directory
+of the process to the one specified here prior to beginning execution.
+.BR chroot (2)
+requires superuser access. A warning will be generated if
+.I UserID
+is not also set.
+
+.TP
+.I EnableCoredumps (boolean)
+On systems that have such support, make an explicit request to the kernel
+to dump cores when the filter crashes for some reason.  Some modern UNIX
+systems suppress core dumps during crashes for security reasons if the
+user ID has changed during the lifetime of the process.  Currently only
+supported on Linux.
+
+.TP
+.I Include (string)
+Names a file to be opened and read as an additional configuration file.
+Nesting is allowed to a maximum of five levels.
+
+.TP
+.I MilterDebug (integer)
+Sets the debug level to be requested from the milter library.  The
+default is 0.
+
+.TP
+.I PeerList (dataset)
+Identifies a set of "peers" that identifies clients whose connections
+should be accepted without processing by this filter.  The set
+should contain on each line a hostname, domain name (e.g. ".example.com"),
+IP address, an IPv6 address (including an IPv4 mapped address), or a
+CIDR-style IP specification (e.g. "192.168.1.0/24").  An entry beginning
+with a bang ("!") character means "not", allowing exclusions of specific
+hosts that are otherwise members of larger sets.  Host and domain names are 
+matched first, then the IP or IPv6 address depending on the connection 
+type.  More precise entries are preferred over less precise ones, i.e. 
+"192.168.1.1" will match before "!192.168.1.0/24".  The text form of IPv6 
+addresses will be forced to lowercase when queried (RFC5952), so the contents
+of this data set should also use lowercase.  The IP address portion of an
+entry may optionally contain square brackets; both forms (with and without)
+will be checked.
+
+.TP
+.I PidFile (string)
+Specifies the path to a file that should be created at process start
+containing the process ID.
+
+.TP
+.I Socket (string)
+Specifies the socket that should be established by the filter to receive
+connections from
+.I sendmail(8)
+in order to provide service.
+.I socketspec
+is in one of two forms:
+.I local:path,
+which creates a UNIX domain socket at the specified
+.I path,
+or
+.I inet:port[@host]
+or
+.I inet6:port[@host]
+which creates a TCP socket on the specified
+.I port
+and in the specified protocol family.  If the
+.I host
+is not given as either a hostname or an IP address, the socket will be
+listening on all interfaces.  A literal IP address must be enclosed in
+square brackets.  This option is mandatory either in the configuration file or
+on the command line.
+
+.TP
+.I Syslog (Boolean)
+Log via calls to
+.I syslog(3)
+any interesting activity.
+
+.TP
+.I SyslogFacility (string)
+Log via calls to
+.I syslog(3)
+using the named facility.  The facility names are the same as the ones
+allowed in
+.I syslog.conf(5).
+The default is "mail".
+
+.TP
+.I UserID (string)
+Attempts to become the specified userid before starting operations.
+The value is of the form
+.I userid[:group].
+The process will be assigned all of the groups and primary group ID of
+the named
+.I userid
+unless an alternate
+.I group
+is specified.
+
+.SH NOTES
+Features that involve specification of IPv4 addresses or CIDR blocks
+will use the
+.I inet_addr(3) 
+function to parse that information.  Users should be familiar with the
+way that function handles the non-trivial cases (for example, "192.0.2/24"    
+and "192.0.2.0/24" are not the same thing).
+.SH FILES
+.TP
+.I @SYSCONFDIR@/openarc.conf
+Default location of this file.
+.SH VERSION
+This man page covers version @VERSION@ of
+.I openarc.
+
+.SH COPYRIGHT
+Copyright (c) 2007, 2008, Sendmail, Inc. and its suppliers.  All rights
+reserved.
+
+Copyright (c) 2009-2016, The Trusted Domain Project.  All rights reserved.
+.SH SEE ALSO
+.I openarc(8), sendmail(8)
+.P
+RFC5451 - Message Header Field for Indicating Message Authentication Status
+.P
+RFC5617 - DKIM Author Domain Signing Practises
+.P
+RFC5965 - An Extensible Format for Email Feedback Reports
+.P
+RFC6008 - Authentication-Results Registration for Differentiating among
+Cryptographic Results
+.P
+RFC6376 - DomainKeys Identified Mail
+.P
+RFC6651 - Extensions to DomainKeys Identified Mail (DKIM) for Failure Reporting

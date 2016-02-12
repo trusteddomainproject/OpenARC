@@ -1,0 +1,250 @@
+OPENARC README
+==============
+
+This directory has the latest open source ARC filter software from The
+Trusted Domain Project.
+
+There is a web site at http://www.trusteddomain.org that is home for the
+latest updates.
+
+
++--------------+
+| INTRODUCTION |
++--------------+
+
+The Trusted Domain Project (TDP) is a non-profit corporation dedicated to
+research and development of techologies that promote trust in the use of
+domain names in on the Internet.  OpenARC is an initiative of TDP, and is
+primarily community effort to develop and maintain an open source library
+for producing ARC-aware applications, and a "milter"-based filter for
+providing ARC service.
+
+ARC is a technology proposal, put forward by a consortium of organizations,
+intended to allow a chain of message handlers (typically email operators)
+to confirm handling by trusted upstream handlers in an attempt to confirm
+the valid use of certain identifiers in the message.
+
+ARC is still experimental, and its specification may change.  This package
+is intended for use by operators willing to take part in the experiment and
+provide their feedback to the development team.
+
+"milter" is a portmanteau of "mail filter" and refers to a protocol and API
+for communicating mail traffic information between MTAs and mail filtering
+plug-in applications.  It was originally invented at Sendmail, Inc. but
+has also been adapted to other MTAs.
+
+A substantial amount of the code here is based on code developed as part of
+The OpenDKIM Project, also a TDP activity, which started as a code fork of
+version 2.8.3 of the open source "dkim-milter" package developed and
+maintained by Sendmail, Inc.  The license used by The OpenDKIM Project is
+found in the LICENSE file.  Portions of this project are also covered by the
+Sendmail Open Source License, available in this distribution in the file
+"LICENSE.Sendmail".  See the copyright notice(s) in each source file to
+determine whether or not it is covered by both licenses.
+
+This package consists of a library that implements the ARC service and a
+milter-based filter application that can plug in to any milter-aware MTA to
+provide that service to sufficiently recent sendmail, Postfix or other MTAs
+that support the milter protocol.
+
+
++--------------+
+| DEPENDENCIES |
++--------------+
+
+To compile and operate, this package requires the following:
+
+o OpenSSL (http://www.openssl.org, or ask your software vendor for a package).
+  Any version will get you started, however v0.9.8 or later is required if
+  you want to be able to sign or verify messages using the SHA256 message
+  digest algorithm which is generally required for current DKIM applications.
+
+o sendmail v8.13.0 (or later), or Postfix 2.3, (or later) and libmilter.
+  (These are only required if you are building the filter.)
+
+o Access to a working nameserver (required only for signature verification).
+
+o On Linux systems, either libbsd (BSD compatibility library) or some other
+  library that provides strlcat() and strlcpy().
+
+o If you are interested in tinkering with the build and packaging structure,
+  you may need to upgrade to these versions of GNU's "autotools" components:
+	autoconf (GNU Autoconf) 2.61
+	automake (GNU automake) 1.7 (or 1.9 to avoid warnings)
+	ltmain.sh (GNU libtool) 2.2.6 (or 1.5.26 after make maintainer-clean)
+
+
++-----------------------+
+| RELATED DOCUMENTATION |
++-----------------------+
+
+The man page for openarc (the actual filter program) is present in the
+openarc directory of this source distribution.  There is additional
+information in the INSTALL and FEATURES files, and in the README file in the
+openarc directory.  Changes are documented in the RELEASE_NOTES file.
+
+HTML-style documentation for libarc is available in libarc/docs in
+this source distribution.
+
+Mailing lists discussing and supporting the ARC software found in this
+package are maintained via a list server at trusteddomain.org.  Visit
+http://www.trusteddomain.org to subscribe or browse archives.  The available
+lists are:
+
+	openarc-announce	(moderated) Release announcements.
+
+	openarc-users		General OpenARC user questions and answers.
+
+	openarc-dev		Chatter among OpenARC developers.
+
+Bug tracking is done via the issue trackers on GitHub, at
+https://github.com/mskucherawy/OpenARC/issues.  You can enter new bug
+reports there, but please check first for older bugs already open,
+or even already closed, before opening a new issue.
+
+
++---------+
+| WARNING |
++---------+
+
+Since OpenARC uses cryptography, the following information from OpenSSL
+applies to this package as well.
+
+PLEASE REMEMBER THAT EXPORT/IMPORT AND/OR USE OF STRONG CRYPTOGRAPHY
+SOFTWARE, PROVIDING CRYPTOGRAPHY HOOKS OR EVEN JUST COMMUNICATING
+TECHNICAL DETAILS ABOUT CRYPTOGRAPHY SOFTWARE IS ILLEGAL IN SOME
+PARTS OF THE WORLD.  SO, WHEN YOU IMPORT THIS PACKAGE TO YOUR
+COUNTRY, RE-DISTRIBUTE IT FROM THERE OR EVEN JUST EMAIL TECHNICAL
+SUGGESTIONS OR EVEN SOURCE PATCHES TO THE AUTHOR OR OTHER PEOPLE
+YOU ARE STRONGLY ADVISED TO PAY CLOSE ATTENTION TO ANY EXPORT/IMPORT
+AND/OR USE LAWS WHICH APPLY TO YOU.  THE AUTHORS ARE NOT LIABLE FOR
+ANY VIOLATIONS YOU MAKE HERE.  SO BE CAREFUL, IT IS YOUR RESPONSIBILITY.
+
+If you use OpenSSL then make sure you read their README file which
+contains information about patents etc.
+
+
++---------------------+
+| DIRECTORY STRUCTURE |
++---------------------+
+
+contrib		A collection of user contributed scripts that may be useful.
+
+docs		A collection of RFCs and drafts related to opendkim.
+
+libopenarc	A library that implements the proposed ARC service.
+
+libopenarc/docs HTML documentation describing the API provided by libopenarc.
+
+openarc		A milter-based filter application which uses libopenarc
+		to provide ARC service via an MTA using the milter protocol.
+
+
++----------------+
+| RUNTIME ISSUES |
++----------------+
+
+WARNING: symbol 'X' not available
+
+ The filter attempted to get some information from the MTA that the MTA
+ did not provide.
+
+ At various points in the interaction between the MTA and the filter, certain
+ macros containing information about the job in progress or the connection
+ being handled are passed from the MTA to the filter.
+
+ In the case of sendmail, the names of the macros the MTA should pass to the
+ filter are defined by the "Milter.macros" settings in sendmail.cf, e.g.
+ "Milter.macros.connect", "Milter.macros.envfrom", etc.  This message
+ indicates that the filter needed the contents of macro X, but that macro
+ was not passed down from the MTA.
+
+ Typically the values needed by this filter are passed from the MTA if the
+ sendmail.cf was generated by the usual m4 method.  If you do not have
+ those options defined in your sendmail.cf, make sure your M4 configuration
+ files are current and rebuild your sendmail.cf to get appropriate lines
+ added to your sendmail.cf, and then restart sendmail.
+
+MTA timeouts
+
+ By default, the MTA is configured to wait up to ten seconds for a response
+ from a filter before giving up.  When querying remote nameservers
+ for key and policy data, the ARC filter may not get a response from the
+ resolver within that time frame, and thus this MTA timeout will occur.
+ This can cause messages to be rejected, temp-failed or delivered without
+ verification, depending on the failure mode selected for the filter.
+
+ When using the standard resolver library provided with your system, the
+ DNS timeout cannot be adjusted.  If you encounter this problem, you must
+ increase the time the MTA waits for replies.  See the documentation in
+ the sendmail open source distribution (libmilter/README in particular)
+ for instructions on changing these timeouts.
+
+d2i_PUBKEY_bio() failed
+
+ After retrieving and decoding a public key to perform a message verification,
+ the OpenSSL library attempted to make use of that key but failed.  The
+ known possible causes are:
+
+  (a) Memory exhaustion
+
+  (b) Key corruption
+
+ If you're set to temp-fail messages in these cases, the remote end will
+ probably retry the message.  If the same message fails again later,
+ the key is probably corrupted or otherwise invalid.
+
+Other OpenARC issues:
+
+ Report any bugs to the email address openarc-users@trusteddomain.org or to
+ the GitHub issue trackers accessible at:
+ 
+ https://github.com/mskucherawy/OpenARC/issues
+
+
++-----------------------------+
+| Sendmail REWRITING FEATURES |
++-----------------------------+
+
+There are two features of the sendmail MTA which, if activated, can interfere
+with successful use of the DKIM service.  The two features are MASQUERADE_AS
+and FEATURE(genericstable).  See cf/README in the open source sendmail
+source code distribution for more information.
+
+Due to the way the milter protocol is incorporated into the MTA, opnarc
+sees the headers before they are modified as required by those two features.
+This means any signature is generated based on the headers originally
+injected by the mail client and not on the headers which are actually sent
+out by the MTA.  As a result, the verifying agent at the receiver's side
+will be unable to verify the signature as the signed data and the received
+data don't match.
+
+The suggested solutions to this problem are:
+
+(1) Send mail with the headers already written as needed, obviating the
+    need for these features (or just turn them off).
+
+(2) Have two MTAs set up, either on separate boxes or on the same box.
+    The first MTA should do all of the rewriting (i.e. use these two
+    features) and the second one should use opendkim to add the signature
+    and do no rewriting at all.
+
+(3) Have multiple DaemonPortOptions lines in your configuration file.  The
+    first daemon port (port 25) does the header rewriting and then routes
+    the message to the second port; the latter does no rewriting but does the
+    signing and then sends the message on its way.
+
+There is also a feature of Sendmail that will cause it to alter addresses
+after signing but before they are transmitted.  The feature, which is on
+by default, passes addresses in header fields to the resolver functions
+to ensure they are canonical.  This can result in the replacement of those
+strings in the sent message with their canonical forms only after the message
+is signed, which will invalidate the signatures.  To suppress this feature,
+add the following line to your sendmail.mc and submit.mc configuration files,
+re-generate your configuration and restart the filter:
+
+	FEATURE(`nocanonify')
+
+--
+Copyright (c) 2010-2012, 2014, 2016, The Trusted Domain Project.
+  All rights reserved.

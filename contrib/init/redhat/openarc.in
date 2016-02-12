@@ -1,0 +1,100 @@
+#!/bin/bash
+#
+# openarc    Start and stop OpenARC.
+
+# chkconfig: - 41 59
+# description: OpenARC implements the Authenticated Received Chain (ARC)
+#              service and a milter-based filter application that can plug
+#              in to any milter-aware MTA.
+# processname: openarc
+# pidfile: /var/run/openarc/openarc.pid
+
+### BEGIN INIT INFO
+# Provides: openarc
+# Short-Description: Start and stop OpenARC
+# Description:	OpenARC implements the Authenticated Received Chain
+#		(ARC) service and a milter-based filter application
+#		that can plug in to any milter-aware MTA.
+### END INIT INFO
+
+# OpenARC startup script v2.0 for RHEL/CentOS/Fedora
+# by Steve Jenkins (SteveJenkins.com) - 03-24-2015
+
+. /etc/rc.d/init.d/functions
+
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+
+RETVAL=0
+prog="openarc"
+
+DAEMON=@sbindir@/$prog
+CONF_FILE=@sysconfdir@/$prog.conf
+PID_FILE=@localstatedir@/run/$prog/$prog.pid
+
+if [ -f /etc/sysconfig/openarc ]; then
+	. /etc/sysconfig/openarc
+fi
+
+start() {
+	echo -n $"Starting OpenARC Milter: "
+	if [ -f $PID_FILE ]; then
+		PID=`cat $PID_FILE`
+		echo OpenARC already running as pid $PID
+	        exit 2;
+	else
+		daemon $DAEMON -x $CONF_FILE -P $PID_FILE
+		RETVAL=$?
+		[ $RETVAL -eq 0 ] && touch /var/lock/subsys/openarc
+		echo
+		return $RETVAL
+	fi
+}
+
+stop() {
+	echo -n $"Stopping OpenARC Milter: "
+	killproc -p $PID_FILE openarc
+	RETVAL=$?
+	echo
+	[ $RETVAL -eq 0 ] && rm -f /var/lock/subsys/openarc
+	return $RETVAL
+}
+
+restart() {
+	stop
+	start
+}
+
+reload() {
+	echo -n $"Reloading OpenARC Milter configuration: "
+	killproc -p $PID_FILE openarc -SIGUSR1
+	RETVAL=$?
+	echo
+	return $RETVAL
+}
+
+case "$1" in
+  start)
+	start
+	;;
+  stop)
+	stop
+	;;
+  reload)
+	reload
+	;;
+  restart)
+	restart
+	;;
+  status)
+	status -p $PID_FILE openarc
+	;;
+  condrestart)
+	[ -f /var/lock/subsys/openarc ] && restart || :
+	;;
+  *)
+	echo $"Usage: $0 {start|stop|status|reload|restart|condrestart}"
+	exit 1
+esac
+
+exit $?

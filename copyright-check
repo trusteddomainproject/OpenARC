@@ -1,0 +1,21 @@
+#!/bin/sh
+#
+# Copyright (c) 2011-2014, The Trusted Domain Project.  All rights reserved.
+#
+
+YEAR=`date +%Y`
+LASTYEAR=$(($YEAR - 1))
+
+for i in `git diff develop --name-only @{$LASTYEAR-12-31} | fgrep -v .jpg | fgrep -v contrib/ | fgrep -v m4/`
+do
+	if test -f $i
+	then
+		if grep -q Copyright $i
+		then
+			if ! grep -q Copyright.\*$YEAR $i
+			then
+				echo $i
+			fi
+		fi
+	fi
+done
