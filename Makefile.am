@@ -5,8 +5,7 @@ AUTOMAKE_OPTIONS = foreign
 ACLOCAL_AMFLAGS = -I m4
 
 SUBDIRS = libopenarc contrib docs openarc
-dist_doc_DATA = FEATURES KNOWNBUGS LICENSE LICENSE.Sendmail \
-	RELEASE_NOTES.Sendmail
+dist_doc_DATA = LICENSE RELEASE_NOTES
 dist_noinst_SCRIPTS = libtool
 
 DISTCLEANFILES = openarc-@VERSION@.tar.gz

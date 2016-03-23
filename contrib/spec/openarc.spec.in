@@ -120,7 +120,7 @@ fi
 
 %files
 %defattr(-,root,root)
-%doc FEATURES KNOWNBUGS LICENSE LICENSE.Sendmail README RELEASE_NOTES RELEASE_NOTES.Sendmail
+%doc LICENSE LICENSE.Sendmail README RELEASE_NOTES
 %config(noreplace) %{_sysconfdir}/openarc.conf
 %config %{_initrddir}/%{name}
 %{_mandir}/*/*
