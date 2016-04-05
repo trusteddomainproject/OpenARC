@@ -1,1 +1,1 @@
-dist_doc_DATA=draft-andersen-arc-02.txt
+dist_doc_DATA=draft-andersen-arc-04.txt

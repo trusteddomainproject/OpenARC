@@ -45,6 +45,8 @@
 
 /* libopenarc includes */
 #include "arc-internal.h"
+#include "arc-canon.h"
+#include "arc-tables.h"
 #include "arc-types.h"
 #include "arc-util.h"
 #include "arc.h"
@@ -67,7 +69,8 @@ void arc_error __P((ARC_MESSAGE *, const char *, ...));
 #define	ARC_STATE_INIT		0
 #define	ARC_STATE_HEADER	1
 #define	ARC_STATE_EOH		2
-#define	ARC_STATE_EOM		3
+#define	ARC_STATE_BODY		3
+#define	ARC_STATE_EOM		4
 #define	ARC_STATE_UNUSABLE	99
 
 #define	CRLF			"\r\n"
@@ -90,6 +93,8 @@ void arc_error __P((ARC_MESSAGE *, const char *, ...));
 
 /* macros */
 #define ARC_ISLWSP(x)  ((x) == 011 || (x) == 013 || (x) == 014 || (x) == 040)
+
+#define	ARC_PHASH(x)		((x) - 32)
 
 /*
 **  ARC_ERROR -- log an error into a DKIM handle
@@ -176,11 +181,28 @@ arc_init(void)
 	ARC_LIB *lib;
 
 	lib = (ARC_LIB *) malloc(sizeof *lib);
-	if (lib != NULL)
+	if (lib == NULL)
+		return lib;
+
+	memset(lib, '\0', sizeof *lib);
+	lib->arcl_flags = ARC_LIBFLAGS_DEFAULT;
+
+#define FEATURE_INDEX(x)	((x) / (8 * sizeof(u_int)))
+#define FEATURE_OFFSET(x)	((x) % (8 * sizeof(u_int)))
+#define FEATURE_ADD(lib,x)	(lib)->arcl_flist[FEATURE_INDEX((x))] |= (1 << FEATURE_OFFSET(x))
+
+	lib->arcl_flsize = (FEATURE_INDEX(ARC_FEATURE_MAX)) + 1;
+	lib->arcl_flist = (u_int *) malloc(sizeof(u_int) * lib->arcl_flsize);
+	if (lib->arcl_flist == NULL)
 	{
-		memset(lib, '\0', sizeof *lib);
-		lib->arcl_flags = ARC_LIBFLAGS_DEFAULT;
+		free(lib);
+		return NULL;
 	}
+	memset(lib->arcl_flist, '\0', sizeof(u_int) * lib->arcl_flsize);
+
+#ifdef HAVE_SHA256
+	FEATURE_ADD(lib, ARC_FEATURE_SHA256);
+#endif /* HAVE_SHA256 */
 
 	return lib;
 }
@@ -275,6 +297,537 @@ const char *
 arc_getsslbuf(ARC_LIB *lib)
 {
 	return (const char *) arc_dstring_get(lib->arcl_sslerrbuf);
+}
+
+/*
+**  ARC_CHECK_UINT -- check a parameter for a valid unsigned integer
+**
+**  Parameters:
+**  	value -- value to check
+**
+**  Return value:
+**  	TRUE iff the input value looks like a properly formed unsigned integer.
+*/
+
+_Bool
+arc_check_uint(u_char *value)
+{
+	uint64_t tmp = 0;
+	char *end;
+
+	assert(value != NULL);
+
+	errno = 0;
+
+	if (value[0] == '-')
+	{
+		errno = ERANGE;
+		tmp = (uint64_t) -1;
+	}
+	else if (value[0] == '\0')
+	{
+		errno = EINVAL;
+		tmp = (uint64_t) -1;
+	}
+	else
+	{
+		tmp = strtoull((char *) value, &end, 10);
+	}
+
+	return !(tmp == (uint64_t) -1 || errno != 0 || *end != '\0');
+}
+
+/*
+**  ARC_PARAM_GET -- get a parameter from a set
+**
+**  Parameters:
+**  	set -- set to search
+**  	param -- parameter to find
+**
+**  Return value:
+**  	Pointer to the parameter requested, or NULL if it's not in the set.
+*/
+
+static u_char *
+arc_param_get(ARC_KVSET *set, u_char *param)
+{
+	ARC_PLIST *plist;
+
+	assert(set != NULL);
+	assert(param != NULL);
+
+	for (plist = set->set_plist[ARC_PHASH(param[0])];
+	     plist != NULL;
+	     plist = plist->plist_next)
+	{
+		if (strcmp((char *) plist->plist_param, (char *) param) == 0)
+			return plist->plist_value;
+	}
+
+	return NULL;
+}
+
+/*
+**  ARC_SET_FIRST -- return first set in a context
+**
+**  Parameters:
+**  	msg -- ARC message context
+**  	type -- type to find, or ARC_KVSETTYPE_ANY
+**
+**  Return value:
+**  	Pointer to the first ARC_KVSET in the context, or NULL if none.
+*/
+
+static ARC_KVSET *
+arc_set_first(ARC_MESSAGE *msg, arc_kvsettype_t type)
+{
+	ARC_KVSET *set;
+
+	assert(msg != NULL);
+
+	if (type == ARC_KVSETTYPE_ANY)
+		return msg->arc_kvsethead;
+
+	for (set = msg->arc_kvsethead; set != NULL; set = set->set_next)
+	{
+		if (set->set_type == type)
+			return set;
+	}
+
+	return NULL;
+}
+
+/*
+**  ARC_SET_NEXT -- return next set in a context
+**
+**  Parameters:
+**  	set -- last set reported (i.e. starting point for this search)
+**  	type -- type to find, or ARC_KVSETTYPE_ANY
+**
+**  Return value:
+**  	Pointer to the next ARC_KVSET in the context, or NULL if none.
+*/
+
+static ARC_KVSET *
+arc_set_next(ARC_KVSET *cur, arc_kvsettype_t type)
+{
+	ARC_KVSET *set;
+
+	assert(cur != NULL);
+
+	if (type == ARC_KVSETTYPE_ANY)
+		return cur->set_next;
+
+	for (set = cur->set_next; set != NULL; set = set->set_next)
+	{
+		if (set->set_type == type)
+			return set;
+	}
+
+	return NULL;
+}
+
+/*
+**  ARC_ADD_PLIST -- add an entry to a parameter-value set
+**
+**  Parameters:
+**  	msg -- ARC message context in which this is performed
+**  	set -- set to modify
+**   	param -- parameter
+**  	value -- value
+**  	force -- override existing value, if any
+**
+**  Return value:
+**  	0 on success, -1 on failure.
+**
+**  Notes:
+**  	Data is not copied; a reference to it is stored.
+*/
+
+static int
+arc_add_plist(ARC_MESSAGE *msg, ARC_KVSET *set, u_char *param, u_char *value,
+              _Bool force)
+{
+	ARC_PLIST *plist;
+
+	assert(msg != NULL);
+	assert(set != NULL);
+	assert(param != NULL);
+	assert(value != NULL);
+
+	if (!isprint(param[0]))
+	{
+		arc_error(msg, "invalid parameter '%s'", param);
+		return -1;
+	}
+
+	/* see if we have one already */
+	for (plist = set->set_plist[ARC_PHASH(param[0])];
+	     plist != NULL;
+	     plist = plist->plist_next)
+	{
+		if (strcasecmp((char *) plist->plist_param,
+		               (char *) param) == 0)
+			break;
+	}
+
+	/* nope; make one and connect it */
+	if (plist == NULL)
+	{
+		int n;
+
+		plist = (ARC_PLIST *) malloc(sizeof(ARC_PLIST));
+		if (plist == NULL)
+		{
+			arc_error(msg, "unable to allocate %d byte(s)",
+			          sizeof(ARC_PLIST));
+			return -1;
+		}
+		force = TRUE;
+		n = ARC_PHASH(param[0]);
+		plist->plist_next = set->set_plist[n];
+		set->set_plist[n] = plist;
+		plist->plist_param = param;
+	}
+
+	/* set the value if "force" was set (or this was a new entry) */
+	if (force)
+		plist->plist_value = value;
+
+	return 0;
+}
+
+/*
+**  ARC_PROCESS_SET -- process a parameter set, i.e. a string of the form
+**                     param=value[; param=value]*
+**
+**  Parameters:
+**  	msg -- ARC_MESSAGE context in which this is performed
+**  	type -- an ARC_KVSETTYPE constant
+**  	str -- string to be scanned
+**  	len -- number of bytes available at "str"
+**
+**  Return value:
+**  	An ARC_STAT constant.
+*/
+
+ARC_STAT
+arc_process_set(ARC_MESSAGE *msg, arc_kvsettype_t type, u_char *str, size_t len)
+{
+	_Bool spaced;
+	int state;
+	int status;
+	u_char *p;
+	u_char *param;
+	u_char *value;
+	u_char *hcopy;
+	char *ctx;
+	ARC_KVSET *set;
+	const char *settype;
+
+	assert(msg != NULL);
+	assert(str != NULL);
+	assert(type == ARC_KVSETTYPE_SEAL ||
+	       type == ARC_KVSETTYPE_SIGNATURE ||
+	       type == ARC_KVSETTYPE_AR ||
+	       type == ARC_KVSETTYPE_KEY);
+
+	param = NULL;
+	value = NULL;
+	state = 0;
+	spaced = FALSE;
+
+	hcopy = (u_char *) malloc(len + 1);
+	if (hcopy == NULL)
+	{
+		arc_error(msg, "unable to allocate %d byte(s)", len + 1);
+		return ARC_STAT_INTERNAL;
+	}
+	strlcpy((char *) hcopy, (char *) str, len + 1);
+
+	set = (ARC_KVSET *) malloc(sizeof(ARC_KVSET));
+	if (set == NULL)
+	{
+		free(hcopy);
+		arc_error(msg, "unable to allocate %d byte(s)",
+		          sizeof(ARC_KVSET));
+		return ARC_STAT_INTERNAL;
+	}
+
+	set->set_type = type;
+	settype = arc_code_to_name(settypes, type);
+
+	if (msg->arc_kvsethead == NULL)
+		msg->arc_kvsethead = set;
+	else
+		msg->arc_kvsettail->set_next = set;
+
+	msg->arc_kvsettail = set;
+
+	set->set_next = NULL;
+	memset(&set->set_plist, '\0', sizeof set->set_plist);
+	set->set_data = hcopy;
+	set->set_bad = FALSE;
+
+	for (p = hcopy; *p != '\0'; p++)
+	{
+		if (!isascii(*p) || (!isprint(*p) && !isspace(*p)))
+		{
+			arc_error(msg,
+			          "invalid character (ASCII 0x%02x at offset %d) in %s data",
+			          *p, p - hcopy, settype);
+			set->set_bad = TRUE;
+			return ARC_STAT_SYNTAX;
+		}
+
+		switch (state)
+		{
+		  case 0:				/* before param */
+			if (isspace(*p))
+			{
+				continue;
+			}
+			else if (isalnum(*p))
+			{
+				param = p;
+				state = 1;
+			}
+			else
+			{
+				arc_error(msg,
+				          "syntax error in %s data (ASCII 0x%02x at offset %d)",
+				          settype, *p, p - hcopy);
+				set->set_bad = TRUE;
+				return ARC_STAT_SYNTAX;
+			}
+			break;
+
+		  case 1:				/* in param */
+			if (isspace(*p))
+			{
+				spaced = TRUE;
+			}
+			else if (*p == '=')
+			{
+				*p = '\0';
+				state = 2;
+				spaced = FALSE;
+			}
+			else if (*p == ';' || spaced)
+			{
+				arc_error(msg,
+				          "syntax error in %s data (ASCII 0x%02x at offset %d)",
+				          settype, *p, p - hcopy);
+				set->set_bad = TRUE;
+				return ARC_STAT_SYNTAX;
+			}
+			break;
+
+		  case 2:				/* before value */
+			if (isspace(*p))
+			{
+				continue;
+			}
+			else if (*p == ';')		/* empty value */
+			{
+				*p = '\0';
+				value = p;
+
+				/* collapse the parameter */
+				arc_collapse(param);
+
+				/* create the ARC_PLIST entry */
+				status = arc_add_plist(msg, set, param,
+				                       value, TRUE);
+				if (status == -1)
+				{
+					set->set_bad = TRUE;
+					return ARC_STAT_INTERNAL;
+				}
+
+				/* reset */
+				param = NULL;
+				value = NULL;
+				state = 0;
+			}
+			else
+			{
+				value = p;
+				state = 3;
+			}
+			break;
+
+		  case 3:				/* in value */
+			if (*p == ';')
+			{
+				*p = '\0';
+
+				/* collapse the parameter and value */
+				arc_collapse(param);
+				arc_collapse(value);
+
+				/* create the ARC_PLIST entry */
+				status = arc_add_plist(msg, set, param,
+				                       value, TRUE);
+				if (status == -1)
+				{
+					set->set_bad = TRUE;
+					return ARC_STAT_INTERNAL;
+				}
+
+				/* reset */
+				param = NULL;
+				value = NULL;
+				state = 0;
+			}
+			break;
+
+		  default:				/* shouldn't happen */
+			assert(0);
+		}
+	}
+
+	switch (state)
+	{
+	  case 0:					/* before param */
+	  case 3:					/* in value */
+		/* parse the data found, if any */
+		if (value != NULL)
+		{
+			/* collapse the parameter and value */
+			arc_collapse(param);
+			arc_collapse(value);
+
+			/* create the ARC_PLIST entry */
+			status = arc_add_plist(msg, set, param, value, TRUE);
+			if (status == -1)
+			{
+				set->set_bad = TRUE;
+				return ARC_STAT_INTERNAL;
+			}
+		}
+		break;
+
+	  case 2:					/* before value */
+		/* create an empty ARC_PLIST entry */
+		status = arc_add_plist(msg, set, param, (u_char *) "", TRUE);
+		if (status == -1)
+		{
+			set->set_bad = TRUE;
+			return ARC_STAT_INTERNAL;
+		}
+		break;
+
+	  case 1:					/* after param */
+		arc_error(msg, "tag without value at end of %s data",
+		          settype);
+		set->set_bad = TRUE;
+		return ARC_STAT_SYNTAX;
+
+	  default:					/* shouldn't happen */
+		assert(0);
+	}
+
+	/* load up defaults, assert requirements */
+	switch (set->set_type)
+	{
+	  case ARC_KVSETTYPE_SIGNATURE:
+		/* make sure required stuff is here */
+		if (arc_param_get(set, (u_char *) "s") == NULL ||
+		    arc_param_get(set, (u_char *) "h") == NULL ||
+		    arc_param_get(set, (u_char *) "d") == NULL ||
+		    arc_param_get(set, (u_char *) "b") == NULL ||
+		    arc_param_get(set, (u_char *) "v") == NULL ||
+		    arc_param_get(set, (u_char *) "i") == NULL ||
+		    arc_param_get(set, (u_char *) "a") == NULL)
+		{
+			arc_error(msg, "missing parameter(s) in %s data",
+			          settype);
+			set->set_bad = TRUE;
+			return ARC_STAT_SYNTAX;
+		}
+
+		/* make sure nothing got signed that shouldn't be */
+		p = arc_param_get(set, (u_char *) "h");
+		hcopy = strdup(p);
+		if (hcopy == NULL)
+		{
+			len = strlen(p);
+			arc_error(msg, "unable to allocate %d byte(s)",
+			          len + 1);
+			set->set_bad = TRUE;
+			return ARC_STAT_INTERNAL;
+		}
+		for (p = strtok_r(hcopy, ":", &ctx);
+		     p != NULL;
+		     p = strtok_r(NULL, ":", &ctx))
+		{
+			if (strcasecmp(p, ARC_AR_HDRNAME) == 0 ||
+			    strcasecmp(p, ARC_MSGSIG_HDRNAME) == 0 ||
+			    strcasecmp(p, ARC_SEAL_HDRNAME) == 0)
+			{
+				arc_error(msg, "ARC-Message-Signature signs %s",
+				          p);
+				set->set_bad = TRUE;
+				return ARC_STAT_INTERNAL;
+			}
+		}
+
+		/* test validity of "t", "x", and "i" */
+		if (!arc_check_uint(arc_param_get(set, (u_char *) "t")))
+		{
+			arc_error(msg,
+			          "invalid \"t\" value in %s data",
+			          settype);
+			set->set_bad = TRUE;
+			return ARC_STAT_SYNTAX;
+		}
+
+		if (!arc_check_uint(arc_param_get(set, (u_char *) "x")))
+		{
+			arc_error(msg,
+			          "invalid \"x\" value in %s data",
+			          settype);
+			set->set_bad = TRUE;
+			return ARC_STAT_SYNTAX;
+		}
+
+		if (!arc_check_uint(arc_param_get(set, (u_char *) "i")))
+		{
+			arc_error(msg,
+			          "invalid \"i\" value in %s data",
+			          settype);
+			set->set_bad = TRUE;
+			return ARC_STAT_SYNTAX;
+		}
+
+		/* default for "q" */
+		status = arc_add_plist(msg, set, (u_char *) "q",
+		                       (u_char *) "dns/txt", FALSE);
+		if (status == -1)
+		{
+			set->set_bad = TRUE;
+			return ARC_STAT_INTERNAL;
+		}
+
+  		break;
+
+	  case ARC_KVSETTYPE_KEY:
+		status = arc_add_plist(msg, set, (u_char *) "k",
+		                       (u_char *) "rsa", FALSE);
+		if (status == -1)
+		{
+			set->set_bad = TRUE;
+			return ARC_STAT_INTERNAL;
+		}
+
+		break;
+			
+	  default:
+		assert(0);
+	}
+
+	return ARC_STAT_OK;
 }
 
 /*
@@ -494,22 +1047,228 @@ arc_header_field(ARC_MESSAGE *msg, u_char *hdr, size_t hlen)
 }
 
 /*
-**  ARC_EOH -- declare no more headers are coming
+**  ARC_EOH -- declare no more header fields are coming
 **
 **  Parameters:
 **  	msg -- message handle
 **
 **  Return value:
 **  	An ARC_STAT_* constant.
-**
-**  Notes:
-**  	This can probably be merged with arc_eom().
 */
 
 ARC_STAT
 arc_eoh(ARC_MESSAGE *msg)
 {
+	u_int c;
+	u_int n;
+	u_int nsets = 0;
+	ARC_STAT status;
+	struct arc_hdrfield *h;
+	ARC_KVSET *set;
+	u_int *sets = NULL;
+	u_char *inst;
+
+	/*
+	**  Process all the header fields that make up ARC sets.
+	*/
+
+	for (h = msg->arc_hhead; h != NULL; h = h->hdr_next)
+	{
+		char hnbuf[ARC_MAXHEADER + 1];
+
+		memset(hnbuf, '\0', sizeof hnbuf);
+		strncpy(hnbuf, h->hdr_text, h->hdr_namelen);
+		if (strcasecmp(hnbuf, ARC_AR_HDRNAME) == 0 ||
+		    strcasecmp(hnbuf, ARC_MSGSIG_HDRNAME) == 0 ||
+		    strcasecmp(hnbuf, ARC_SEAL_HDRNAME) == 0)
+		{
+			arc_kvsettype_t kvtype;
+
+			kvtype = arc_name_to_code(archdrnames, hnbuf);
+			status = arc_process_set(msg, kvtype,
+			                         h->hdr_colon + 1,
+			                         h->hdr_textlen - h->hdr_namelen - 1);
+			if (status != ARC_STAT_OK)
+				return status;
+		}
+	}
+
+	/*
+	**  Ensure all sets are complete.
+	*/
+
+	/* walk the seals */
+	for (set = arc_set_first(msg, ARC_KVSETTYPE_SEAL);
+             set != NULL;
+             set = arc_set_next(set, ARC_KVSETTYPE_SEAL))
+	{
+		inst = arc_param_get(set, "i");
+		n = strtoul(inst, NULL, 10);
+		if (n >= nsets)
+		{
+			u_int *newsets;
+
+			if (nsets == 0)
+			{
+				newsets = (u_int *) malloc(n * sizeof(u_int));
+			}
+			else
+			{
+				newsets = (u_int *) realloc(sets,
+				                            n * sizeof(u_int));
+			}
+
+			if (newsets == NULL)
+			{
+				arc_error(msg,
+				          "unable to allocate %d byte(s)",
+				          n * sizeof(u_int));
+				if (sets != NULL)
+					free(sets);
+				return ARC_STAT_NORESOURCE;
+			}
+
+			memset(&newsets[n], '\0', (n + 1) * sizeof(u_int));
+			nsets = n;
+			sets = newsets;
+			sets[n - 1] = 1;
+		}
+		else
+		{
+			if (sets[n - 1] != 0)
+			{
+				arc_error(msg,
+				          "duplicate ARC seal at instance %u",
+				          n);
+				msg->arc_sigerror = ARC_SIGERROR_DUPINSTANCE;
+				free(sets);
+				return ARC_STAT_SYNTAX;
+			}
+
+			sets[n - 1] = 1;
+		}
+	}
+
+	/* ensure there's a complete sequence */
+	for (c = 0; c < n; c++)
+	{
+		if (sets[c] == 0)
+		{
+			arc_error(msg, "ARC seal gap at instance %u", c + 1);
+			free(sets);
+			return ARC_STAT_SYNTAX;
+		}
+	}
+
+	/* make sure all the seals have signatures */
+	memset(sets, '\0', nsets * sizeof(u_int));
+	for (set = arc_set_first(msg, ARC_KVSETTYPE_SIGNATURE);
+             set != NULL;
+             set = arc_set_next(set, ARC_KVSETTYPE_SIGNATURE))
+	{
+		inst = arc_param_get(set, "i");
+		n = strtoul(inst, NULL, 10);
+		if (n > nsets)
+		{
+			arc_error(msg,
+			          "ARC signature instance %u out of range",
+			          n);
+			free(sets);
+			return ARC_STAT_SYNTAX;
+		}
+
+		if (sets[n] == 1)
+		{
+			arc_error(msg,
+			          "duplicate ARC signature at instance %u",
+			          n);
+			free(sets);
+			return ARC_STAT_SYNTAX;
+		}
+
+		sets[n] = 1;
+	}
+
+	for (c = 0; c < n; c++)
+	{
+		if (sets[c] == 0)
+		{
+			arc_error(msg, "ARC signature gap at instance %u",
+			          c + 1);
+			free(sets);
+			return ARC_STAT_SYNTAX;
+		}
+	}
+
+	/* make sure all the seals have A-Rs */
+	memset(sets, '\0', nsets * sizeof(u_int));
+	for (set = arc_set_first(msg, ARC_KVSETTYPE_AR);
+             set != NULL;
+             set = arc_set_next(set, ARC_KVSETTYPE_AR))
+	{
+		inst = arc_param_get(set, "i");
+		n = strtoul(inst, NULL, 10);
+		if (n > nsets)
+		{
+			arc_error(msg,
+			          "ARC authentication results instance %u out of range",
+			          n);
+			free(sets);
+			return ARC_STAT_SYNTAX;
+		}
+
+		if (sets[n] == 1)
+		{
+			arc_error(msg,
+			          "duplicate ARC authentication results at instance %u",
+			          n);
+			free(sets);
+			return ARC_STAT_SYNTAX;
+		}
+
+		sets[n] = 1;
+	}
+
+	for (c = 0; c < n; c++)
+	{
+		if (sets[c] == 0)
+		{
+			arc_error(msg,
+			          "ARC authentication results gap at instance %u",
+			          c + 1);
+			free(sets);
+			return ARC_STAT_SYNTAX;
+		}
+	}
+
+	/* ...finally! */
 	return ARC_STAT_OK;
+}
+
+/*
+**  ARC_BODY -- process a body chunk
+**
+**  Parameters:
+**  	msg -- an ARC message handle
+**  	buf -- the body chunk to be processed, in canonical format
+**  	len -- number of bytes to process starting at "buf"
+**
+**  Return value:
+**  	A ARC_STAT_* constant.
+*/
+
+ARC_STAT
+arc_body (ARC_MESSAGE *msg, u_char *buf, size_t len)
+{
+	assert(msg != NULL);
+	assert(buf != NULL);
+
+	if (msg->arc_state > ARC_STATE_BODY ||
+	    msg->arc_state < ARC_STATE_EOH)
+		return ARC_STAT_INVALID;
+	msg->arc_state = ARC_STATE_BODY;
+
+	return arc_canon_bodychunk(msg, buf, len);
 }
 
 /*
@@ -615,4 +1374,30 @@ uint64_t
 arc_ssl_version(void)
 {
 	return 0;
+}
+
+/*
+**  ARC_LIBFEATURE -- determine whether or not a particular library feature
+**                    is actually available
+**
+**  Parameters:
+**  	lib -- library handle
+**  	fc -- feature code to check
+**
+**  Return value:
+**  	TRUE iff the specified feature was compiled in
+*/
+
+_Bool
+arc_libfeature(ARC_LIB *lib, u_int fc)
+{
+	u_int idx;
+	u_int offset;
+
+	idx = fc / (8 * sizeof(int));
+	offset = fc % (8 * sizeof(int));
+
+	if (idx > lib->arcl_flsize)
+		return FALSE;
+	return ((lib->arcl_flist[idx] & (1 << offset)) != 0);
 }

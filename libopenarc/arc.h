@@ -76,6 +76,62 @@ typedef int ARC_STAT;
 #define	ARC_STAT_SIGGEN		13	/* seal generation failed */
 
 /*
+**  ARC_SIGERROR -- signature errors
+*/
+
+typedef int ARC_SIGERROR;
+
+#define ARC_SIGERROR_UNKNOWN		(-1)	/* unknown error */
+#define ARC_SIGERROR_OK			0	/* no error */
+#define ARC_SIGERROR_VERSION		1	/* unsupported version */
+#define ARC_SIGERROR_DOMAIN		2	/* invalid domain (d=/i=) */
+#define ARC_SIGERROR_EXPIRED		3	/* signature expired */
+#define ARC_SIGERROR_FUTURE		4	/* signature in the future */
+#define ARC_SIGERROR_TIMESTAMPS		5	/* x= < t= */
+#define ARC_SIGERROR_UNUSED		6	/* OBSOLETE */
+#define ARC_SIGERROR_INVALID_HC		7	/* c= invalid (header) */
+#define ARC_SIGERROR_INVALID_BC		8	/* c= invalid (body) */
+#define ARC_SIGERROR_MISSING_A		9	/* a= missing */
+#define ARC_SIGERROR_INVALID_A		10	/* a= invalid */
+#define ARC_SIGERROR_MISSING_H		11	/* h= missing */
+#define ARC_SIGERROR_INVALID_L		12	/* l= invalid */
+#define ARC_SIGERROR_INVALID_Q		13	/* q= invalid */
+#define ARC_SIGERROR_INVALID_QO		14	/* q= option invalid */
+#define ARC_SIGERROR_MISSING_D		15	/* d= missing */
+#define ARC_SIGERROR_EMPTY_D		16	/* d= empty */
+#define ARC_SIGERROR_MISSING_S		17	/* s= missing */
+#define ARC_SIGERROR_EMPTY_S		18	/* s= empty */
+#define ARC_SIGERROR_MISSING_B		19	/* b= missing */
+#define ARC_SIGERROR_EMPTY_B		20	/* b= empty */
+#define ARC_SIGERROR_CORRUPT_B		21	/* b= corrupt */
+#define ARC_SIGERROR_NOKEY		22	/* no key found in DNS */
+#define ARC_SIGERROR_DNSSYNTAX		23	/* DNS reply corrupt */
+#define ARC_SIGERROR_KEYFAIL		24	/* DNS query failed */
+#define ARC_SIGERROR_MISSING_BH		25	/* bh= missing */
+#define ARC_SIGERROR_EMPTY_BH		26	/* bh= empty */
+#define ARC_SIGERROR_CORRUPT_BH		27	/* bh= corrupt */
+#define ARC_SIGERROR_BADSIG		28	/* signature mismatch */
+#define ARC_SIGERROR_SUBDOMAIN		29	/* unauthorized subdomain */
+#define ARC_SIGERROR_MULTIREPLY		30	/* multiple records returned */
+#define ARC_SIGERROR_EMPTY_H		31	/* h= empty */
+#define ARC_SIGERROR_INVALID_H		32	/* h= missing req'd entries */
+#define ARC_SIGERROR_TOOLARGE_L		33	/* l= value exceeds body size */
+#define ARC_SIGERROR_MBSFAILED		34	/* "must be signed" failure */
+#define	ARC_SIGERROR_KEYVERSION		35	/* unknown key version */
+#define	ARC_SIGERROR_KEYUNKNOWNHASH	36	/* unknown key hash */
+#define	ARC_SIGERROR_KEYHASHMISMATCH	37	/* sig-key hash mismatch */
+#define	ARC_SIGERROR_NOTEMAILKEY	38	/* not an e-mail key */
+#define	ARC_SIGERROR_UNUSED2		39	/* OBSOLETE */
+#define	ARC_SIGERROR_KEYTYPEMISSING	40	/* key type missing */
+#define	ARC_SIGERROR_KEYTYPEUNKNOWN	41	/* key type unknown */
+#define	ARC_SIGERROR_KEYREVOKED		42	/* key revoked */
+#define	ARC_SIGERROR_KEYDECODE		43	/* key couldn't be decoded */
+#define	ARC_SIGERROR_MISSING_V		44	/* v= tag missing */
+#define	ARC_SIGERROR_EMPTY_V		45	/* v= tag empty */
+#define	ARC_SIGERROR_KEYTOOSMALL	46	/* too few key bits */
+#define	ARC_SIGERROR_DUPINSTANCE	47	/* duplicate instance */
+
+/*
 **  ARC_SIGN -- signing method
 */
 
@@ -132,6 +188,13 @@ typedef int arc_opts_t;
 
 struct arc_lib;
 typedef struct arc_lib ARC_LIB;
+
+/* LIBRARY FEATURES */
+#define	ARC_FEATURE_SHA256	1
+
+#define	ARC_FEATURE_MAX		1
+
+extern _Bool arc_libfeature __P((ARC_LIB *lib, u_int fc));
 
 /*
 **  ARC_MESSAGE -- ARC message context
@@ -272,6 +335,20 @@ ARC_STAT arc_header_field(ARC_MESSAGE *, u_char *, size_t);
 */
 
 ARC_STAT arc_eoh(ARC_MESSAGE *);
+
+/*
+**  ARC_BODY -- process a body chunk
+**
+**  Parameters:
+**  	msg -- an ARC message handle
+**  	buf -- the body chunk to be processed, in canonical format
+**  	len -- number of bytes to process starting at "buf"
+**
+**  Return value:
+**  	A ARC_STAT_* constant.
+*/
+
+extern ARC_STAT arc_body __P((ARC_MESSAGE *msg, u_char *buf, size_t len));
 
 /*
 **  ARC_EOM -- declare end of message

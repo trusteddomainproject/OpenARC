@@ -66,4 +66,60 @@
 /* defaults */
 #define	DEFTMPDIR		"/tmp"	/* default temporary directory */
 
+/*
+**  ARC_KVSETTYPE -- types of key-value sets
+*/
+
+typedef int arc_kvsettype_t;
+
+#define	ARC_KVSETTYPE_ANY	(-1)
+#define	ARC_KVSETTYPE_SIGNATURE	0
+#define	ARC_KVSETTYPE_KEY	1
+#define ARC_KVSETTYPE_SEAL	2
+#define ARC_KVSETTYPE_AR	3
+#define ARC_KVSETTYPE_MAX	3	/* sentinel value */
+
+/*
+**  ARC_HASHTYPE -- types of hashes
+*/
+
+#define ARC_HASHTYPE_UNKNOWN	(-1)
+#define ARC_HASHTYPE_SHA1	0
+#define ARC_HASHTYPE_SHA256	1
+
+/*
+**  ARC_KEYTYPE -- types of keys
+*/
+
+#define	ARC_KEYTYPE_UNKNOWN	(-1)
+#define	ARC_KEYTYPE_RSA		0
+
+/*
+**  ARC_QUERY -- types of queries
+*/
+
+#define	ARC_QUERY_UNKNOWN	(-1)
+#define	ARC_QUERY_DNS		0
+
+/*
+** ARC_KVSET -- a set of parameters and values
+*/
+
+struct arc_kvset;
+typedef struct arc_kvset ARC_KVSET;
+
+/*
+**  ARC_PLIST -- a parameter/value pair, as a linked list
+*/
+
+struct arc_plist;
+typedef struct arc_plist ARC_PLIST;
+
+/*
+**  ARC_CANON -- canonicalization
+*/
+
+struct arc_canon;
+typedef struct arc_canon ARC_CANON;
+
 #endif /* ! _ARC_INTERNAL_H_ */

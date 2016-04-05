@@ -1,5 +1,4 @@
-/*
-**  Copyright (c) 2016, The Trusted Domain Project.  All rights reserved.
+/* **  Copyright (c) 2016, The Trusted Domain Project.  All rights reserved.
 */
 
 #ifndef _ARC_UTIL_H_
@@ -29,6 +28,9 @@ extern struct arc_dstring *arc_dstring_new __P((ARC_MESSAGE *, int, int));
 extern size_t arc_dstring_printf __P((struct arc_dstring *dstr, char *fmt,
                                       ...));
 
-u_char * arc_strndup(u_char *, size_t);
+extern void arc_collapse __P((u_char *));
+extern void arc_lowerhdr __P((u_char *));
+extern u_char *arc_strndup(u_char *, size_t);
+extern ARC_STAT arc_tmpfile __P((ARC_MESSAGE *, int *, _Bool));
 
 #endif /* _ARC_UTIL_H_ */

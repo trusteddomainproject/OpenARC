@@ -198,6 +198,7 @@ sfsistat mlfi_abort __P((SMFICTX *));
 sfsistat mlfi_close __P((SMFICTX *));
 sfsistat mlfi_connect __P((SMFICTX *, char *, _SOCK_ADDR *));
 sfsistat mlfi_eoh __P((SMFICTX *));
+sfsistat mlfi_body __P((SMFICTX *, u_char *, size_t));
 sfsistat mlfi_eom __P((SMFICTX *));
 sfsistat mlfi_header __P((SMFICTX *, char *, char *));
 sfsistat mlfi_negotiate __P((SMFICTX *, unsigned long, unsigned long,
@@ -2105,7 +2106,6 @@ mlfi_negotiate(SMFICTX *ctx,
 	unsigned long protosteps = (SMFIP_NOHELO |
 	                            SMFIP_NOMAIL |
 	                            SMFIP_NORCPT |
-	                            SMFIP_NOBODY |
 	                            SMFIP_NOUNKNOWN |
 	                            SMFIP_NODATA |
 	                            SMFIP_SKIP );
@@ -2660,6 +2660,65 @@ mlfi_eoh(SMFICTX *ctx)
 			syslog(LOG_INFO,
 			       "%s: error processing at end of header",
 			       afc->mctx_jobid);
+		}
+
+		return SMFIS_TEMPFAIL;
+	}
+
+	return SMFIS_CONTINUE;
+}
+
+/*
+**  MLFI_BODY -- handler for an arbitrary body block
+**
+**  Parameters:
+**  	ctx -- milter context
+**  	bodyp -- body block
+**  	bodylen -- amount of data available at bodyp
+**
+**  Return value:
+**  	An SMFIS_* constant.
+**
+**  Description:
+**  	This function reads the body chunks passed by the MTA and
+**  	stores them for later wrapping, if needed.
+*/
+
+sfsistat
+mlfi_body(SMFICTX *ctx, u_char *bodyp, size_t bodylen)
+{
+	int status;
+	msgctx afc;
+	connctx cc;
+	struct arcf_config *conf;
+
+	assert(ctx != NULL);
+	assert(bodyp != NULL);
+
+	cc = (connctx) smfi_getpriv(ctx);
+	assert(cc != NULL);
+	afc = cc->cctx_msg;
+	assert(afc != NULL);
+	conf = cc->cctx_config;
+
+	/*
+	**  No need to do anything if the body was empty.
+	*/
+
+	if (bodylen == 0)
+		return SMFIS_CONTINUE;
+
+	if (afc->mctx_arcmsg != NULL)
+	{
+		status = arc_body(afc->mctx_arcmsg, bodyp, bodylen);
+		if (status != ARC_STAT_OK)
+		{
+			if (conf->conf_dolog)
+			{
+				syslog(LOG_INFO,
+				       "%s: error processing body chunk",
+				       afc->mctx_jobid);
+			}
 		}
 
 		return SMFIS_TEMPFAIL;

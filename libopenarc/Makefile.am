@@ -8,7 +8,7 @@ endif
 LDADD = ./libopenarc.la
 
 lib_LTLIBRARIES = libopenarc.la
-libopenarc_la_SOURCES = base64.c arc.c arc.h arc-internal.h arc-types.h arc-util.c arc-util.h
+libopenarc_la_SOURCES = base64.c arc.c arc.h arc-canon.c arc-canon.h arc-internal.h arc-tables.c arc-tables.h arc-types.h arc-util.c arc-util.h
 libopenarc_la_CPPFLAGS = $(LIBCRYPTO_CPPFLAGS)
 libopenarc_la_CFLAGS = $(LIBCRYPTO_INCDIRS) $(LIBOPENARC_INC)
 libopenarc_la_LDFLAGS = -no-undefined  $(LIBCRYPTO_LIBDIRS) -version-info $(LIBOPENARC_VERSION_INFO)

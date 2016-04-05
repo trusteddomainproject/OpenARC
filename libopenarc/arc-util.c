@@ -19,6 +19,7 @@
 #include <string.h>
 #include <errno.h>
 #include <stdio.h>
+#include <ctype.h>
 
 /* libopenarc includes */
 #include "arc-internal.h"
@@ -476,4 +477,112 @@ arc_strndup(u_char *src, size_t len)
 	}
 
 	return ret;
+}
+
+/*
+**  ARC_COLLAPSE -- remove spaces from a string
+**
+**  Parameters:
+**  	str -- string to process
+**
+**  Return value:
+**  	None.
+*/
+
+void
+arc_collapse(u_char *str)
+{
+	u_char *q;
+	u_char *r;
+
+	assert(str != NULL);
+
+	for (q = str, r = str; *q != '\0'; q++)
+	{
+		if (!isspace(*q))
+		{
+			if (q != r)
+				*r = *q;
+			r++;
+		}
+	}
+
+	*r = '\0';
+}
+
+/*
+**  ARC_LOWERHDR -- convert a string (presumably a header) to all lowercase,
+**                  but only up to a colon
+**
+**  Parameters:
+**  	str -- string to modify
+**
+**  Return value:
+**  	None.
+*/
+
+void
+arc_lowerhdr(unsigned char *str)
+{
+	unsigned char *p;
+
+	assert(str != NULL);
+
+	for (p = str; *p != '\0'; p++)
+	{
+		if (*p == ':')
+			return;
+
+		if (isascii(*p) && isupper(*p))
+			*p = tolower(*p);
+	}
+}
+
+/*
+**  ARC_TMPFILE -- open a temporary file
+**
+**  Parameters:
+**  	msg -- ARC_MESSAGE handle
+**  	fp -- descriptor (returned)
+**  	keep -- if FALSE, unlink() the file once created
+**
+**  Return value:
+**  	An ARC_STAT_* constant.
+*/
+
+ARC_STAT
+arc_tmpfile(ARC_MESSAGE *msg, int *fp, _Bool keep)
+{
+	int fd;
+	char *p;
+	char path[MAXPATHLEN + 1];
+
+	assert(msg != NULL);
+	assert(fp != NULL);
+
+	snprintf(path, MAXPATHLEN, "%s/dkim.XXXXXX",
+	         msg->arc_library->arcl_tmpdir);
+
+	for (p = path + strlen((char *) msg->arc_library->arcl_tmpdir) + 1;
+	     *p != '\0';
+	     p++)
+	{
+		if (*p == '/')
+			*p = '.';
+	}
+
+	fd = mkstemp(path);
+	if (fd == -1)
+	{
+		arc_error(msg, "can't create temporary file at %s: %s",
+		          path, strerror(errno));
+		return ARC_STAT_NORESOURCE;
+	}
+
+	*fp = fd;
+
+	if (!keep)
+		(void) unlink(path);
+
+	return ARC_STAT_OK;
 }
