@@ -8,6 +8,9 @@
 /* system includes */
 #include <sys/param.h>
 #include <sys/types.h>
+#include <arpa/inet.h>
+#include <arpa/nameser.h>
+#include <netinet/in.h>
 #ifdef HAVE_STDBOOL_H
 # include <stdbool.h>
 #endif /* HAVE_STDBOOL_H */
@@ -19,12 +22,20 @@
 #include <string.h>
 #include <errno.h>
 #include <stdio.h>
+#include <netdb.h>
+#include <resolv.h>
 #include <ctype.h>
 
 /* libopenarc includes */
 #include "arc-internal.h"
 #include "arc-types.h"
 #include "arc-util.h"
+
+#if defined(__RES) && (__RES >= 19940415)
+# define RES_UNC_T		char *
+#else /* __RES && __RES >= 19940415 */
+# define RES_UNC_T		unsigned char *
+#endif /* __RES && __RES >= 19940415 */
 
 /* prototypes */
 extern void arc_error __P((ARC_MESSAGE *, const char *, ...));
@@ -586,3 +597,199 @@ arc_tmpfile(ARC_MESSAGE *msg, int *fp, _Bool keep)
 
 	return ARC_STAT_OK;
 }
+
+/*
+**  ARC_MIN_TIMEVAL -- determine the timeout to apply before reaching
+**                     one of two timevals
+**
+**  Parameters:
+**  	t1 -- first timeout (absolute)
+**  	t2 -- second timeout (absolute) (may be NULL)
+**  	t -- final timeout (relative)
+**  	which -- which of t1 and t2 hit first
+**
+**  Return value:
+**  	None.
+*/
+
+void
+arc_min_timeval(struct timeval *t1, struct timeval *t2, struct timeval *t,
+                struct timeval **which)
+{
+	struct timeval *next;
+	struct timeval now;
+
+	assert(t1 != NULL);
+	assert(t != NULL);
+
+	if (t2 == NULL ||
+	    t2->tv_sec > t1->tv_sec ||
+	    (t2->tv_sec == t1->tv_sec && t2->tv_usec > t1->tv_usec))
+		next = t1;
+	else
+		next = t2;
+
+	(void) gettimeofday(&now, NULL);
+
+	if (next->tv_sec < now.tv_sec ||
+	    (next->tv_sec == now.tv_sec && next->tv_usec < now.tv_usec))
+	{
+		t->tv_sec = 0;
+		t->tv_usec = 0;
+	}
+	else
+	{
+		t->tv_sec = next->tv_sec - now.tv_sec;
+		if (next->tv_usec < now.tv_usec)
+		{
+			t->tv_sec--;
+			t->tv_usec = next->tv_usec - now.tv_usec + 1000000;
+		}
+		else
+		{
+			t->tv_usec = next->tv_usec - now.tv_usec;
+		}
+	}
+
+	if (which != NULL)
+		*which = next;
+}
+
+/*
+**  ARC_CHECK_DNS_REPLY -- see if a DNS reply is truncated or corrupt
+**
+**  Parameters:
+**  	ansbuf -- answer buffer
+**  	anslen -- number of bytes returned
+**  	xclass -- expected class
+**  	xtype -- expected type
+**
+**  Return value:
+**  	2 -- reply not usable
+**  	1 -- reply truncated but usable
+**  	0 -- reply intact (but may not be what you want)
+**  	-1 -- other error
+*/
+
+int
+arc_check_dns_reply(unsigned char *ansbuf, size_t anslen,
+                    int xclass, int xtype)
+{
+	_Bool trunc = FALSE;
+	int qdcount;
+	int ancount;
+	int n;
+	uint16_t type = (uint16_t) -1;
+	uint16_t class = (uint16_t) -1;
+	unsigned char *cp;
+	unsigned char *eom;
+	HEADER hdr;
+	unsigned char name[ARC_MAXHOSTNAMELEN + 1];
+
+	assert(ansbuf != NULL);
+
+	/* set up pointers */
+	memcpy(&hdr, ansbuf, sizeof hdr);
+	cp = ansbuf + HFIXEDSZ;
+	eom = ansbuf + anslen;
+
+	/* skip over the name at the front of the answer */
+	for (qdcount = ntohs((unsigned short) hdr.qdcount);
+	     qdcount > 0;
+	     qdcount--)
+	{
+		/* copy it first */
+		(void) dn_expand((unsigned char *) ansbuf, eom, cp,
+		                 (RES_UNC_T) name, sizeof name);
+
+		if ((n = dn_skipname(cp, eom)) < 0)
+			return 2;
+
+		cp += n;
+
+		/* extract the type and class */
+		if (cp + INT16SZ + INT16SZ > eom)
+			return 2;
+
+		GETSHORT(type, cp);
+		GETSHORT(class, cp);
+	}
+
+	if (type != xtype || class != xclass)
+		return 0;
+
+	/* if NXDOMAIN, return DKIM_STAT_NOKEY */
+	if (hdr.rcode == NXDOMAIN)
+		return 0;
+
+	/* if truncated, we can't do it */
+	if (hdr.tc)
+		trunc = TRUE;
+
+	/* get the answer count */
+	ancount = ntohs((unsigned short) hdr.ancount);
+	if (ancount == 0)
+		return (trunc ? 2 : 0);
+
+	/*
+	**  Extract the data from the first TXT answer.
+	*/
+
+	while (--ancount >= 0 && cp < eom)
+	{
+		/* grab the label, even though we know what we asked... */
+		if ((n = dn_expand((unsigned char *) ansbuf, eom, cp,
+		                   (RES_UNC_T) name, sizeof name)) < 0)
+			return 2;
+
+		/* ...and move past it */
+		cp += n;
+
+		/* extract the type and class */
+		if (cp + INT16SZ + INT16SZ + INT32SZ > eom)
+			return 2;
+
+		GETSHORT(type, cp);
+		cp += INT16SZ; /* class */
+		cp += INT32SZ; /* ttl */
+
+		/* skip CNAME if found; assume it was resolved */
+		if (type == T_CNAME)
+		{
+			if ((n = dn_expand((u_char *) ansbuf, eom, cp,
+			                   (RES_UNC_T) name, sizeof name)) < 0)
+				return 2;
+
+			cp += n;
+			continue;
+		}
+		else if (type != xtype)
+		{
+			return (trunc ? 1 : 0);
+		}
+
+		/* found a record we can use; break */
+		break;
+	}
+
+	/* if ancount went below 0, there were no good records */
+	if (ancount < 0)
+		return (trunc ? 1 : 0);
+
+	/* get payload length */
+	if (cp + INT16SZ > eom)
+		return 2;
+
+	GETSHORT(n, cp);
+
+	/*
+	**  XXX -- maybe deal with a partial reply rather than require
+	**  	   it all
+	*/
+
+	if (cp + n > eom)
+		return 2;
+
+	return (trunc ? 1 : 0);
+}
+

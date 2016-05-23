@@ -113,13 +113,16 @@ struct arc_canon
 /* struct arc_msghandle -- a complete ARC transaction context */
 struct arc_msghandle
 {
-	u_char *		arc_domain;
-	u_char *		arc_selector;
 	u_char *		arc_key;
 	u_char *		arc_error;
 	u_char *		arc_hdrlist;
+	u_char *		arc_domain;
+	u_char *		arc_selector;
+	int			arc_dnssec_key;
 	u_int			arc_state;
 	u_int			arc_hdrcnt;
+	u_int			arc_timeout;
+	arc_query_t		arc_query;
 	size_t			arc_keylen;
 	size_t			arc_errorlen;
 	ssize_t			arc_bodylen;
@@ -135,6 +138,7 @@ struct arc_msghandle
 	struct arc_kvset *	arc_kvsethead;
 	struct arc_kvset *	arc_kvsettail;
 	ARC_LIB *		arc_library;
+	const void *		arc_user_context;
 };
 
 /* struct arc_lib -- a ARC library context */
@@ -144,7 +148,25 @@ struct arc_lib
 	uint32_t		arcl_flags;
 	u_int *			arcl_flist;
 	struct arc_dstring *	arcl_sslerrbuf;
+	u_int			arcl_callback_int;
+	void			(*arcl_dns_callback) (const void *context);
+	void			*arcl_dns_service;
+	int			(*arcl_dns_init) (void **srv);
+	void			(*arcl_dns_close) (void *srv);
+	int			(*arcl_dns_start) (void *srv, int type,
+				                   unsigned char *query,
+				                   unsigned char *buf,
+				                   size_t buflen,
+				                   void **qh);
+	int			(*arcl_dns_cancel) (void *srv, void *qh);
+	int			(*arcl_dns_waitreply) (void *srv,
+				                       void *qh,
+				                       struct timeval *to,
+				                       size_t *bytes,
+				                       int *error,
+				                       int *dnssec);
 	u_char			arcl_tmpdir[MAXPATHLEN + 1];
+	u_char			arcl_queryinfo[MAXPATHLEN + 1];
 };
 
 #endif /* _ARC_TYPES_H_ */

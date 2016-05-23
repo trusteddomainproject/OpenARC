@@ -131,6 +131,13 @@ typedef int ARC_SIGERROR;
 #define	ARC_SIGERROR_KEYTOOSMALL	46	/* too few key bits */
 #define	ARC_SIGERROR_DUPINSTANCE	47	/* duplicate instance */
 
+/* generic DNS error codes */
+#define	ARC_DNS_ERROR		(-1)		/* error in transit */
+#define	ARC_DNS_SUCCESS		0		/* reply available */
+#define	ARC_DNS_NOREPLY		1		/* reply not available (yet) */
+#define	ARC_DNS_EXPIRED		2		/* no reply, query expired */
+#define	ARC_DNS_INVALID		3		/* invalid request */
+
 /*
 **  ARC_SIGN -- signing method
 */
@@ -141,6 +148,18 @@ typedef int arc_alg_t;
 #define ARC_SIGN_DEFAULT	(-1)	/* use internal default */
 #define ARC_SIGN_RSASHA1	0	/* an RSA-signed SHA1 digest */
 #define ARC_SIGN_RSASHA256	1	/* an RSA-signed SHA256 digest */
+
+/*
+**  ARC_QUERY -- key query method
+*/
+
+typedef int arc_query_t;
+
+#define ARC_QUERY_UNKNOWN	(-1)	/* unknown method */
+#define ARC_QUERY_DNS		0	/* DNS query method (per the draft) */
+#define ARC_QUERY_FILE		1	/* text file method (for testing) */
+
+#define ARC_QUERY_DEFAULT	ARC_QUERY_DNS
 
 /*
 **  ARC_PARAM -- known signature parameters
@@ -181,6 +200,15 @@ typedef int arc_opts_t;
 
 /* default */
 #define	ARC_LIBFLAGS_DEFAULT		ARC_LIBFLAGS_NONE
+
+/*
+**  ARC_DNSSEC -- results of DNSSEC queries
+*/
+
+#define ARC_DNSSEC_UNKNOWN	(-1)
+#define ARC_DNSSEC_BOGUS	0
+#define ARC_DNSSEC_INSECURE	1
+#define ARC_DNSSEC_SECURE	2
 
 /*
 **  ARC_LIB -- library handle
