@@ -57,6 +57,16 @@ static struct nametable prv_querytypes[] =	/* query types */
 };
 struct nametable *querytypes = prv_querytypes;
 
+static struct nametable prv_chainstatus[] =	/* chain status */
+{
+	{ "none",	ARC_CHAIN_NONE },
+	{ "fail",	ARC_CHAIN_FAIL },
+	{ "pass",	ARC_CHAIN_PASS },
+	{ "unknown",	ARC_CHAIN_UNKNOWN },
+	{ NULL,		-1 },
+};
+struct nametable *chainstatus = prv_chainstatus;
+
 static struct nametable prv_results[] =		/* result codes */
 {
 	{ "Success",			ARC_STAT_OK },

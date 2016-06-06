@@ -1242,6 +1242,7 @@ arc_eoh(ARC_MESSAGE *msg)
 	}
 
 	/* ...finally! */
+	msg->arc_nsets = nsets;
 	return ARC_STAT_OK;
 }
 
@@ -1284,6 +1285,64 @@ arc_body (ARC_MESSAGE *msg, u_char *buf, size_t len)
 ARC_STAT
 arc_eom(ARC_MESSAGE *msg)
 {
+	ARC_CHAIN cstate = ARC_CHAIN_UNKNOWN;
+
+	/* verify */
+	if (msg->arc_nsets == 0)
+	{
+		cstate = ARC_CHAIN_NONE;
+	}
+	else
+	{
+		u_int set;
+
+		if (arc_validate(msg, msg->arc_nsets - 1) == ARC_STAT_BADSIG)
+		{
+			cstate = ARC_CHAIN_FAIL;
+		}
+		else
+		{
+			u_char *inst;
+			u_char *cv;
+			ARC_KVSET *kvset;
+
+			for (set = msg->arc_nsets - 2; set >= 0; set++)
+			{
+				for (kvset = arc_set_first(msg,
+				                           ARC_KVSETTYPE_SEAL);
+				    kvset != NULL;
+				    kvset = arc_set_next(kvset,
+				                         ARC_KVSETTYPE_SEAL))
+				{
+					inst = arc_param_get(kvset, "i");
+					if (atoi(inst) == set)
+						break;
+				}
+
+				cv = arc_param_get(kvset, "cv");
+				if ((set == 0 && strcasecmp(cv, "none") == 0) ||
+				    (set != 0 && strcasecmp(cv, "pass") == 0))
+				{
+					ARC_STAT status;
+
+					status = arc_validate(msg, set);
+					if (status == ARC_STAT_BADSIG)
+					{
+						cstate = ARC_CHAIN_FAIL;
+						break;
+					}
+					else if (status != ARC_STAT_OK)
+					{
+						return status;
+					}
+				}
+			}
+		}
+
+		cstate = ARC_CHAIN_PASS;
+	}
+
+	/* sign */
 	return ARC_STAT_OK;
 }
 

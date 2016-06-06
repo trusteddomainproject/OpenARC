@@ -76,6 +76,17 @@ typedef int ARC_STAT;
 #define	ARC_STAT_SIGGEN		13	/* seal generation failed */
 
 /*
+**  ARC_CHAIN -- chain state
+*/
+
+typedef int ARC_CHAIN;
+
+#define	ARC_CHAIN_UNKNOWN	(-1)	/* unknown */
+#define	ARC_CHAIN_NONE		0	/* none */
+#define	ARC_CHAIN_FAIL		1	/* fail */
+#define	ARC_CHAIN_PASS		2	/* pass */
+
+/*
 **  ARC_SIGERROR -- signature errors
 */
 

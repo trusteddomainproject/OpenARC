@@ -30,6 +30,7 @@ struct nametable
 extern struct nametable *algorithms;
 extern struct nametable *archdrnames;
 extern struct nametable *canonicalizations;
+extern struct nametable *chainstatus;
 extern struct nametable *hashes;
 extern struct nametable *settypes;
 extern struct nametable *sigerrors;

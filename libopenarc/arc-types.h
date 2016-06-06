@@ -119,6 +119,7 @@ struct arc_msghandle
 	u_char *		arc_domain;
 	u_char *		arc_selector;
 	int			arc_dnssec_key;
+	u_int			arc_nsets;
 	u_int			arc_state;
 	u_int			arc_hdrcnt;
 	u_int			arc_timeout;
