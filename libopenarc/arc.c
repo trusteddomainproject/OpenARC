@@ -309,7 +309,7 @@ arc_getsslbuf(ARC_LIB *lib)
 **  	TRUE iff the input value looks like a properly formed unsigned integer.
 */
 
-_Bool
+static _Bool
 arc_check_uint(u_char *value)
 {
 	uint64_t tmp = 0;
@@ -511,7 +511,7 @@ arc_add_plist(ARC_MESSAGE *msg, ARC_KVSET *set, u_char *param, u_char *value,
 **  	An ARC_STAT constant.
 */
 
-ARC_STAT
+static ARC_STAT
 arc_process_set(ARC_MESSAGE *msg, arc_kvsettype_t type, u_char *str, size_t len)
 {
 	_Bool spaced;
@@ -827,6 +827,37 @@ arc_process_set(ARC_MESSAGE *msg, arc_kvsettype_t type, u_char *str, size_t len)
 		assert(0);
 	}
 
+	return ARC_STAT_OK;
+}
+
+/*
+**  ARC_VALIDATE -- validate a specific ARC seal
+**
+**  Parameters:
+**  	msg -- ARC message handle
+**  	set -- ARC set number to be validated (zero-based)
+**
+**  Return value:
+**  	An ARC_STAT_* constant.
+*/
+
+static ARC_STAT
+arc_validate(ARC_MESSAGE *msg, u_int set)
+{
+	ARC_KVSET *seal = NULL;
+	ARC_KVSET *ar = NULL;
+	ARC_KVSET *sig = NULL;
+	u_char *i;
+
+	assert(msg != NULL);
+
+	/* XXX -- set up a header canonicalization */
+	/* XXX -- for seals 1 through n-1 */
+		/* XXX -- canonicalizae AAR, AMS, AS */
+	/* XXX -- for seal n, canonicalize AAR, AMS, ASB */
+	/* XXX -- finalize and validate against n's parameters */
+
+	/* XXX -- return an ARC_STAT_* constant */
 	return ARC_STAT_OK;
 }
 
@@ -1259,7 +1290,7 @@ arc_eoh(ARC_MESSAGE *msg)
 */
 
 ARC_STAT
-arc_body (ARC_MESSAGE *msg, u_char *buf, size_t len)
+arc_body(ARC_MESSAGE *msg, u_char *buf, size_t len)
 {
 	assert(msg != NULL);
 	assert(buf != NULL);
@@ -1287,7 +1318,10 @@ arc_eom(ARC_MESSAGE *msg)
 {
 	ARC_CHAIN cstate = ARC_CHAIN_UNKNOWN;
 
-	/* verify */
+	/*
+	**  Verify the exisitng chain, if any.
+	*/
+
 	if (msg->arc_nsets == 0)
 	{
 		cstate = ARC_CHAIN_NONE;
@@ -1315,7 +1349,7 @@ arc_eom(ARC_MESSAGE *msg)
 				                         ARC_KVSETTYPE_SEAL))
 				{
 					inst = arc_param_get(kvset, "i");
-					if (atoi(inst) == set)
+					if (atoi(inst) == set + 1)
 						break;
 				}
 
@@ -1342,7 +1376,14 @@ arc_eom(ARC_MESSAGE *msg)
 		cstate = ARC_CHAIN_PASS;
 	}
 
-	/* sign */
+	/*
+	**  Generate a new signature and store it.
+	*/
+
+	/* XXX -- construct a new AAR */
+	/* XXX -- construct a new AMS */
+	/* XXX -- construct a new AS */
+
 	return ARC_STAT_OK;
 }
 
