@@ -851,13 +851,11 @@ arc_validate(ARC_MESSAGE *msg, u_int set)
 
 	assert(msg != NULL);
 
-	/* XXX -- set up a header canonicalization */
-	/* XXX -- for seals 1 through n-1 */
-		/* XXX -- canonicalizae AAR, AMS, AS */
-	/* XXX -- for seal n, canonicalize AAR, AMS, ASB */
-	/* XXX -- finalize and validate against n's parameters */
+	/* XXX -- pull the (set-1)th ARC Set */
+	/* XXX -- validate the ARC-Seal */
+	/* XXX -- validate the ARC-Message-Signature */
+	/* XXX -- return corresponding ARC_STAT_* constant */
 
-	/* XXX -- return an ARC_STAT_* constant */
 	return ARC_STAT_OK;
 }
 
@@ -1316,15 +1314,13 @@ arc_body(ARC_MESSAGE *msg, u_char *buf, size_t len)
 ARC_STAT
 arc_eom(ARC_MESSAGE *msg)
 {
-	ARC_CHAIN cstate = ARC_CHAIN_UNKNOWN;
-
 	/*
 	**  Verify the exisitng chain, if any.
 	*/
 
 	if (msg->arc_nsets == 0)
 	{
-		cstate = ARC_CHAIN_NONE;
+		msg->arc_cstate = ARC_CHAIN_NONE;
 	}
 	else
 	{
@@ -1332,7 +1328,7 @@ arc_eom(ARC_MESSAGE *msg)
 
 		if (arc_validate(msg, msg->arc_nsets - 1) == ARC_STAT_BADSIG)
 		{
-			cstate = ARC_CHAIN_FAIL;
+			msg->arc_cstate = ARC_CHAIN_FAIL;
 		}
 		else
 		{
@@ -1340,7 +1336,7 @@ arc_eom(ARC_MESSAGE *msg)
 			u_char *cv;
 			ARC_KVSET *kvset;
 
-			for (set = msg->arc_nsets - 2; set >= 0; set++)
+			for (set = msg->arc_nsets - 1; set >= 0; set++)
 			{
 				for (kvset = arc_set_first(msg,
 				                           ARC_KVSETTYPE_SEAL);
@@ -1362,7 +1358,7 @@ arc_eom(ARC_MESSAGE *msg)
 					status = arc_validate(msg, set);
 					if (status == ARC_STAT_BADSIG)
 					{
-						cstate = ARC_CHAIN_FAIL;
+						msg->arc_cstate = ARC_CHAIN_FAIL;
 						break;
 					}
 					else if (status != ARC_STAT_OK)
@@ -1373,16 +1369,8 @@ arc_eom(ARC_MESSAGE *msg)
 			}
 		}
 
-		cstate = ARC_CHAIN_PASS;
+		msg->arc_cstate = ARC_CHAIN_PASS;
 	}
-
-	/*
-	**  Generate a new signature and store it.
-	*/
-
-	/* XXX -- construct a new AAR */
-	/* XXX -- construct a new AMS */
-	/* XXX -- construct a new AS */
 
 	return ARC_STAT_OK;
 }
@@ -1406,6 +1394,14 @@ ARC_STAT
 arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *selector,
             char *domain, u_char *key, size_t keylen)
 {
+	/*
+	**  Generate a new signature and store it.
+	*/
+
+	/* XXX -- construct a new AAR */
+	/* XXX -- construct a new AMS */
+	/* XXX -- construct a new AS */
+
 	return ARC_STAT_OK;
 }
 

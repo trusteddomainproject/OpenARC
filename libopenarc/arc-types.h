@@ -127,6 +127,7 @@ struct arc_msghandle
 	size_t			arc_keylen;
 	size_t			arc_errorlen;
 	ssize_t			arc_bodylen;
+	ARC_CHAIN		arc_cstate;
 	ARC_SIGERROR		arc_sigerror;
 	struct arc_dstring *	arc_canonbuf;
 	struct arc_dstring *	arc_hdrbuf;
