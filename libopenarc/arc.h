@@ -411,6 +411,7 @@ ARC_STAT arc_eom(ARC_MESSAGE *);
 **  	domain -- domain name
 **  	key -- secret key, printable
 **  	keylen -- key length
+**  	ar -- Authentication-Results to be enshrined
 **
 **  Return value:
 **  	An ARC_STAT_* constant.
@@ -421,7 +422,7 @@ ARC_STAT arc_eom(ARC_MESSAGE *);
 */
 
 ARC_STAT arc_getseal(ARC_MESSAGE *, ARC_HDRFIELD **, char *, char *,
-                     u_char *, size_t);
+                     u_char *, size_t, u_char *);
 
 /*
 **  ARC_HDR_NAME -- extract name from an ARC_HDRFIELD

@@ -2809,11 +2809,14 @@ mlfi_eom(SMFICTX *ctx)
 
 	/*
 	**  Get the seal fields to apply.
+	** 
+	**  XXX -- the last parameter in the call to arc_getseal() should be
+	**  the combined A-R for this authserv-id.
 	*/
 
 	status = arc_getseal(afc->mctx_arcmsg, &seal, conf->conf_selector,
                              conf->conf_domain, conf->conf_keydata,
-	                     conf->conf_keylen);
+	                     conf->conf_keylen, NULL);
 	if (status != ARC_STAT_OK)
 	{
 		if (conf->conf_dolog)

@@ -919,19 +919,21 @@ arc_free(ARC_MESSAGE *msg)
 }
 
 /*
-**  ARC_HDRFIELD -- consume a header field
+**  ARC_PARSE_HEADER_FIELD -- parse a header field into an internal object
 **
 **  Parameters:
 **  	msg -- message handle
 **  	hdr -- full text of the header field
 **  	hlen -- bytes to use at hname
+**  	ret -- (returned) object, if it's good
 **
 **  Return value:
 **  	An ARC_STAT_* constant.
 */
 
-ARC_STAT
-arc_header_field(ARC_MESSAGE *msg, u_char *hdr, size_t hlen)
+static ARC_STAT
+arc_parse_header_field(ARC_MESSAGE *msg, u_char *hdr, size_t hlen,
+                       struct arc_hdrfield **ret)
 {
 	u_char *colon;
 	u_char *semicolon;
@@ -942,10 +944,6 @@ arc_header_field(ARC_MESSAGE *msg, u_char *hdr, size_t hlen)
 	assert(msg != NULL);
 	assert(hdr != NULL);
 	assert(hlen != 0);
-
-	if (msg->arc_state > ARC_STATE_HEADER)
-		return ARC_STAT_INVALID;
-	msg->arc_state = ARC_STATE_HEADER;
 
 	/* enforce RFC 5322, Section 2.2 */
 	colon = NULL;
@@ -1058,6 +1056,41 @@ arc_header_field(ARC_MESSAGE *msg, u_char *hdr, size_t hlen)
 		h->hdr_colon = h->hdr_text + (colon - hdr);
 	h->hdr_flags = 0;
 	h->hdr_next = NULL;
+
+	*ret = h;
+
+	return ARC_STAT_OK;
+}
+
+/*
+**  ARC_HEADER_FIELD -- consume a header field
+**
+**  Parameters:
+**  	msg -- message handle
+**  	hdr -- full text of the header field
+**  	hlen -- bytes to use at hname
+**
+**  Return value:
+**  	An ARC_STAT_* constant.
+*/
+
+ARC_STAT
+arc_header_field(ARC_MESSAGE *msg, u_char *hdr, size_t hlen)
+{
+	ARC_STAT status;
+	struct arc_hdrfield *h;
+
+	assert(msg != NULL);
+	assert(hdr != NULL);
+	assert(hlen != 0);
+
+	if (msg->arc_state > ARC_STATE_HEADER)
+		return ARC_STAT_INVALID;
+	msg->arc_state = ARC_STATE_HEADER;
+
+	status = arc_parse_header_field(msg, hdr, hlen, &h);
+	if (status != ARC_STAT_OK)
+		return status;
 
 	if (msg->arc_hhead == NULL)
 	{
@@ -1385,6 +1418,7 @@ arc_eom(ARC_MESSAGE *msg)
 **      domain -- domain name
 **      key -- secret key, printable
 **      keylen -- key length
+**  	ar -- Authentication-Results to be enshrined
 **
 **  Return value:
 **  	An ARC_STAT_* constant.
@@ -1392,15 +1426,61 @@ arc_eom(ARC_MESSAGE *msg)
 
 ARC_STAT
 arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *selector,
-            char *domain, u_char *key, size_t keylen)
+            char *domain, u_char *key, size_t keylen, u_char *ar)
 {
+	ARC_STAT status;
+	ARC_HDRFIELD *h;
+	struct arc_dstring *dstr;
+
+	assert(msg != NULL);
+	assert(seal != NULL);
+	assert(selector != NULL);
+	assert(domain != NULL);
+	assert(key != NULL);
+	assert(keylen > 0);
+
+	dstr = arc_dstring_new(msg, ARC_MAXHEADER, 0);
+
 	/*
 	**  Generate a new signature and store it.
 	*/
 
-	/* XXX -- construct a new AAR */
+	if (msg->arc_sealhead != NULL)
+	{
+		ARC_HDRFIELD *tmphdr;
+		ARC_HDRFIELD *next;
+
+		tmphdr = msg->arc_sealhead;
+		while (tmphdr != NULL)
+		{
+			next = tmphdr->hdr_next;
+			free(tmphdr->hdr_text);
+			free(tmphdr);
+		}
+
+		msg->arc_sealhead = NULL;
+		msg->arc_sealtail = NULL;
+	}
+	
+	/* construct a new AAR */
+	arc_dstring_printf(dstr, "ARC-Authentication-Results: i=%u; %s",
+	                   msg->arc_nsets + 1,
+	                   ar == NULL ? "none" : (char *) ar);
+	status = arc_parse_header_field(msg, arc_dstring_get(dstr),
+	                                arc_dstring_len(dstr), &h);
+	if (status != ARC_STAT_OK)
+	{
+		arc_dstring_free(dstr);
+		return status;
+	}
+
+	msg->arc_sealhead = h;
+	msg->arc_sealtail = h;
+	
 	/* XXX -- construct a new AMS */
 	/* XXX -- construct a new AS */
+
+	arc_dstring_free(dstr);
 
 	return ARC_STAT_OK;
 }

@@ -137,6 +137,8 @@ struct arc_msghandle
 	struct arc_canon *	arc_canontail;
 	struct arc_hdrfield *	arc_hhead;
 	struct arc_hdrfield *	arc_htail;
+	struct arc_hdrfield *	arc_sealhead;
+	struct arc_hdrfield *	arc_sealtail;
 	struct arc_kvset *	arc_kvsethead;
 	struct arc_kvset *	arc_kvsettail;
 	ARC_LIB *		arc_library;
