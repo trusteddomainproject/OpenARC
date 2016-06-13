@@ -166,6 +166,433 @@ arc_error(ARC_MESSAGE *msg, const char *format, ...)
 }
 
 /*
+**  ARC_GENAMSHDR -- generate a signature header
+**
+**  Parameters:
+**  	arc -- ARC_MESSAGE handle
+**  	dstr -- dstring to which to write
+**  	delim -- delimiter
+**
+**  Return value:
+**  	Number of bytes written to "dstr", or <= 0 on error.
+*/
+
+static size_t
+arc_genamshdr(ARC_MESSAGE *msg, struct arc_dstring *dstr, char *delim)
+{
+	_Bool firsthdr;
+	_Bool nosigner = FALSE;
+	int n;
+	int status;
+	int delimlen;
+	size_t hashlen;
+	char *format;
+	u_char *hash;
+	struct arc_hdrfield *hdr;
+	u_char tmp[ARC_MAXHEADER + 1];
+	u_char b64hash[ARC_MAXHEADER + 1];
+
+	assert(msg != NULL);
+	assert(dstr != NULL);
+	assert(delim != NULL);
+
+	delimlen = strlen(delim);
+
+	/*
+	**  We need to generate an ARC-Message-Signature: header field template
+	**  and include it in the canonicalization.
+	*/
+
+	/* basic required stuff */
+	if (sizeof(msg->arc_timestamp) == sizeof(unsigned long long))
+		format = "a=%s;%sd=%s;%ss=%s;%st=%llu";
+	else if (sizeof(msg->arc_timestamp) == sizeof(unsigned long))
+		format = "a=%s;%sd=%s;%ss=%s;%st=%lu";
+	else 
+		format = "a=%s;%sd=%s;%ss=%s;%st=%u";
+
+
+	(void) arc_dstring_printf(dstr, format,
+	                          delim,
+	                          arc_code_to_name(algorithms,
+	                                           msg->arc_signalg),
+	                          delim,
+	                          msg->arc_domain, delim,
+	                          msg->arc_selector, delim,
+	                          msg->arc_timestamp);
+
+	if (msg->arc_querymethods != NULL)
+	{
+		_Bool firstq = TRUE;
+		struct arc_qmethod *q;
+
+		for (q = msg->arc_querymethods; q != NULL; q = q->qm_next)
+		{
+			if (firstq)
+			{
+				arc_dstring_printf(dstr, ";%sq=%s", delim,
+				                   q->qm_type);
+			}
+			else
+			{
+				arc_dstring_printf(dstr, ":%s", q->qm_type);
+			}
+
+			if (q->qm_options)
+			{
+				arc_dstring_printf(dstr, "/%s", q->qm_options);
+			}
+
+			firstq = FALSE;
+		}
+	}
+
+	if (msg->arc_sigttl != 0)
+	{
+		uint64_t expire;
+
+		expire = msg->arc_timestamp + msg->arc_sigttl;
+		if (sizeof(expire) == sizeof(unsigned long long))
+			arc_dstring_printf(dstr, ";%sx=%llu", delim, expire);
+		else if (sizeof(expire) == sizeof(unsigned long))
+			arc_dstring_printf(dstr, ";%sx=%lu", delim, expire);
+		else
+			arc_dstring_printf(dstr, ";%sx=%u", delim, expire);
+	}
+
+	if (msg->arc_xtags != NULL)
+	{
+		struct arc_xtag *x;
+
+		for (x = msg->arc_xtags; x != NULL; x = x->xt_next)
+		{
+			arc_dstring_printf(dstr, ";%s%s=%s", delim,
+			                    x->xt_tag, x->xt_value);
+		}
+	}
+
+	memset(b64hash, '\0', sizeof b64hash);
+
+	status = arc_canon_closebody(msg);
+	if (status != ARC_STAT_OK)
+		return 0;
+
+	status = arc_canon_getfinal(msg->arc_bodycanon, &hash, &hashlen);
+	if (status != ARC_STAT_OK)
+	{
+		arc_error(msg, "arc_canon_getfinal() failed");
+		return (size_t) -1;
+	}
+
+	status = arc_base64_encode(hash, hashlen, b64hash, sizeof b64hash);
+	arc_dstring_printf(dstr, ";%sbh=%s", delim, b64hash);
+
+	/* l= */
+	if (msg->arc_partial)
+	{
+		arc_dstring_printf(dstr, ";%sl=%lu", delim,
+		                   (u_long) msg->arc_bodycanon->canon_wrote);
+	}
+
+	/* h= */
+	firsthdr = TRUE;
+	for (hdr = msg->arc_hhead; hdr != NULL; hdr = hdr->hdr_next)
+	{
+		if ((hdr->hdr_flags & ARC_HDR_SIGNED) == 0)
+			continue;
+
+		if (!firsthdr)
+		{
+			arc_dstring_cat1(dstr, ':');
+		}
+		else
+		{
+			arc_dstring_cat1(dstr, ';');
+			arc_dstring_catn(dstr, (u_char *) delim, delimlen);
+			arc_dstring_catn(dstr, (u_char *) "h=", 2);
+		}
+
+		firsthdr = FALSE;
+
+		arc_dstring_catn(dstr, hdr->hdr_text, hdr->hdr_namelen);
+	}
+
+	/* and finally, an empty b= */
+	arc_dstring_cat1(dstr, ';');
+	arc_dstring_catn(dstr, (u_char *) delim, delimlen);
+	arc_dstring_catn(dstr, (u_char *) "b=", 2);
+
+	return arc_dstring_len(dstr);
+}
+
+/*
+**  ARC_GETSIGHDR_D -- for signing operations, retrieve the complete signature
+**                     header, doing so dynamically
+**
+**  Parameters:
+**  	msg -- ARC_MESSAGE handle
+**  	initial -- initial line width
+**  	buf -- pointer to buffer containing the signature (returned)
+**  	buflen -- number of bytes at "buf" (returned)
+**
+**  Return value:
+**  	An ARC_STAT_* constant.
+**
+**  Notes:
+**  	Per RFC6376 Section 3.7, the signature header returned here does
+**  	not contain a trailing CRLF.
+*/
+
+ARC_STAT
+arc_getamshdr_d(ARC_MESSAGE *msg, size_t initial, u_char **buf, size_t *buflen)
+{
+	size_t len;
+	char *ctx;
+	char *pv;
+	struct arc_dstring *tmpbuf;
+
+	assert(msg != NULL);
+	assert(buf != NULL);
+	assert(buflen != NULL);
+
+#define	DELIMITER	"\001"
+
+	tmpbuf = arc_dstring_new(msg, BUFRSZ, MAXBUFRSZ);
+	if (tmpbuf == NULL)
+	{
+		arc_error(msg, "failed to allocate dynamic string");
+		return ARC_STAT_NORESOURCE;
+	}
+
+	if (msg->arc_hdrbuf == NULL)
+	{
+		msg->arc_hdrbuf = arc_dstring_new(msg, BUFRSZ, MAXBUFRSZ);
+		if (msg->arc_hdrbuf == NULL)
+		{
+			arc_dstring_free(tmpbuf);
+			arc_error(msg, "failed to allocate dynamic string");
+			return ARC_STAT_NORESOURCE;
+		}
+	}
+	else
+	{
+		arc_dstring_blank(msg->arc_hdrbuf);
+	}
+
+	/* compute and extract the signature header */
+	len = arc_genamshdr(msg, tmpbuf, DELIMITER);
+	if (len == 0)
+	{
+		arc_dstring_free(tmpbuf);
+		return ARC_STAT_INVALID;
+	}
+
+	if (msg->arc_b64sig != NULL)
+		arc_dstring_cat(tmpbuf, msg->arc_b64sig);
+
+	if (msg->arc_margin == 0)
+	{
+		_Bool first = TRUE;
+
+		for (pv = strtok_r((char *) arc_dstring_get(tmpbuf),
+		                   DELIMITER, &ctx);
+		     pv != NULL;
+		     pv = strtok_r(NULL, DELIMITER, &ctx))
+		{
+			if (!first)
+				arc_dstring_cat1(msg->arc_hdrbuf, ' ');
+
+			arc_dstring_cat(msg->arc_hdrbuf, (u_char *) pv);
+
+			first = FALSE;
+		}
+	}
+	else
+	{
+		_Bool first = TRUE;
+		_Bool forcewrap;
+		int pvlen;
+		int whichlen;
+		char *p;
+		char *q;
+		char *end;
+		char which[MAXTAGNAME + 1];
+
+		len = initial;
+		end = which + MAXTAGNAME;
+
+		for (pv = strtok_r((char *) arc_dstring_get(tmpbuf),
+		                   DELIMITER, &ctx);
+		     pv != NULL;
+		     pv = strtok_r(NULL, DELIMITER, &ctx))
+		{
+			for (p = pv, q = which; *p != '=' && q <= end; p++, q++)
+			{
+				*q = *p;
+				*(q + 1) = '\0';
+			}
+
+			whichlen = strlen(which);
+
+			/* force wrapping of "b=" ? */
+
+			forcewrap = FALSE;
+			if (msg->arc_keytype == ARC_KEYTYPE_RSA)
+			{
+				u_int siglen;
+
+				siglen = BASE64SIZE(msg->arc_keybits / 8);
+				if (strcmp(which, "b") == 0 &&
+				    len + whichlen + siglen + 1 >= msg->arc_margin)
+					forcewrap = TRUE;
+			}
+
+			pvlen = strlen(pv);
+
+			if (len == 0 || first)
+			{
+				arc_dstring_catn(msg->arc_hdrbuf,
+				                  (u_char *) pv,
+				                  pvlen);
+				len += pvlen;
+				first = FALSE;
+			}
+			else if (forcewrap || len + pvlen > msg->arc_margin)
+			{
+				forcewrap = FALSE;
+				arc_dstring_catn(msg->arc_hdrbuf,
+				                  (u_char *) "\r\n\t", 3);
+				len = 8;
+
+				if (strcmp(which, "h") == 0)
+				{			/* break at colons */
+					_Bool ifirst = TRUE;
+					int tmplen;
+					char *tmp;
+					char *ctx2;
+
+					for (tmp = strtok_r(pv, ":", &ctx2);
+					     tmp != NULL;
+					     tmp = strtok_r(NULL, ":", &ctx2))
+					{
+						tmplen = strlen(tmp);
+
+						if (ifirst)
+						{
+							arc_dstring_catn(msg->arc_hdrbuf,
+							                 (u_char *) tmp,
+							                 tmplen);
+							len += tmplen;
+							ifirst = FALSE;
+						}
+						else if (len + tmplen + 1 > msg->arc_margin)
+						{
+							arc_dstring_cat1(msg->arc_hdrbuf,
+							                 ':');
+							len += 1;
+							arc_dstring_catn(msg->arc_hdrbuf,
+							                 (u_char *) "\r\n\t ",
+							                 4);
+							len = 9;
+							arc_dstring_catn(msg->arc_hdrbuf,
+							                 (u_char *) tmp,
+							                 tmplen);
+							len += tmplen;
+						}
+						else
+						{
+							arc_dstring_cat1(msg->arc_hdrbuf,
+							                  ':');
+							len += 1;
+							arc_dstring_catn(msg->arc_hdrbuf,
+							                  (u_char *) tmp,
+							                  tmplen);
+							len += tmplen;
+						}
+					}
+
+				}
+				else if (strcmp(which, "b") == 0 ||
+				         strcmp(which, "bh") == 0 ||
+				         strcmp(which, "z") == 0)
+				{			/* break at margins */
+					int offset;
+					int n;
+					char *x;
+					char *y;
+
+					offset = whichlen + 1;
+
+					arc_dstring_catn(msg->arc_hdrbuf,
+					                 (u_char *) which,
+					                 whichlen);
+					arc_dstring_cat1(msg->arc_hdrbuf,
+					                 '=');
+
+					len += offset;
+
+					arc_dstring_cat1(msg->arc_hdrbuf,
+					                 *(pv + offset));
+					len++;
+
+					x = pv + offset + 1;
+					y = pv + pvlen;
+
+					while (x < y)
+					{
+						if (msg->arc_margin - len == 0)
+						{
+							arc_dstring_catn(msg->arc_hdrbuf,
+							                  (u_char *) "\r\n\t ",
+							                  4);
+							len = 9;
+						}
+
+						n = MIN(msg->arc_margin - len,
+						        y - x);
+						arc_dstring_catn(msg->arc_hdrbuf,
+						                  (u_char *) x,
+						                  n);
+						x += n;
+						len += n;
+						
+					}
+				}
+				else
+				{			/* break at delimiter */
+					arc_dstring_catn(msg->arc_hdrbuf,
+					                  (u_char *) pv,
+					                  pvlen);
+					len += pvlen;
+				}
+			}
+			else
+			{
+				if (!first)
+				{
+					arc_dstring_cat1(msg->arc_hdrbuf,
+					                  ' ');
+					len += 1;
+				}
+
+				first = FALSE;
+				arc_dstring_catn(msg->arc_hdrbuf,
+				                  (u_char *) pv,
+				                  pvlen);
+				len += pvlen;
+			}
+		}
+	}
+
+	*buf = arc_dstring_get(msg->arc_hdrbuf);
+	*buflen = arc_dstring_len(msg->arc_hdrbuf);
+
+	arc_dstring_free(tmpbuf);
+
+	return ARC_STAT_OK;
+}
+
+/*
 **  ARC_INIT -- create a library instance
 **
 **  Parameters:
@@ -885,6 +1312,7 @@ arc_message(ARC_LIB *lib, const u_char **err)
 		memset(msg, '\0', sizeof *msg);
 
 		msg->arc_library = lib;
+		(void) time(&msg->arc_timestamp);
 	}
 
 	return msg;
@@ -1305,7 +1733,9 @@ arc_eoh(ARC_MESSAGE *msg)
 
 	/* ...finally! */
 	msg->arc_nsets = nsets;
-	return ARC_STAT_OK;
+
+	/* process everything else */
+	return arc_canon_runheaders(msg);
 }
 
 /*
@@ -1429,7 +1859,14 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *selector,
             char *domain, u_char *key, size_t keylen, u_char *ar)
 {
 	ARC_STAT status;
+	size_t diglen;
+	size_t len;
+	u_char *sighdr;
+	u_char *digest;
 	ARC_HDRFIELD *h;
+	ARC_HDRFIELD hdr;
+	ARC_CANON *hc;
+	struct arc_rsa *rsa;
 	struct arc_dstring *dstr;
 
 	assert(msg != NULL);
@@ -1445,6 +1882,7 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *selector,
 	**  Generate a new signature and store it.
 	*/
 
+	/* purge any previous seal */
 	if (msg->arc_sealhead != NULL)
 	{
 		ARC_HDRFIELD *tmphdr;
@@ -1462,7 +1900,10 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *selector,
 		msg->arc_sealtail = NULL;
 	}
 	
-	/* construct a new AAR */
+	/*
+	**  Part 1: Construct a new AAR
+	*/
+
 	arc_dstring_printf(dstr, "ARC-Authentication-Results: i=%u; %s",
 	                   msg->arc_nsets + 1,
 	                   ar == NULL ? "none" : (char *) ar);
@@ -1477,8 +1918,56 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *selector,
 	msg->arc_sealhead = h;
 	msg->arc_sealtail = h;
 	
-	/* XXX -- construct a new AMS */
-	/* XXX -- construct a new AS */
+	/*
+	**  Part B: Construct a new AMS (basically a no-frills DKIM signature)
+	*/
+
+	/* finalize body canonicalizations */
+	status = arc_canon_closebody(msg);
+	if (status != ARC_STAT_OK)
+		return status;
+
+	/* construct the AMS */
+	arc_dstring_blank(dstr);
+	arc_dstring_catn(dstr, (u_char *) ARC_MSGSIG_HDRNAME ": ",
+	                 sizeof ARC_MSGSIG_HDRNAME + 1);
+
+	status = arc_getamshdr_d(msg, arc_dstring_len(dstr), &sighdr, &len);
+	if (status != ARC_STAT_OK)
+	{
+		arc_dstring_free(dstr);
+		return status;
+	}
+
+	arc_dstring_catn(dstr, sighdr, len);
+	len = arc_dstring_len(dstr);
+
+	hdr.hdr_text = arc_dstring_get(dstr);
+	hdr.hdr_colon = hdr.hdr_text + ARC_MSGSIG_HDRNAMELEN;
+	hdr.hdr_namelen = ARC_MSGSIG_HDRNAMELEN;
+	hdr.hdr_textlen = len;
+	hdr.hdr_flags = 0;
+	hdr.hdr_next = NULL;
+
+	/* canonicalize */
+	arc_canon_signature(msg, &hdr);
+
+	arc_dstring_free(dstr);
+
+	/* finalize */
+	status = arc_canon_getfinal(hc, &digest, &diglen);
+	if (status != ARC_STAT_OK)
+	{
+		arc_error(msg, "arc_canon_getfinal() failed");
+		return ARC_STAT_INTERNAL;
+	}
+
+	/* XXX -- encrypt the digest; that's our signature */
+	/* XXX -- base64 encode it */
+	/* XXX -- append it to the stub */
+	/* XXX -- add it to the seal */
+	
+	/* XXX -- Part III: Construct a new AS */
 
 	arc_dstring_free(dstr);
 

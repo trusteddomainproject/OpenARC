@@ -45,6 +45,22 @@ struct arc_sha256
 };
 #endif /* HAVE_SHA256 */
 
+/* struct arc_qmethod -- signature query method */
+struct arc_qmethod
+{
+	char *			qm_type;
+	char *			qm_options;
+	struct arc_qmethod *	qm_next;
+};
+
+/* struct arc_xtag -- signature extension tag */
+struct arc_xtag
+{
+	char *			xt_tag;
+	char *			xt_value;
+	struct arc_xtag *	xt_next;
+};
+
 /* struct arc_dstring -- a dynamically-sized string */
 struct arc_dstring
 {
@@ -113,22 +129,34 @@ struct arc_canon
 /* struct arc_msghandle -- a complete ARC transaction context */
 struct arc_msghandle
 {
+	_Bool			arc_partial;
 	u_char *		arc_key;
 	u_char *		arc_error;
 	u_char *		arc_hdrlist;
 	u_char *		arc_domain;
 	u_char *		arc_selector;
+	u_char *		arc_b64sig;
+	void *			arc_signature;
 	int			arc_dnssec_key;
+	int			arc_signalg;
 	u_int			arc_nsets;
+	u_int			arc_margin;
 	u_int			arc_state;
 	u_int			arc_hdrcnt;
 	u_int			arc_timeout;
+	u_int			arc_keybits;
+	u_int			arc_keytype;
 	arc_query_t		arc_query;
+	time_t			arc_timestamp;
+	time_t			arc_sigttl;
+	size_t			arc_siglen;
 	size_t			arc_keylen;
 	size_t			arc_errorlen;
 	ssize_t			arc_bodylen;
 	ARC_CHAIN		arc_cstate;
 	ARC_SIGERROR		arc_sigerror;
+	struct arc_qmethod *	arc_querymethods;
+	struct arc_xtag *	arc_xtags;
 	struct arc_dstring *	arc_canonbuf;
 	struct arc_dstring *	arc_hdrbuf;
 	struct arc_canon *	arc_hdrcanon;
