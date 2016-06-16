@@ -86,7 +86,7 @@
 #include "util.h"
 
 /* macros */
-#define CMDLINEOPTS	""
+#define CMDLINEOPTS	"Ac:flnp:P:r:t:u:vV"
 
 /*
 **  CONFIGVALUE -- a list of configuration values
