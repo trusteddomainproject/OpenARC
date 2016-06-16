@@ -1858,16 +1858,25 @@ ARC_STAT
 arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *selector,
             char *domain, u_char *key, size_t keylen, u_char *ar)
 {
+	int rstatus;
+	int siglen;
+	int nid;
 	ARC_STAT status;
 	size_t diglen;
+	size_t keysize;
 	size_t len;
+	size_t b64siglen;
 	u_char *sighdr;
 	u_char *digest;
+	u_char *sigout;
+	u_char *b64sig;
 	ARC_HDRFIELD *h;
 	ARC_HDRFIELD hdr;
 	ARC_CANON *hc;
-	struct arc_rsa *rsa;
 	struct arc_dstring *dstr;
+	BIO *keydata;
+	EVP_PKEY *pkey;
+	RSA *rsa;
 
 	assert(msg != NULL);
 	assert(seal != NULL);
@@ -1875,6 +1884,56 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *selector,
 	assert(domain != NULL);
 	assert(key != NULL);
 	assert(keylen > 0);
+
+	/* load the key */
+	keydata = BIO_new_mem_buf(key, keylen);
+	if (keydata == NULL)
+	{
+		arc_error(msg, "BIO_new_mem_buf() failed");
+		return ARC_STAT_NORESOURCE;
+	}
+
+	if (strncmp(key, "-----", 5) == 0)
+	{
+		pkey = PEM_read_bio_PrivateKey(keydata, NULL, NULL, NULL);
+		if (pkey == NULL)
+		{
+			arc_error(msg, "PEM_read_bio_PrivateKey() failed");
+			BIO_free(keydata);
+			return ARC_STAT_NORESOURCE;
+		}
+	}
+	else
+	{
+		pkey = d2i_PrivateKey_bio(keydata, NULL);
+		if (pkey == NULL)
+		{
+			arc_error(msg, "d2i_PrivateKey_bio() failed");
+			BIO_free(keydata);
+			return ARC_STAT_NORESOURCE;
+		}
+	}
+
+	rsa = EVP_PKEY_get1_RSA(pkey);
+	if (rsa == NULL)
+	{
+		arc_error(msg, "EVP_PKEY_get1_RSA() failed");
+		/* XXX -- free the pkey */
+		BIO_free(keydata);
+		return ARC_STAT_NORESOURCE;
+	}
+
+	keysize = RSA_size(rsa);
+	sigout = malloc(keysize);
+	if (sigout == NULL)
+	{
+		arc_error(msg, "can't allocate %d bytes for signature",
+		          keysize);
+		/* XXX -- free the pkey */
+		RSA_free(rsa);
+		BIO_free(keydata);
+		return ARC_STAT_NORESOURCE;
+	}
 
 	dstr = arc_dstring_new(msg, ARC_MAXHEADER, 0);
 
@@ -1912,6 +1971,9 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *selector,
 	if (status != ARC_STAT_OK)
 	{
 		arc_dstring_free(dstr);
+		free(sigout);
+		RSA_free(rsa);
+		BIO_free(keydata);
 		return status;
 	}
 
@@ -1925,7 +1987,13 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *selector,
 	/* finalize body canonicalizations */
 	status = arc_canon_closebody(msg);
 	if (status != ARC_STAT_OK)
+	{
+		arc_dstring_free(dstr);
+		free(sigout);
+		RSA_free(rsa);
+		BIO_free(keydata);
 		return status;
+	}
 
 	/* construct the AMS */
 	arc_dstring_blank(dstr);
@@ -1936,6 +2004,9 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *selector,
 	if (status != ARC_STAT_OK)
 	{
 		arc_dstring_free(dstr);
+		free(sigout);
+		RSA_free(rsa);
+		BIO_free(keydata);
 		return status;
 	}
 
@@ -1959,14 +2030,82 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *selector,
 	if (status != ARC_STAT_OK)
 	{
 		arc_error(msg, "arc_canon_getfinal() failed");
+		arc_dstring_free(dstr);
+		free(sigout);
+		RSA_free(rsa);
+		BIO_free(keydata);
 		return ARC_STAT_INTERNAL;
 	}
 
-	/* XXX -- encrypt the digest; that's our signature */
-	/* XXX -- base64 encode it */
-	/* XXX -- append it to the stub */
-	/* XXX -- add it to the seal */
+	/* encrypt the digest; that's our signature */
+	nid = NID_sha256;
+	rstatus = RSA_sign(nid, digest, diglen, sigout, &siglen, rsa);
+	if (rstatus != 1 || siglen == 0)
+	{
+		arc_error(msg, "RSA_sign() failed (status %d, length %d)",
+		          rstatus, siglen);
+		arc_dstring_free(dstr);
+		free(sigout);
+		RSA_free(rsa);
+		BIO_free(keydata);
+		return ARC_STAT_INTERNAL;
+	}
+
+	/* base64 encode it */
+	b64siglen = siglen * 3 + 5;
+	b64siglen += (b64siglen / 60);
+	b64sig = malloc(b64siglen);
+	if (b64sig == NULL)
+	{
+		arc_error(msg, "can't allocate %d bytes for base64 signature",
+		          b64siglen);
+		arc_dstring_free(dstr);
+		free(sigout);
+		RSA_free(rsa);
+		BIO_free(keydata);
+		return ARC_STAT_NORESOURCE;
+	}
+
+	memset(b64sig, '\0', sizeof b64siglen);
+	rstatus = arc_base64_encode(sigout, siglen, b64sig, b64siglen);
+	if (rstatus == -1)
+	{
+		arc_error(msg, "signature base64 encoding failed");
+		arc_dstring_free(dstr);
+		free(b64sig);
+		free(sigout);
+		RSA_free(rsa);
+		BIO_free(keydata);
+		return ARC_STAT_INTERNAL;
+	}
+
+	/* append it to the stub */
+	arc_dstring_cat(dstr, b64sig);
+
+	/* add it to the seal */
+	h = malloc(sizeof hdr);
+	if (h == NULL)
+	{
+		arc_error(msg, "can't allocate %d bytes", sizeof hdr);
+		arc_dstring_free(dstr);
+		free(b64sig);
+		free(sigout);
+		RSA_free(rsa);
+		BIO_free(keydata);
+		return ARC_STAT_INTERNAL;
+	}
+
+	memcpy(h, &hdr, sizeof hdr);
+
+	msg->arc_sealhead = h;
+	msg->arc_sealtail = h;
 	
+	/* clean up */
+	free(b64sig);
+	free(sigout);
+	RSA_free(rsa);
+	BIO_free(keydata);
+
 	/* XXX -- Part III: Construct a new AS */
 
 	arc_dstring_free(dstr);
