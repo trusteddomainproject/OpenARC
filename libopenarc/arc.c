@@ -1587,6 +1587,8 @@ arc_eoh(ARC_MESSAGE *msg)
 	**  Ensure all sets are complete.
 	*/
 
+	/* XXX -- build up the array of ARC sets, for use later */
+
 	/* walk the seals */
 	for (set = arc_set_first(msg, ARC_KVSETTYPE_SEAL);
              set != NULL;
@@ -1861,6 +1863,7 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *selector,
 	int rstatus;
 	int siglen;
 	int nid;
+	u_int set;
 	ARC_STAT status;
 	size_t diglen;
 	size_t keysize;
@@ -2106,7 +2109,23 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *selector,
 	RSA_free(rsa);
 	BIO_free(keydata);
 
-	/* XXX -- Part III: Construct a new AS */
+	/* Part III: Construct a new AS */
+	arc_dstring_blank(dstr);
+
+	/* hash all the existing ARC sets */
+	for (set = 1; set <= msg->arc_nsets; set++)
+	{
+		/* XXX -- find the Nth ARC set */
+		/* XXX -- hash the AAR, then the AMS, then the AS */
+	}
+
+	/* XXX -- build our partial AS */
+		/* XXX -- hash our generated AAR, then our AMS */
+		/* XXX -- generate an incomplete AS */
+		/* XXX -- get a digest of it */
+		/* XXX -- encrypt it */
+		/* XXX -- complete the AS */
+		/* XXX -- add it to the seal */
 
 	arc_dstring_free(dstr);
 
