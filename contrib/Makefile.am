@@ -1,4 +1,4 @@
 # Copyright (c) 2010, 2011, 2016, The Trusted Domain Project.
 # All rights reserved.
 
-SUBDIRS = docs generic init spec systemd
+SUBDIRS = docs init spec systemd
