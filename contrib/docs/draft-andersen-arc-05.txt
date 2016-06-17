@@ -5,7 +5,7 @@
 independent                                              . OAR-DEV Group
 Internet-Draft                                             OAR-DEV Group
 Intended status: Informational                               K. Andersen
-Expires: October 30, 2016                                       LinkedIn
+Expires: November 24, 2016                                      LinkedIn
                                                        J. Rae-Grant, Ed.
                                                             B. Long, Ed.
                                                                   Google
@@ -13,11 +13,11 @@ Expires: October 30, 2016                                       LinkedIn
                                                                   Paypal
                                                            S. Jones, Ed.
                                                                      TDP
-                                                          April 28, 2016
+                                                            May 23, 2016
 
 
                    Authenticated Received Chain (ARC)
-                         draft-andersen-arc-04
+                         draft-andersen-arc-05
 
 Abstract
 
@@ -45,7 +45,7 @@ Status of This Memo
    time.  It is inappropriate to use Internet-Drafts as reference
    material or to cite them other than as "work in progress."
 
-   This Internet-Draft will expire on October 30, 2016.
+   This Internet-Draft will expire on November 24, 2016.
 
 
 
@@ -53,9 +53,9 @@ Status of This Memo
 
 
 
-OAR-DEV Group, et al.   Expires October 30, 2016                [Page 1]
+OAR-DEV Group, et al.   Expires November 24, 2016               [Page 1]
 
-Internet-Draft                     ARC                        April 2016
+Internet-Draft                     ARC                          May 2016
 
 
 Copyright Notice
@@ -83,14 +83,14 @@ Table of Contents
      2.1.  Primary Design Criteria . . . . . . . . . . . . . . . . .   4
      2.2.  Out of Scope  . . . . . . . . . . . . . . . . . . . . . .   4
      2.3.  Utility . . . . . . . . . . . . . . . . . . . . . . . . .   4
-   3.  Terminology . . . . . . . . . . . . . . . . . . . . . . . . .   5
+   3.  Terminology . . . . . . . . . . . . . . . . . . . . . . . . .   4
    4.  Overview  . . . . . . . . . . . . . . . . . . . . . . . . . .   5
    5.  Definition  . . . . . . . . . . . . . . . . . . . . . . . . .   5
      5.1.  Description of the New Header Fields  . . . . . . . . . .   6
        5.1.1.  ARC-Seal  . . . . . . . . . . . . . . . . . . . . . .   6
        5.1.2.  ARC-Message-Signature . . . . . . . . . . . . . . . .   9
        5.1.3.  ARC-Authentication-Results  . . . . . . . . . . . . .  10
-     5.2.  Constructing the ARC-Seal Set . . . . . . . . . . . . . .  11
+     5.2.  Constructing the ARC-Seal Set . . . . . . . . . . . . . .  10
        5.2.1.  Handling Violations in the ARC Sets . . . . . . . . .  11
      5.3.  Key Management and Binding  . . . . . . . . . . . . . . .  12
        5.3.1.  Namespace . . . . . . . . . . . . . . . . . . . . . .  12
@@ -102,21 +102,21 @@ Table of Contents
        6.4.1.  Assessing Chain Validity Violations . . . . . . . . .  13
        6.4.2.  Responding to ARC Validity Violations . . . . . . . .  13
        6.4.3.  Recording the Results of ARC Evaluation . . . . . . .  13
-       6.4.4.  Output Data Points from ARC Evaluation  . . . . . . .  14
+       6.4.4.  Output Data Points from ARC Evaluation  . . . . . . .  13
        6.4.5.  Reporting ARC Effects for DMARC Local Policy  . . . .  14
    7.  Privacy Considerations  . . . . . . . . . . . . . . . . . . .  14
    8.  IANA Considerations . . . . . . . . . . . . . . . . . . . . .  14
 
 
 
-OAR-DEV Group, et al.   Expires October 30, 2016                [Page 2]
+OAR-DEV Group, et al.   Expires November 24, 2016               [Page 2]
 
-Internet-Draft                     ARC                        April 2016
+Internet-Draft                     ARC                          May 2016
 
 
      8.1.  Authentication-Results Method Registry Update . . . . . .  14
      8.2.  Definitions of the ARC header fields  . . . . . . . . . .  15
-   9.  Security Considerations . . . . . . . . . . . . . . . . . . .  16
+   9.  Security Considerations . . . . . . . . . . . . . . . . . . .  15
      9.1.  Message Content Suspicion . . . . . . . . . . . . . . . .  16
    10. References  . . . . . . . . . . . . . . . . . . . . . . . . .  16
      10.1.  Normative References . . . . . . . . . . . . . . . . . .  16
@@ -125,19 +125,18 @@ Internet-Draft                     ARC                        April 2016
      A.1.  Example 1: Simple mailing list  . . . . . . . . . . . . .  19
        A.1.1.  Here's the message as it exits the Origin:  . . . . .  19
        A.1.2.  Message is then received at example.org . . . . . . .  19
-       A.1.3.  Example 1: Message received by Recipient  . . . . . .  22
-     A.2.  Example 2: Mailing list to forwarded mailbox  . . . . . .  23
-       A.2.1.  Here's the message as it exits the Origin:  . . . . .  23
-       A.2.2.  Message is then received at example.org . . . . . . .  24
-       A.2.3.  Example 2: Message received by Recipient  . . . . . .  28
-     A.3.  Example 3: Mailing list to forwarded mailbox with source   30
-       A.3.1.  Here's the message as it exits the Origin:  . . . . .  30
-       A.3.2.  Message is then received at example.org . . . . . . .  31
-       A.3.3.  Example 3: Message received by Recipient  . . . . . .  36
-   Appendix B.  Acknowledgements . . . . . . . . . . . . . . . . . .  38
-   Appendix C.  Comments and Feedback  . . . . . . . . . . . . . . .  39
-   Appendix D.  Historical Note  . . . . . . . . . . . . . . . . . .  39
-   Authors' Addresses  . . . . . . . . . . . . . . . . . . . . . . .  39
+       A.1.3.  Example 1: Message received by Recipient  . . . . . .  21
+     A.2.  Example 2: Mailing list to forwarded mailbox  . . . . . .  22
+       A.2.1.  Here's the message as it exits the Origin:  . . . . .  22
+       A.2.2.  Message is then received at example.org . . . . . . .  23
+       A.2.3.  Example 2: Message received by Recipient  . . . . . .  27
+     A.3.  Example 3: Mailing list to forwarded mailbox with source   29
+       A.3.1.  Here's the message as it exits the Origin:  . . . . .  29
+       A.3.2.  Message is then received at example.org . . . . . . .  30
+       A.3.3.  Example 3: Message received by Recipient  . . . . . .  35
+   Appendix B.  Acknowledgements . . . . . . . . . . . . . . . . . .  37
+   Appendix C.  Comments and Feedback  . . . . . . . . . . . . . . .  38
+   Authors' Addresses  . . . . . . . . . . . . . . . . . . . . . . .  38
 
 1.  Introduction
 
@@ -161,17 +160,15 @@ Internet-Draft                     ARC                        April 2016
    Forgery of the Received header fields is a common tactic used by bad
    actors.  One of the goals of this specification defines a comparable
    set of trace header fields which can be relied upon by receivers,
-
-
-
-
-OAR-DEV Group, et al.   Expires October 30, 2016                [Page 3]
-
-Internet-Draft                     ARC                        April 2016
-
-
    assuming all ADministrative Management Domain (ADMD) intermediary
    handlers of a message participate in ARC.
+
+
+
+OAR-DEV Group, et al.   Expires November 24, 2016               [Page 3]
+
+Internet-Draft                     ARC                          May 2016
+
 
    The Authentication-Results (A-R) mechanism [RFC7601] permits the
    output of an email authentication evaluation process to be
@@ -215,20 +212,19 @@ Internet-Draft                     ARC                        April 2016
    policy overrides to for violations of origination domain
    authentication policies.
 
-
-
-
-
-
-
-OAR-DEV Group, et al.   Expires October 30, 2016                [Page 4]
-
-Internet-Draft                     ARC                        April 2016
-
-
 3.  Terminology
 
    This section defines terms used in the rest of the document.
+
+
+
+
+
+
+OAR-DEV Group, et al.   Expires November 24, 2016               [Page 4]
+
+Internet-Draft                     ARC                          May 2016
+
 
    The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
    "SHOULD", "SHOULD NOT", "RECOMMENDED", "MAY", and "OPTIONAL" in this
@@ -275,15 +271,16 @@ Internet-Draft                     ARC                        April 2016
    common sequence number, identified in an "i=" tag.  Such a correlated
    group of header fields is referred to as an "ARC set".
 
-
-
-OAR-DEV Group, et al.   Expires October 30, 2016                [Page 5]
-
-Internet-Draft                     ARC                        April 2016
-
-
    Specific references to individual header fields use the header field
    names to distinguish such references.
+
+
+
+
+OAR-DEV Group, et al.   Expires November 24, 2016               [Page 5]
+
+Internet-Draft                     ARC                          May 2016
+
 
    The ARC sets SHOULD be added at the top of a message header as it
    transits MTAs that do authentication checks, so some idea of how far
@@ -317,7 +314,7 @@ Internet-Draft                     ARC                        April 2016
    The header field can appear more than once in a single message, but
    each instance MUST have a unique "i=" value.
 
-   The ARC-Seal header field includes a digigal signature of all
+   The ARC-Seal header field includes a digital signature of all
    preceding ARC message header fields on the message.
 
 5.1.1.1.  Tags in the ARC-Seal Header Field Value
@@ -329,25 +326,23 @@ Internet-Draft                     ARC                        April 2016
    o  a = hash algorithm; syntax is the same as the "a=" tag defined in
       Section 3.5 of [RFC6376];
 
-
-
-
-
-OAR-DEV Group, et al.   Expires October 30, 2016                [Page 6]
-
-Internet-Draft                     ARC                        April 2016
-
-
    o  b = digital signature; syntax is the same as the "b=" tag defined
       in Section 3.5 of [RFC6376];
 
    o  cv = chain validation status: valid values:
 
-      *  'N' = None, no pre-existing chain;
 
-      *  'F' = Fail, the chain as received does not validate; or
 
-      *  'P' = Pass, valid chain received.
+OAR-DEV Group, et al.   Expires November 24, 2016               [Page 6]
+
+Internet-Draft                     ARC                          May 2016
+
+
+      *  'none' = no pre-existing chain;
+
+      *  'fail' = the chain as received does not validate; or
+
+      *  'pass' = valid chain received.
 
    o  d = domain for key; syntax is the same as the "d=" tag defined in
       Section 3.5 of [RFC6376];
@@ -369,7 +364,7 @@ Internet-Draft                     ARC                        April 2016
    ARC-Seal does not use the 'h' tag (the list of signed header fields)
    that is defined for DKIM-Signatures because the list of applicable
    header fields is fully determined by the construction rules (see
-   Section 5.2).
+   Section 5.1.1.3).
 
    ARC-Seal does not use the 'c' (canonicalization) tag because only
    'relaxed' canonicalization [RFC6376] is allowed for ARC-Seal header
@@ -386,19 +381,18 @@ Internet-Draft                     ARC                        April 2016
    Results, "AMS" to ARC- Message-Signature, "AS" to ARC-Seal, and "ASB"
    to an ARC-Seal with an empty "b" tag.
 
-
-
-
-OAR-DEV Group, et al.   Expires October 30, 2016                [Page 7]
-
-Internet-Draft                     ARC                        April 2016
-
-
    Generally, the scope of an ARC set for a message containing "n" ARC
    sets is the concatenation of the following, for x (instance number)
    from 1 to n:
 
    o  AAR(x);
+
+
+
+OAR-DEV Group, et al.   Expires November 24, 2016               [Page 7]
+
+Internet-Draft                     ARC                          May 2016
+
 
    o  AMS(x);
 
@@ -433,22 +427,10 @@ Internet-Draft                     ARC                        April 2016
    1.  All ARC-Seal header fields MUST validate;
 
    2.  All ARC-Seal header fields MUST have a chain value (cv=) status
-       of valid (except the first which MUST be None); and
+       of "pass" (except the first which MUST be "none"); and
 
    3.  The newest (highest instance number (i=)) AMS header field MUST
        validate.
-
-
-
-
-
-
-
-
-OAR-DEV Group, et al.   Expires October 30, 2016                [Page 8]
-
-Internet-Draft                     ARC                        April 2016
-
 
 5.1.1.5.1.  Pseudocode to Determine Chain Value Status:
 
@@ -460,21 +442,29 @@ Internet-Draft                     ARC                        April 2016
    "Success" means that the signature found in the referenced header
    validates when against the content which was signed.
 
+
+
+
+OAR-DEV Group, et al.   Expires November 24, 2016               [Page 8]
+
+Internet-Draft                     ARC                          May 2016
+
+
    if num_hops == 0:
-     return None
+     return "none"
    else:
      if validate(latest_hop.AMS) != success:
-       return Fail
+       return "fail"
 
      for each hop (from highest instance to lowest):
-       if (hop_num > 1 and hop.ARC-Seal.cv == Valid) or
-          (hop_num == 1 and hop.ARC-Seal.cv == None):
+       if (hop_num > 1 and hop.ARC-Seal.cv == "pass") or
+          (hop_num == 1 and hop.ARC-Seal.cv == "none"):
          if validate(hop.ARC-Seal) == success:
            next
          else:
-           return Fail
+           return "fail"
 
-     return Pass
+     return "pass"
 
 5.1.2.  ARC-Message-Signature
 
@@ -497,15 +487,6 @@ Internet-Draft                     ARC                        April 2016
    ARC-Message-Signature is otherwise identical to that specified in
    section 5.4 of [RFC6376].
 
-
-
-
-
-OAR-DEV Group, et al.   Expires October 30, 2016                [Page 9]
-
-Internet-Draft                     ARC                        April 2016
-
-
 5.1.2.1.2.  Implicit Canonicalization: 'c'
 
    The ARC-Message-Signature header field MUST be created using the
@@ -517,6 +498,14 @@ Internet-Draft                     ARC                        April 2016
    Contrary to DKIM, the 'i' tag for ARC-Message-Signature identifies
    the sequential instance of the field, thus indicating that it is part
    of a particular ARC set.  That is, an ARC-Message-Signature, ARC-
+
+
+
+OAR-DEV Group, et al.   Expires November 24, 2016               [Page 9]
+
+Internet-Draft                     ARC                          May 2016
+
+
    Seal, and ARC-Authentication-Results all bearing an "i=" tag with the
    same value are part of the same ARC set (see Section 5.1.1.1).
 
@@ -555,13 +544,6 @@ Internet-Draft                     ARC                        April 2016
    the "authserv-id" which indicates the ARC set to which it belongs as
    described in the previous section (see Section 5.1.1.1).
 
-
-
-OAR-DEV Group, et al.   Expires October 30, 2016               [Page 10]
-
-Internet-Draft                     ARC                        April 2016
-
-
 5.2.  Constructing the ARC-Seal Set
 
    The ARC-Seal is built in the same fashion as the analogous DKIM-
@@ -570,6 +552,15 @@ Internet-Draft                     ARC                        April 2016
    the header fields covered by the cryptographic signature:
 
    1.  The ARC sets MUST be ordered in descending instance (i=) order.
+
+
+
+
+
+OAR-DEV Group, et al.   Expires November 24, 2016              [Page 10]
+
+Internet-Draft                     ARC                          May 2016
+
 
    2.  The referenced ARC-Message-Signatures (matching i= value) MUST
        immediately follow the ARC-Seal instance which included the
@@ -610,14 +601,6 @@ Internet-Draft                     ARC                        April 2016
    o  Within each set, header fields are sorted as specified in
       Section 5.2; then
 
-
-
-
-OAR-DEV Group, et al.   Expires October 30, 2016               [Page 11]
-
-Internet-Draft                     ARC                        April 2016
-
-
    o  Any ARC sets that are complete duplicates are removed - leaving
       only one instance of each unique ARC set; then
 
@@ -625,6 +608,15 @@ Internet-Draft                     ARC                        April 2016
       follows:
 
    1.  (First) By descending order of i=; then
+
+
+
+
+
+OAR-DEV Group, et al.   Expires November 24, 2016              [Page 11]
+
+Internet-Draft                     ARC                          May 2016
+
 
    2.  (Second) By descending order of t= (from the ARC-Seal header
        field within the set); then
@@ -665,15 +657,6 @@ Internet-Draft                     ARC                        April 2016
    boundary is crossed, and especially when prior DKIM-Signatures might
    not survive the handling being performed such as some mailing lists
    that modify the content of messages or some gateway transformations.
-
-
-
-
-OAR-DEV Group, et al.   Expires October 30, 2016               [Page 12]
-
-Internet-Draft                     ARC                        April 2016
-
-
    Note that trust boundaries might or might not exactly correspond with
    ADMD boundaries.
 
@@ -681,6 +664,15 @@ Internet-Draft                     ARC                        April 2016
    of asserting their own seal.  Even if the set is determined to be
    invalid, a participating ADMD SHOULD apply their own seal because
    this can help in analysis of breakage points in the chain.
+
+
+
+
+
+OAR-DEV Group, et al.   Expires November 24, 2016              [Page 12]
+
+Internet-Draft                     ARC                          May 2016
+
 
 6.2.  Relationship between DKIM Signatures and ARC Headers
 
@@ -690,7 +682,8 @@ Internet-Draft                     ARC                        April 2016
 
    Determining the validity of a chain of ARC sets is defined above in
    Section 5.1.1.5.  Validation failures MUST be indicated with a "cv="
-   tag value of 'F' when attaching a subsequent ARC-Seal header field.
+   tag value of 'fail' when attaching a subsequent ARC-Seal header
+   field.
 
 6.4.  ARC Set Validity
 
@@ -722,14 +715,6 @@ Internet-Draft                     ARC                        April 2016
    Receivers MAY add an "arc=pass" or "arc=fail" method annotation into
    a locally-affixed Authentication-Results [RFC7601] header field.
 
-
-
-
-OAR-DEV Group, et al.   Expires October 30, 2016               [Page 13]
-
-Internet-Draft                     ARC                        April 2016
-
-
 6.4.4.  Output Data Points from ARC Evaluation
 
    The evaluation of a series of ARC sets results in the following data
@@ -737,6 +722,13 @@ Internet-Draft                     ARC                        April 2016
 
    o  A list of the "d=" domains found in the validated (all) ARC-Seal
       header fields;
+
+
+
+OAR-DEV Group, et al.   Expires November 24, 2016              [Page 13]
+
+Internet-Draft                     ARC                          May 2016
+
 
    o  The "d=" domain found in the most recent (highest instance number)
       AMS header field (since that is the only one necessarily
@@ -778,14 +770,6 @@ Internet-Draft                     ARC                        April 2016
 
       Defined: [I-D.ARC]
 
-
-
-
-OAR-DEV Group, et al.   Expires October 30, 2016               [Page 14]
-
-Internet-Draft                     ARC                        April 2016
-
-
       ptype: header
 
       Property: chain evaluation result
@@ -793,6 +777,14 @@ Internet-Draft                     ARC                        April 2016
       Value: chain evaluation result status (see Section 5.1.1.1)
 
       Status: active
+
+
+
+
+OAR-DEV Group, et al.   Expires November 24, 2016              [Page 14]
+
+Internet-Draft                     ARC                          May 2016
+
 
       Version: 1
 
@@ -835,19 +827,20 @@ Internet-Draft                     ARC                        April 2016
 
       Specification document(s): [I-D.ARC]
 
-
-
-OAR-DEV Group, et al.   Expires October 30, 2016               [Page 15]
-
-Internet-Draft                     ARC                        April 2016
-
-
       Related information: [RFC7601]
 
 9.  Security Considerations
 
    The Security Considerations of [RFC6376] and [RFC7601] apply directly
    to this specification.
+
+
+
+
+OAR-DEV Group, et al.   Expires November 24, 2016              [Page 15]
+
+Internet-Draft                     ARC                          May 2016
+
 
    Inclusion of ARC sets in the header of emails may cause problems for
    some older or more constrained MTAs if they are unable to accept the
@@ -890,14 +883,6 @@ Internet-Draft                     ARC                        April 2016
               DOI 10.17487/RFC2119, March 1997,
               <http://www.rfc-editor.org/info/rfc2119>.
 
-
-
-
-OAR-DEV Group, et al.   Expires October 30, 2016               [Page 16]
-
-Internet-Draft                     ARC                        April 2016
-
-
    [RFC2142]  Crocker, D., "Mailbox Names for Common Services, Roles and
               Functions", RFC 2142, DOI 10.17487/RFC2142, May 1997,
               <http://www.rfc-editor.org/info/rfc2142>.
@@ -905,6 +890,13 @@ Internet-Draft                     ARC                        April 2016
    [RFC2606]  Eastlake 3rd, D. and A. Panitz, "Reserved Top Level DNS
               Names", BCP 32, RFC 2606, DOI 10.17487/RFC2606, June 1999,
               <http://www.rfc-editor.org/info/rfc2606>.
+
+
+
+OAR-DEV Group, et al.   Expires November 24, 2016              [Page 16]
+
+Internet-Draft                     ARC                          May 2016
+
 
    [RFC3463]  Vaudreuil, G., "Enhanced Mail System Status Codes",
               RFC 3463, DOI 10.17487/RFC3463, January 2003,
@@ -947,17 +939,20 @@ Internet-Draft                     ARC                        April 2016
               DOI 10.17487/RFC5863, May 2010,
               <http://www.rfc-editor.org/info/rfc5863>.
 
-
-
-OAR-DEV Group, et al.   Expires October 30, 2016               [Page 17]
-
-Internet-Draft                     ARC                        April 2016
-
-
    [RFC6376]  Crocker, D., Ed., Hansen, T., Ed., and M. Kucherawy, Ed.,
               "DomainKeys Identified Mail (DKIM) Signatures", STD 76,
               RFC 6376, DOI 10.17487/RFC6376, September 2011,
               <http://www.rfc-editor.org/info/rfc6376>.
+
+
+
+
+
+
+OAR-DEV Group, et al.   Expires November 24, 2016              [Page 17]
+
+Internet-Draft                     ARC                          May 2016
+
 
    [RFC6377]  Kucherawy, M., "DomainKeys Identified Mail (DKIM) and
               Mailing Lists", BCP 167, RFC 6377, DOI 10.17487/RFC6377,
@@ -1002,17 +997,18 @@ Internet-Draft                     ARC                        April 2016
               (DMARC)", RFC 7489, DOI 10.17487/RFC7489, March 2015,
               <http://www.rfc-editor.org/info/rfc7489>.
 
-
-
-
-OAR-DEV Group, et al.   Expires October 30, 2016               [Page 18]
-
-Internet-Draft                     ARC                        April 2016
-
-
 10.3.  URIs
 
    [1] mailto:arc-discuss@dmarc.org
+
+
+
+
+
+OAR-DEV Group, et al.   Expires November 24, 2016              [Page 18]
+
+Internet-Draft                     ARC                          May 2016
+
 
 Appendix A.  Appendix A - Example Usage
 
@@ -1058,73 +1054,23 @@ A.1.2.1.  Example 1, Step A: Message forwarded to list members
 
    o  example.org adds ARC-Auth-Results header
 
-
-
-
-OAR-DEV Group, et al.   Expires October 30, 2016               [Page 19]
-
-Internet-Draft                     ARC                        April 2016
-
-
    o  example.org adds Received: header
 
    o  example.org adds a ARC-Seal header
 
-   Here's the message as it exits example.org:
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-OAR-DEV Group, et al.   Expires October 30, 2016               [Page 20]
+OAR-DEV Group, et al.   Expires November 24, 2016              [Page 19]
 
-Internet-Draft                     ARC                        April 2016
+Internet-Draft                     ARC                          May 2016
 
+
+   Here's the message as it exits example.org:
 
  Return-Path: <jqd@d1.example>
  ARC-Seal: i=1; a=rsa-sha256; t=1421363107;
-     s=seal2015; d=example.org; cv=N;
+     s=seal2015; d=example.org; cv=none;
      b=pCw3Qxgfs9E1qnyNZ+cTTF3KHgAjWwZz++Rju0BceSiuwIg0Pkk+3RZH/kaiz61
       TX6RVT6E4gs49Sstp41K7muj1OR5R6Q6llahLlQJZ/YfDZ3NImCU52gFWLUD7L69
       EU8TzypfkUhscqXjOJgDwjIceBNNOfh3Jy+V8hQZrVFCw0A=
@@ -1171,11 +1117,9 @@ Internet-Draft                     ARC                        April 2016
 
 
 
-
-
-OAR-DEV Group, et al.   Expires October 30, 2016               [Page 21]
+OAR-DEV Group, et al.   Expires November 24, 2016              [Page 20]
 
-Internet-Draft                     ARC                        April 2016
+Internet-Draft                     ARC                          May 2016
 
 
 A.1.3.  Example 1: Message received by Recipient
@@ -1209,7 +1153,7 @@ A.1.3.  Example 1: Message received by Recipient
      smtp.from=jqd@d1.example; dkim=pass (1024-bit key)
      header.i=@example.org; dmarc=fail; arc=pass
  ARC-Seal: i=1; a=rsa-sha256; t=1421363107;
-     s=seal2015; d=example.org; cv=N;
+     s=seal2015; d=example.org; cv=none;
      b=pCw3Qxgfs9E1qnyNZ+cTTF3KHgAjWwZz++Rju0BceSiuwIg0Pkk+3RZH/kaiz61
       TX6RVT6E4gs49Sstp41K7muj1OR5R6Q6llahLlQJZ/YfDZ3NImCU52gFWLUD7L69
       EU8TzypfkUhscqXjOJgDwjIceBNNOfh3Jy+V8hQZrVFCw0A=
@@ -1229,9 +1173,9 @@ A.1.3.  Example 1: Message received by Recipient
 
 
 
-OAR-DEV Group, et al.   Expires October 30, 2016               [Page 22]
+OAR-DEV Group, et al.   Expires November 24, 2016              [Page 21]
 
-Internet-Draft                     ARC                        April 2016
+Internet-Draft                     ARC                          May 2016
 
 
      spf=pass smtp.mfrom=jqd@d1.example;
@@ -1285,9 +1229,9 @@ A.2.1.  Here's the message as it exits the Origin:
 
 
 
-OAR-DEV Group, et al.   Expires October 30, 2016               [Page 23]
+OAR-DEV Group, et al.   Expires November 24, 2016              [Page 22]
 
-Internet-Draft                     ARC                        April 2016
+Internet-Draft                     ARC                          May 2016
 
 
  Return-Path: <jqd@d1.example>
@@ -1341,14 +1285,14 @@ A.2.2.1.  Example 2, Step A: Message forwarded to list members
 
 
 
-OAR-DEV Group, et al.   Expires October 30, 2016               [Page 24]
+OAR-DEV Group, et al.   Expires November 24, 2016              [Page 23]
 
-Internet-Draft                     ARC                        April 2016
+Internet-Draft                     ARC                          May 2016
 
 
    Return-Path: <jqd@d1.example>
    ARC-Seal: i=1; a=rsa-sha256; t=1421363107;
-       s=seal2015; d=example.org; cv=N;
+       s=seal2015; d=example.org; cv=none;
        b=pCw3Qxgfs9E1qnyNZ+cTTF3KHgAjWwZz++Rju0BceSiuwIg0Pkk+3RZH/kaiz6
         1TX6RVT6E4gs49Sstp41K7muj1OR5R6Q6llahLlQJZ/YfDZ3NImCU52gFWLUD7L
         69EU8TzypfkUhscqXjOJgDwjIceBNNOfh3Jy+V8hQZrVFCw0A=
@@ -1397,9 +1341,9 @@ Internet-Draft                     ARC                        April 2016
 
 
 
-OAR-DEV Group, et al.   Expires October 30, 2016               [Page 25]
+OAR-DEV Group, et al.   Expires November 24, 2016              [Page 24]
 
-Internet-Draft                     ARC                        April 2016
+Internet-Draft                     ARC                          May 2016
 
 
 A.2.2.2.  Example 2, Step B: Message from list forwarded
@@ -1453,13 +1397,13 @@ A.2.2.2.  Example 2, Step B: Message from list forwarded
 
 
 
-OAR-DEV Group, et al.   Expires October 30, 2016               [Page 26]
+OAR-DEV Group, et al.   Expires November 24, 2016              [Page 25]
 
-Internet-Draft                     ARC                        April 2016
+Internet-Draft                     ARC                          May 2016
 
 
    ARC-Seal: i=2; a=rsa-sha256; t=1421363253;
-       s=notary01; d=gmail.com; cv=P;
+       s=notary01; d=gmail.com; cv=pass;
        b=sjHDMriRZ0Mui5eVEOGscRHWbQHcy97lvrduHQ8h+f2CfIrxUiKOE44x3LQwDWR
         YbDjf5fcM9MdcIahC+cP59BQ9Y9DHwMDzwRTnM7NVb4kY+tSaVnLoIOaP9lF/sut
         txO+RRNr0fCFw==
@@ -1482,7 +1426,7 @@ Internet-Draft                     ARC                        April 2016
        smtp.from=jqd@d1.example; dkim=pass (1024-bit key)
        header.i=@example.org; dmarc=fail; arc=pass
    ARC-Seal: i=1; a=rsa-sha256; t=1421363107;
-       s=seal2015; d=example.org; cv=N:
+       s=seal2015; d=example.org; cv=none:
        b=pCw3Qxgfs9E1qnyNZ+cTTF3KHgAjWwZz++Rju0BceSiuwIg0Pkk+3RZH/kaiz61
         TX6RVT6E4gs49Sstp41K7muj1OR5R6Q6llahLlQJZ/YfDZ3NImCU52gFWLUD7L69
         EU8TzypfkUhscqXjOJgDwjIceBNNOfh3Jy+V8hQZrVFCw0A=
@@ -1509,9 +1453,9 @@ Internet-Draft                     ARC                        April 2016
 
 
 
-OAR-DEV Group, et al.   Expires October 30, 2016               [Page 27]
+OAR-DEV Group, et al.   Expires November 24, 2016              [Page 26]
 
-Internet-Draft                     ARC                        April 2016
+Internet-Draft                     ARC                          May 2016
 
 
        (envelope-from jqd@d1.example)
@@ -1565,16 +1509,16 @@ A.2.3.  Example 2: Message received by Recipient
 
 
 
-OAR-DEV Group, et al.   Expires October 30, 2016               [Page 28]
+OAR-DEV Group, et al.   Expires November 24, 2016              [Page 27]
 
-Internet-Draft                     ARC                        April 2016
+Internet-Draft                     ARC                          May 2016
 
 
    Authentication-Results: clothilde.example.com; spf=fail
        smtp.from=jqd@d1.example; dkim=pass (1024-bit key)
        header.i=@gmail.com; dmarc=fail; arc=pass
    ARC-Seal: i=2; a=rsa-sha256; t=1421363253;
-       s=notary01; d=gmail.com; cv=P;
+       s=notary01; d=gmail.com; cv=pass;
        b=sjHDMriRZ0Mui5eVEOGscRHWbQHcy97lvrduHQ8h+f2CfIrxUiKOE44x3LQwDWR
         YbDjf5fcM9MdcIahC+cP59BQ9Y9DHwMDzwRTnM7NVb4kY+tSaVnLoIOaP9lF/sut
         txO+RRNr0fCFw==
@@ -1597,7 +1541,7 @@ Internet-Draft                     ARC                        April 2016
        smtp.from=jqd@d1.example; dkim=pass (1024-bit key)
        header.i=@example.org; dmarc=fail; arc=pass
    ARC-Seal: i=1; a=rsa-sha256; t=1421363107;
-       s=seal2015; d=example.org; cv=N;
+       s=seal2015; d=example.org; cv=none;
        b=pCw3Qxgfs9E1qnyNZ+cTTF3KHgAjWwZz++Rju0BceSiuwIg0Pkk+3RZH/kaiz61
         TX6RVT6E4gs49Sstp41K7muj1OR5R6Q6llahLlQJZ/YfDZ3NImCU52gFWLUD7L69
         EU8TzypfkUhscqXjOJgDwjIceBNNOfh3Jy+V8hQZrVFCw0A=
@@ -1621,9 +1565,9 @@ Internet-Draft                     ARC                        April 2016
 
 
 
-OAR-DEV Group, et al.   Expires October 30, 2016               [Page 29]
+OAR-DEV Group, et al.   Expires November 24, 2016              [Page 28]
 
-Internet-Draft                     ARC                        April 2016
+Internet-Draft                     ARC                          May 2016
 
 
        (authenticated bits=0)
@@ -1677,9 +1621,9 @@ A.3.1.  Here's the message as it exits the Origin:
 
 
 
-OAR-DEV Group, et al.   Expires October 30, 2016               [Page 30]
+OAR-DEV Group, et al.   Expires November 24, 2016              [Page 29]
 
-Internet-Draft                     ARC                        April 2016
+Internet-Draft                     ARC                          May 2016
 
 
   Return-Path: <jqd@d1.example>
@@ -1689,7 +1633,7 @@ Internet-Draft                     ARC                        April 2016
       Thu, 14 Jan 2015 15:00:01 -0800 (PST)
       (envelope-from jqd@d1.example)
   ARC-Seal: i=1; a=rsa-sha256; t=1421363107;
-      s=origin2015; d=d1.example; cv=N;
+      s=origin2015; d=d1.example; cv=none;
       b=pCw3Qxgfs9E1qnyNZ+cTTF3KHgAjWwZz++Rju0BceSiuwIg0Pkk+3RZH/kaiz61T
        X6RVT6E4gs49Sstp41K7muj1OR5R6Q6llahLlQJZ/YfDZ3NImCU52gFWLUD7L69EU
        8TzypfkUhscqXjOJgDwjIceBNNOfh3Jy+V8hQZrVFCw0A=
@@ -1733,9 +1677,9 @@ A.3.2.1.  Example 3, Step A: Message forwarded to list members with
 
 
 
-OAR-DEV Group, et al.   Expires October 30, 2016               [Page 31]
+OAR-DEV Group, et al.   Expires November 24, 2016              [Page 30]
 
-Internet-Draft                     ARC                        April 2016
+Internet-Draft                     ARC                          May 2016
 
 
    o  example.org adds a DKIM-Signature
@@ -1789,14 +1733,14 @@ Internet-Draft                     ARC                        April 2016
 
 
 
-OAR-DEV Group, et al.   Expires October 30, 2016               [Page 32]
+OAR-DEV Group, et al.   Expires November 24, 2016              [Page 31]
 
-Internet-Draft                     ARC                        April 2016
+Internet-Draft                     ARC                          May 2016
 
 
    Return-Path: <jqd@d1.example>
    ARC-Seal: i=2; a=rsa-sha256; t=1421363107;
-       s=seal2015; d=example.org; cv=P;
+       s=seal2015; d=example.org; cv=pass;
        b=pCw3Qxgfs9E1qnyNZ+cTTF3KHgAjWwZz++Rju0BceSiuwIg0Pkk+3RZH/kaiz6
         1TX6RVT6E4gs49Sstp41K7muj1OR5R6Q6llahLlQJZ/YfDZ3NImCU52gFWLUD7L
         69EU8TzypfkUhscqXjOJgDwjIceBNNOfh3Jy+V8hQZrVFCw0A=
@@ -1822,7 +1766,7 @@ Internet-Draft                     ARC                        April 2016
        Thu, 14 Jan 2015 15:00:01 -0800 (PST)
        (envelope-from jqd@d1.example)
    ARC-Seal: i=1; a=rsa-sha256; t=1421363107;
-       s=origin2015; d=d1.example; cv=N;
+       s=origin2015; d=d1.example; cv=none;
        b=pCw3Qxgfs9E1qnyNZ+cTTF3KHgAjWwZz++Rju0BceSiuwIg0Pkk+3RZH/kaiz61
         TX6RVT6E4gs49Sstp41K7muj1OR5R6Q6llahLlQJZ/YfDZ3NImCU52gFWLUD7L69
         EU8TzypfkUhscqXjOJgDwjIceBNNOfh3Jy+V8hQZrVFCw0A=
@@ -1845,9 +1789,9 @@ Internet-Draft                     ARC                        April 2016
 
 
 
-OAR-DEV Group, et al.   Expires October 30, 2016               [Page 33]
+OAR-DEV Group, et al.   Expires November 24, 2016              [Page 32]
 
-Internet-Draft                     ARC                        April 2016
+Internet-Draft                     ARC                          May 2016
 
 
 A.3.2.2.  Example 3, Step B: Message from list forwarded with source
@@ -1901,13 +1845,13 @@ A.3.2.2.  Example 3, Step B: Message from list forwarded with source
 
 
 
-OAR-DEV Group, et al.   Expires October 30, 2016               [Page 34]
+OAR-DEV Group, et al.   Expires November 24, 2016              [Page 33]
 
-Internet-Draft                     ARC                        April 2016
+Internet-Draft                     ARC                          May 2016
 
 
    ARC-Seal: i=3; a=rsa-sha256; t=1421363253;
-       s=notary01; d=gmail.com; cv=P;
+       s=notary01; d=gmail.com; cv=pass;
        b=sjHDMriRZ0Mui5eVEOGscRHWbQHcy97lvrduHQ8h+f2CfIrxUiKOE44x3LQwD
         WRYbDjf5fcM9MdcIahC+cP59BQ9Y9DHwMDzwRTnM7NVb4kY+tSaVnLoIOaP9lF
         /suttxO+RRNr0fCFw==
@@ -1930,7 +1874,7 @@ Internet-Draft                     ARC                        April 2016
        smtp.from=jqd@d1.example; dkim=pass (1024-bit key)
        header.i=@example.org; dmarc=fail; arc=pass
    ARC-Seal: i=2; a=rsa-sha256; t=1421363107;
-       s=seal2015; d=example.org; cv=P;
+       s=seal2015; d=example.org; cv=pass;
        b=pCw3Qxgfs9E1qnyNZ+cTTF3KHgAjWwZz++Rju0BceSiuwIg0Pkk+3RZH/kaiz61
         TX6RVT6E4gs49Sstp41K7muj1OR5R6Q6llahLlQJZ/YfDZ3NImCU52gFWLUD7L69
         EU8TzypfkUhscqXjOJgDwjIceBNNOfh3Jy+V8hQZrVFCw0A=
@@ -1957,14 +1901,14 @@ Internet-Draft                     ARC                        April 2016
 
 
 
-OAR-DEV Group, et al.   Expires October 30, 2016               [Page 35]
+OAR-DEV Group, et al.   Expires November 24, 2016              [Page 34]
 
-Internet-Draft                     ARC                        April 2016
+Internet-Draft                     ARC                          May 2016
 
 
        (envelope-from jqd@d1.example)
    ARC-Seal: i=1; a=rsa-sha256; t=1421363107;
-       s=origin2015; d=d1.example; cv=N;
+       s=origin2015; d=d1.example; cv=none;
        b=pCw3Qxgfs9E1qnyNZ+cTTF3KHgAjWwZz++Rju0BceSiuwIg0Pkk+3RZH/kaiz61
         TX6RVT6E4gs49Sstp41K7muj1OR5R6Q6llahLlQJZ/YfDZ3NImCU52gFWLUD7L69
         EU8TzypfkUhscqXjOJgDwjIceBNNOfh3Jy+V8hQZrVFCw0A=
@@ -2013,9 +1957,9 @@ A.3.3.  Example 3: Message received by Recipient
 
 
 
-OAR-DEV Group, et al.   Expires October 30, 2016               [Page 36]
+OAR-DEV Group, et al.   Expires November 24, 2016              [Page 35]
 
-Internet-Draft                     ARC                        April 2016
+Internet-Draft                     ARC                          May 2016
 
 
    Here's what the message looks like at this point:
@@ -2029,7 +1973,7 @@ Authentication-Results: clothilde.example.com; spf=fail
     smtp.from=jqd@d1.example; dkim=pass (1024-bit key)
     header.i=@gmail.com; dmarc=fail; arc=pass
 ARC-Seal: i=3; a=rsa-sha256; t=1421363253;
-    s=notary01; d=gmail.com; cv=P;
+    s=notary01; d=gmail.com; cv=pass;
     b=sjHDMriRZ0Mui5eVEOGscRHWbQHcy97lvrduHQ8h+f2CfIrxUiKOE44x3LQwDW
      RYbDjf5fcM9MdcIahC+cP59BQ9Y9DHwMDzwRTnM7NVb4kY+tSaVnLoIOaP9lF/s
      uttxO+RRNr0fCFw==
@@ -2052,7 +1996,7 @@ Authentication-Results: i=3; gmail.com; spf=fail
     smtp.from=jqd@d1.example; dkim=pass (1024-bit key)
     header.i=@example.org; dmarc=fail; arc=pass
 ARC-Seal: i=2; a=rsa-sha256; t=1421363107;
-    s=seal2015; d=example.org; cv=P;
+    s=seal2015; d=example.org; cv=pass;
     b=pCw3Qxgfs9E1qnyNZ+cTTF3KHgAjWwZz++Rju0BceSiuwIg0Pkk+3RZH/kaiz6
      1TX6RVT6E4gs49Sstp41K7muj1OR5R6Q6llahLlQJZ/YfDZ3NImCU52gFWLUD7L
      69EU8TzypfkUhscqXjOJgDwjIceBNNOfh3Jy+V8hQZrVFCw0A=
@@ -2069,9 +2013,9 @@ Received: from segv.d1.example (segv.d1.example [72.52.75.15])
 
 
 
-OAR-DEV Group, et al.   Expires October 30, 2016               [Page 37]
+OAR-DEV Group, et al.   Expires November 24, 2016              [Page 36]
 
-Internet-Draft                     ARC                        April 2016
+Internet-Draft                     ARC                          May 2016
 
 
     for <arc@example.org>; Thu, 14 Jan 2015 15:01:30 -0800 (PST)
@@ -2086,7 +2030,7 @@ Received: from [10.10.10.131] (w-x-y-z.dsl.static.isp.com [w.x.y.z])
     Thu, 14 Jan 2015 15:00:01 -0800 (PST)
     (envelope-from jqd@d1.example)
 ARC-Seal: i=1; a=rsa-sha256; t=1421363107;
-    s=origin2015; d=d1.example; cv=N;
+    s=origin2015; d=d1.example; cv=none;
     b=pCw3Qxgfs9E1qnyNZ+cTTF3KHgAjWwZz++Rju0BceSiuwIg0Pkk+3RZH/kaiz61
      TX6RVT6E4gs49Sstp41K7muj1OR5R6Q6llahLlQJZ/YfDZ3NImCU52gFWLUD7L69
      EU8TzypfkUhscqXjOJgDwjIceBNNOfh3Jy+V8hQZrVFCw0A=
@@ -2125,17 +2069,15 @@ Appendix B.  Acknowledgements
 
 
 
-OAR-DEV Group, et al.   Expires October 30, 2016               [Page 38]
+OAR-DEV Group, et al.   Expires November 24, 2016              [Page 37]
 
-Internet-Draft                     ARC                        April 2016
+Internet-Draft                     ARC                          May 2016
 
 
 Appendix C.  Comments and Feedback
 
    Please address all comments, discussions, and questions to arc-
    discuss@dmarc.org [1][mailto:arc-discuss@dmarc.org].
-
-Appendix D.  Historical Note
 
 Authors' Addresses
 
@@ -2181,4 +2123,6 @@ Authors' Addresses
 
 
 
-OAR-DEV Group, et al.   Expires October 30, 2016               [Page 39]
+
+
+OAR-DEV Group, et al.   Expires November 24, 2016              [Page 38]
