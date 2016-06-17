@@ -23,8 +23,12 @@
 
 #define	ARC_HASHBUFSIZE	4096
 
+#define	ARC_CANONTYPE_HEADER	0
+#define	ARC_CANONTYPE_BODY	1
+#define	ARC_CANONTYPE_SEAL	2
+
 /* prototypes */
-extern ARC_STAT arc_add_canon __P((ARC_MESSAGE *, _Bool, int,
+extern ARC_STAT arc_add_canon __P((ARC_MESSAGE *, int, int,
                                    u_char *, struct arc_hdrfield *,
                                    ssize_t length, ARC_CANON **));
 extern ARC_STAT arc_canon_bodychunk __P((ARC_MESSAGE *, u_char *, size_t));
@@ -39,6 +43,7 @@ extern ARC_STAT arc_canon_header_string __P((struct arc_dstring *,
 extern ARC_STAT arc_canon_init __P((ARC_MESSAGE *, _Bool, _Bool));
 extern u_long arc_canon_minbody __P((ARC_MESSAGE *));
 extern ARC_STAT arc_canon_runheaders __P((ARC_MESSAGE *));
+extern ARC_STAT arc_canon_runheaders_seal __P((ARC_MESSAGE *));
 extern int arc_canon_selecthdrs __P((ARC_MESSAGE *, u_char *,
                                      struct arc_hdrfield **, int));
 extern ARC_STAT arc_canon_signature __P((ARC_MESSAGE *, struct arc_hdrfield *));

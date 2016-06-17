@@ -51,6 +51,7 @@ extern "C" {
 #define	ARC_MSGSIG_HDRNAME	"ARC-Message-Signature"
 #define	ARC_MSGSIG_HDRNAMELEN	sizeof(ARC_MSGSIG_HDRNAME)
 #define	ARC_SEAL_HDRNAME	"ARC-Seal"
+#define	ARC_SEAL_HDRNAMELEN	sizeof(ARC_SEAL_HDRNAME)
 
 /* special DNS tokens */
 #define	ARC_DNSKEYNAME		"_domainkey"

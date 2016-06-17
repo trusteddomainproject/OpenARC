@@ -85,6 +85,14 @@ struct arc_hdrfield
 /* hdr_flags bits */
 #define	ARC_HDR_SIGNED		0x01
 
+/* struct arc_set -- a complete single set of ARC header fields */
+struct arc_set
+{
+	struct arc_hdrfield *	arcset_aar;
+	struct arc_hdrfield *	arcset_ams;
+	struct arc_hdrfield *	arcset_as;
+};
+
 /* struct arc_plist -- a parameter/value pair */
 struct arc_plist
 {
@@ -93,12 +101,13 @@ struct arc_plist
 	struct arc_plist *	plist_next;
 };
 
-/* struct arc_set -- a set of parameter/value pairs */
+/* struct arc_kvset -- a set of parameter/value pairs */
 struct arc_kvset
 {
 	_Bool			set_bad;
 	arc_kvsettype_t		set_type;
 	u_char *		set_data;
+	void *			set_udata;
 	struct arc_plist *	set_plist[NPRINTABLE];
 	struct arc_kvset *	set_next;
 };
@@ -107,8 +116,8 @@ struct arc_kvset
 struct arc_canon
 {
 	_Bool			canon_done;
-	_Bool			canon_hdr;
 	_Bool			canon_blankline;
+	int			canon_type;
 	int			canon_lastchar;
 	int			canon_bodystate;
 	u_int			canon_hashtype;
@@ -159,6 +168,7 @@ struct arc_msghandle
 	struct arc_xtag *	arc_xtags;
 	struct arc_dstring *	arc_canonbuf;
 	struct arc_dstring *	arc_hdrbuf;
+	struct arc_canon *	arc_sealcanon;
 	struct arc_canon *	arc_hdrcanon;
 	struct arc_canon *	arc_bodycanon;
 	struct arc_canon *	arc_canonhead;
@@ -169,6 +179,7 @@ struct arc_msghandle
 	struct arc_hdrfield *	arc_sealtail;
 	struct arc_kvset *	arc_kvsethead;
 	struct arc_kvset *	arc_kvsettail;
+	struct arc_set *	arc_sets;
 	ARC_LIB *		arc_library;
 	const void *		arc_user_context;
 };

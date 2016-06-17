@@ -684,6 +684,7 @@ arc_canon_cleanup(ARC_MESSAGE *msg)
 **  Parameters:
 **  	msg -- verification handle
 **  	hdr -- TRUE iff this is specifying a header canonicalization
+**  	type -- an ARC_CANONTYPE_* constant
 **  	hashtype -- hash type
 **  	hdrlist -- for header canonicalization, the header list
 **  	sighdr -- pointer to header being verified (NULL for signing)
@@ -695,7 +696,7 @@ arc_canon_cleanup(ARC_MESSAGE *msg)
 */
 
 ARC_STAT
-arc_add_canon(ARC_MESSAGE *msg, _Bool hdr, int hashtype,
+arc_add_canon(ARC_MESSAGE *msg, int type, int hashtype,
                u_char *hdrlist, struct arc_hdrfield *sighdr,
                ssize_t length, ARC_CANON **cout)
 {
@@ -714,13 +715,14 @@ arc_add_canon(ARC_MESSAGE *msg, _Bool hdr, int hashtype,
 		assert(hashtype == ARC_HASHTYPE_SHA1);
 	}
 
-	if (!hdr)
+	if (type == ARC_CANONTYPE_HEADER)
 	{
 		for (cur = msg->arc_canonhead;
 		     cur != NULL;
 		     cur = cur->canon_next)
 		{
-			if (cur->canon_hdr || cur->canon_hashtype != hashtype)
+			if (cur->canon_type == ARC_CANONTYPE_HEADER ||
+			    cur->canon_hashtype != hashtype)
 				continue;
 
 			if (length != cur->canon_length)
@@ -741,11 +743,11 @@ arc_add_canon(ARC_MESSAGE *msg, _Bool hdr, int hashtype,
 	}
 
 	new->canon_done = FALSE;
-	new->canon_hdr = hdr;
+	new->canon_type = type;
 	new->canon_hashtype = hashtype;
 	new->canon_hash = NULL;
 	new->canon_wrote = 0;
-	if (hdr)
+	if (type != ARC_CANONTYPE_BODY)
 	{
 		new->canon_length = (ssize_t) -1;
 		new->canon_remain = (ssize_t) -1;
@@ -955,8 +957,61 @@ arc_canon_selecthdrs(ARC_MESSAGE *msg, u_char *hdrlist,
 }
 
 /*
-**  ARC_CANON_RUNHEADERS -- run the headers through all header
-**                           canonicalizations
+**  ARC_CANON_RUNHEADERS_SEAL -- run the ARC-specific header fields through
+**                               seal canonicalization(s)
+**
+**  Parameters:
+**  	msg -- ARC_MESSAGE handle
+**
+**  Return value:
+**  	An ARC_STAT_* constant.
+*/
+
+ARC_STAT
+arc_canon_runheaders_seal(ARC_MESSAGE *msg)
+{
+	ARC_STAT status;
+	u_int n;
+
+	assert(msg != NULL);
+
+	ARC_CANON *cur;
+
+	for (cur = msg->arc_canonhead; cur != NULL; cur = cur->canon_next)
+	{
+		/* skip done hashes and those which are of the wrong type */
+		if (cur->canon_done || cur->canon_type != ARC_CANONTYPE_SEAL)
+			continue;
+
+		/* canonicalize each set, in the right order */
+		for (n = 0; n < msg->arc_nsets; n++)
+		{
+			status = arc_canon_header(msg, cur,
+			                          msg->arc_sets[n].arcset_aar,
+			                          TRUE);
+			if (status != ARC_STAT_OK)
+				return status;
+
+			status = arc_canon_header(msg, cur,
+			                          msg->arc_sets[n].arcset_ams,
+			                          TRUE);
+			if (status != ARC_STAT_OK)
+				return status;
+
+			status = arc_canon_header(msg, cur,
+			                          msg->arc_sets[n].arcset_as,
+			                          TRUE);
+			if (status != ARC_STAT_OK)
+				return status;
+		}
+	}
+
+	return ARC_STAT_OK;
+}
+
+/*
+**  ARC_CANON_RUNHEADERS -- run the headers through all header and seal
+**                          canonicalizations
 **
 **  Parameters:
 **  	msg -- ARC message handle
@@ -1017,7 +1072,7 @@ arc_canon_runheaders(ARC_MESSAGE *msg)
 	for (cur = msg->arc_canonhead; cur != NULL; cur = cur->canon_next)
 	{
 		/* skip done hashes and those which are of the wrong type */
-		if (cur->canon_done || !cur->canon_hdr)
+		if (cur->canon_done || cur->canon_type != ARC_CANONTYPE_HEADER)
 			continue;
 
 		signing = (cur->canon_sigheader == NULL);
@@ -1282,7 +1337,7 @@ arc_canon_signature(ARC_MESSAGE *msg, struct arc_hdrfield *hdr)
 	for (cur = msg->arc_canonhead; cur != NULL; cur = cur->canon_next)
 	{
 		/* skip done hashes and those which are of the wrong type */
-		if (cur->canon_done || !cur->canon_hdr)
+		if (cur->canon_done || cur->canon_type != ARC_CANONTYPE_HEADER)
 			continue;
 
 		/* prepare the data */
@@ -1367,7 +1422,7 @@ arc_canon_minbody(ARC_MESSAGE *msg)
 	for (cur = msg->arc_canonhead; cur != NULL; cur = cur->canon_next)
 	{
 		/* skip done hashes and those which are of the wrong type */
-		if (cur->canon_done || cur->canon_hdr)
+		if (cur->canon_done || cur->canon_type != ARC_CANONTYPE_BODY)
 			continue;
 
 		/* if this one wants the whole message, short-circuit */
@@ -1416,7 +1471,7 @@ arc_canon_bodychunk(ARC_MESSAGE *msg, u_char *buf, size_t buflen)
 	for (cur = msg->arc_canonhead; cur != NULL; cur = cur->canon_next)
 	{
 		/* skip done hashes and those which are of the wrong type */
-		if (cur->canon_done || cur->canon_hdr)
+		if (cur->canon_done || cur->canon_type != ARC_CANONTYPE_BODY)
 			continue;
 
 		start = buf;
@@ -1589,7 +1644,7 @@ arc_canon_closebody(ARC_MESSAGE *msg)
 	for (cur = msg->arc_canonhead; cur != NULL; cur = cur->canon_next)
 	{
 		/* skip done hashes or header canonicalizations */
-		if (cur->canon_done || cur->canon_hdr)
+		if (cur->canon_done || cur->canon_type != ARC_CANONTYPE_BODY)
 			continue;
 
 		/* handle unprocessed content */

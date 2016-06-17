@@ -166,19 +166,21 @@ arc_error(ARC_MESSAGE *msg, const char *format, ...)
 }
 
 /*
-**  ARC_GENAMSHDR -- generate a signature header
+**  ARC_GENAMSHDR -- generate a signature or seal header field
 **
 **  Parameters:
 **  	arc -- ARC_MESSAGE handle
 **  	dstr -- dstring to which to write
 **  	delim -- delimiter
+**  	seal -- true IFF a seal is being generated
 **
 **  Return value:
 **  	Number of bytes written to "dstr", or <= 0 on error.
 */
 
 static size_t
-arc_genamshdr(ARC_MESSAGE *msg, struct arc_dstring *dstr, char *delim)
+arc_genamshdr(ARC_MESSAGE *msg, struct arc_dstring *dstr, char *delim,
+              _Bool seal)
 {
 	_Bool firsthdr;
 	_Bool nosigner = FALSE;
@@ -205,18 +207,17 @@ arc_genamshdr(ARC_MESSAGE *msg, struct arc_dstring *dstr, char *delim)
 
 	/* basic required stuff */
 	if (sizeof(msg->arc_timestamp) == sizeof(unsigned long long))
-		format = "a=%s;%sd=%s;%ss=%s;%st=%llu";
+		format = "i=%u;%sa=%s;%sd=%s;%ss=%s;%st=%llu";
 	else if (sizeof(msg->arc_timestamp) == sizeof(unsigned long))
-		format = "a=%s;%sd=%s;%ss=%s;%st=%lu";
+		format = "i=%u;%sa=%s;%sd=%s;%ss=%s;%st=%lu";
 	else 
-		format = "a=%s;%sd=%s;%ss=%s;%st=%u";
+		format = "i=%u;%sa=%s;%sd=%s;%ss=%s;%st=%u";
 
 
 	(void) arc_dstring_printf(dstr, format,
-	                          delim,
+                                  msg->arc_nsets + 1, delim,
 	                          arc_code_to_name(algorithms,
-	                                           msg->arc_signalg),
-	                          delim,
+	                                           msg->arc_signalg), delim,
 	                          msg->arc_domain, delim,
 	                          msg->arc_selector, delim,
 	                          msg->arc_timestamp);
@@ -271,50 +272,56 @@ arc_genamshdr(ARC_MESSAGE *msg, struct arc_dstring *dstr, char *delim)
 		}
 	}
 
-	memset(b64hash, '\0', sizeof b64hash);
-
-	status = arc_canon_closebody(msg);
-	if (status != ARC_STAT_OK)
-		return 0;
-
-	status = arc_canon_getfinal(msg->arc_bodycanon, &hash, &hashlen);
-	if (status != ARC_STAT_OK)
+	if (!seal)
 	{
-		arc_error(msg, "arc_canon_getfinal() failed");
-		return (size_t) -1;
-	}
+		memset(b64hash, '\0', sizeof b64hash);
 
-	status = arc_base64_encode(hash, hashlen, b64hash, sizeof b64hash);
-	arc_dstring_printf(dstr, ";%sbh=%s", delim, b64hash);
+		status = arc_canon_closebody(msg);
+		if (status != ARC_STAT_OK)
+			return 0;
 
-	/* l= */
-	if (msg->arc_partial)
-	{
-		arc_dstring_printf(dstr, ";%sl=%lu", delim,
-		                   (u_long) msg->arc_bodycanon->canon_wrote);
-	}
-
-	/* h= */
-	firsthdr = TRUE;
-	for (hdr = msg->arc_hhead; hdr != NULL; hdr = hdr->hdr_next)
-	{
-		if ((hdr->hdr_flags & ARC_HDR_SIGNED) == 0)
-			continue;
-
-		if (!firsthdr)
+		status = arc_canon_getfinal(msg->arc_bodycanon,
+		                            &hash, &hashlen);
+		if (status != ARC_STAT_OK)
 		{
-			arc_dstring_cat1(dstr, ':');
-		}
-		else
-		{
-			arc_dstring_cat1(dstr, ';');
-			arc_dstring_catn(dstr, (u_char *) delim, delimlen);
-			arc_dstring_catn(dstr, (u_char *) "h=", 2);
+			arc_error(msg, "arc_canon_getfinal() failed");
+			return (size_t) -1;
 		}
 
-		firsthdr = FALSE;
+		status = arc_base64_encode(hash, hashlen,
+		                           b64hash, sizeof b64hash);
+		arc_dstring_printf(dstr, ";%sbh=%s", delim, b64hash);
 
-		arc_dstring_catn(dstr, hdr->hdr_text, hdr->hdr_namelen);
+		/* l= */
+		if (msg->arc_partial)
+		{
+			arc_dstring_printf(dstr, ";%sl=%lu", delim,
+		                   	(u_long) msg->arc_bodycanon->canon_wrote);
+		}
+
+		/* h= */
+		firsthdr = TRUE;
+		for (hdr = msg->arc_hhead; hdr != NULL; hdr = hdr->hdr_next)
+		{
+			if ((hdr->hdr_flags & ARC_HDR_SIGNED) == 0)
+				continue;
+
+			if (!firsthdr)
+			{
+				arc_dstring_cat1(dstr, ':');
+			}
+			else
+			{
+				arc_dstring_cat1(dstr, ';');
+				arc_dstring_catn(dstr, (u_char *) delim,
+				                 delimlen);
+				arc_dstring_catn(dstr, (u_char *) "h=", 2);
+			}
+
+			firsthdr = FALSE;
+
+			arc_dstring_catn(dstr, hdr->hdr_text, hdr->hdr_namelen);
+		}
 	}
 
 	/* and finally, an empty b= */
@@ -334,6 +341,7 @@ arc_genamshdr(ARC_MESSAGE *msg, struct arc_dstring *dstr, char *delim)
 **  	initial -- initial line width
 **  	buf -- pointer to buffer containing the signature (returned)
 **  	buflen -- number of bytes at "buf" (returned)
+**  	seal -- true IFF we're generating a seal
 **
 **  Return value:
 **  	An ARC_STAT_* constant.
@@ -344,7 +352,8 @@ arc_genamshdr(ARC_MESSAGE *msg, struct arc_dstring *dstr, char *delim)
 */
 
 ARC_STAT
-arc_getamshdr_d(ARC_MESSAGE *msg, size_t initial, u_char **buf, size_t *buflen)
+arc_getamshdr_d(ARC_MESSAGE *msg, size_t initial, u_char **buf, size_t *buflen,
+                _Bool seal)
 {
 	size_t len;
 	char *ctx;
@@ -380,7 +389,7 @@ arc_getamshdr_d(ARC_MESSAGE *msg, size_t initial, u_char **buf, size_t *buflen)
 	}
 
 	/* compute and extract the signature header */
-	len = arc_genamshdr(msg, tmpbuf, DELIMITER);
+	len = arc_genamshdr(msg, tmpbuf, DELIMITER, seal);
 	if (len == 0)
 	{
 		arc_dstring_free(tmpbuf);
@@ -855,6 +864,40 @@ arc_set_next(ARC_KVSET *cur, arc_kvsettype_t type)
 }
 
 /*
+**  ARC_SET_TYPE -- return the type of a KVSET
+**
+**  Parameters:
+**  	set -- set of interest
+**
+**  Return value:
+**  	Its type field, one of the ARC_KVSETTYPE_* constants.
+*/
+
+static arc_kvsettype_t
+arc_set_type(ARC_KVSET *set)
+{
+	return set->set_type;
+}
+
+/*
+**  ARC_SET_UDATA -- return the udata of a KVSET
+**
+**  Parameters:
+**  	set -- set of interest
+**
+**  Return value:
+**  	Its udata, as provided to arc_process_set() originally.
+*/
+
+static void *
+arc_set_udata(ARC_KVSET *set)
+{
+	return set->set_udata;
+}
+
+/*
+**  ARC_ADD_PLIST -- add an entry to a parameter-value set
+/*
 **  ARC_ADD_PLIST -- add an entry to a parameter-value set
 **
 **  Parameters:
@@ -933,13 +976,15 @@ arc_add_plist(ARC_MESSAGE *msg, ARC_KVSET *set, u_char *param, u_char *value,
 **  	type -- an ARC_KVSETTYPE constant
 **  	str -- string to be scanned
 **  	len -- number of bytes available at "str"
+**  	data -- opaque handle to store with the set
 **
 **  Return value:
 **  	An ARC_STAT constant.
 */
 
 static ARC_STAT
-arc_process_set(ARC_MESSAGE *msg, arc_kvsettype_t type, u_char *str, size_t len)
+arc_process_set(ARC_MESSAGE *msg, arc_kvsettype_t type, u_char *str, size_t len,
+                void *data)
 {
 	_Bool spaced;
 	int state;
@@ -981,6 +1026,7 @@ arc_process_set(ARC_MESSAGE *msg, arc_kvsettype_t type, u_char *str, size_t len)
 		return ARC_STAT_INTERNAL;
 	}
 
+	set->set_udata = data;
 	set->set_type = type;
 	settype = arc_code_to_name(settypes, type);
 
@@ -1552,10 +1598,10 @@ arc_eoh(ARC_MESSAGE *msg)
 	u_int c;
 	u_int n;
 	u_int nsets = 0;
+	arc_kvsettype_t type;
 	ARC_STAT status;
 	struct arc_hdrfield *h;
 	ARC_KVSET *set;
-	u_int *sets = NULL;
 	u_char *inst;
 
 	/*
@@ -1577,7 +1623,8 @@ arc_eoh(ARC_MESSAGE *msg)
 			kvtype = arc_name_to_code(archdrnames, hnbuf);
 			status = arc_process_set(msg, kvtype,
 			                         h->hdr_colon + 1,
-			                         h->hdr_textlen - h->hdr_namelen - 1);
+			                         h->hdr_textlen - h->hdr_namelen - 1,
+                                                 h);
 			if (status != ARC_STAT_OK)
 				return status;
 		}
@@ -1587,157 +1634,105 @@ arc_eoh(ARC_MESSAGE *msg)
 	**  Ensure all sets are complete.
 	*/
 
-	/* XXX -- build up the array of ARC sets, for use later */
-
-	/* walk the seals */
-	for (set = arc_set_first(msg, ARC_KVSETTYPE_SEAL);
+	/* find the highest instance number we've got */
+	for (set = arc_set_first(msg, ARC_KVSETTYPE_ANY);
              set != NULL;
-             set = arc_set_next(set, ARC_KVSETTYPE_SEAL))
+             set = arc_set_next(set, ARC_KVSETTYPE_ANY))
 	{
 		inst = arc_param_get(set, "i");
 		n = strtoul(inst, NULL, 10);
-		if (n >= nsets)
+		nsets = MAX(n, nsets);
+	}
+
+	msg->arc_nsets = nsets;
+
+	/* build up the array of ARC sets, for use later */
+	if (nsets > 0)
+	{
+		msg->arc_sets = malloc(sizeof(struct arc_set) * nsets);
+		if (msg->arc_sets == NULL)
+			return ARC_STAT_NORESOURCE;
+		memset(msg->arc_sets, '\0', sizeof(struct arc_set) * nsets);
+	}
+
+	for (set = arc_set_first(msg, ARC_KVSETTYPE_ANY);
+             set != NULL;
+             set = arc_set_next(set, ARC_KVSETTYPE_ANY))
+	{
+		inst = arc_param_get(set, "i");
+		type = arc_set_type(set);
+		n = strtoul(inst, NULL, 10);
+
+		switch (type)
 		{
-			u_int *newsets;
-
-			if (nsets == 0)
-			{
-				newsets = (u_int *) malloc(n * sizeof(u_int));
-			}
-			else
-			{
-				newsets = (u_int *) realloc(sets,
-				                            n * sizeof(u_int));
-			}
-
-			if (newsets == NULL)
+		  case ARC_KVSETTYPE_AR:
+			if (msg->arc_sets[n - 1].arcset_aar != NULL)
 			{
 				arc_error(msg,
-				          "unable to allocate %d byte(s)",
-				          n * sizeof(u_int));
-				if (sets != NULL)
-					free(sets);
-				return ARC_STAT_NORESOURCE;
-			}
-
-			memset(&newsets[n], '\0', (n + 1) * sizeof(u_int));
-			nsets = n;
-			sets = newsets;
-			sets[n - 1] = 1;
-		}
-		else
-		{
-			if (sets[n - 1] != 0)
-			{
-				arc_error(msg,
-				          "duplicate ARC seal at instance %u",
+				          "multiple ARC auth results at instance %u",
 				          n);
-				msg->arc_sigerror = ARC_SIGERROR_DUPINSTANCE;
-				free(sets);
 				return ARC_STAT_SYNTAX;
 			}
 
-			sets[n - 1] = 1;
+			msg->arc_sets[n - 1].arcset_aar = arc_set_udata(set);
+			break;
+
+		  case ARC_KVSETTYPE_SIGNATURE:
+			if (msg->arc_sets[n - 1].arcset_ams != NULL)
+			{
+				arc_error(msg,
+				          "multiple ARC signatures at instance %u",
+				          n);
+				return ARC_STAT_SYNTAX;
+			}
+
+			msg->arc_sets[n - 1].arcset_ams = arc_set_udata(set);
+			break;
+
+		  case ARC_KVSETTYPE_SEAL:
+			if (msg->arc_sets[n - 1].arcset_as != NULL)
+			{
+				arc_error(msg,
+				          "multiple ARC seals at instance %u",
+				          n);
+				return ARC_STAT_SYNTAX;
+			}
+
+			msg->arc_sets[n - 1].arcset_as = arc_set_udata(set);
+			break;
 		}
 	}
 
-	/* ensure there's a complete sequence */
-	for (c = 0; c < n; c++)
+	/* look for invalid stuff */
+	for (c = 0; c < nsets; c++)
 	{
-		if (sets[c] == 0)
-		{
-			arc_error(msg, "ARC seal gap at instance %u", c + 1);
-			free(sets);
-			return ARC_STAT_SYNTAX;
-		}
-	}
-
-	/* make sure all the seals have signatures */
-	memset(sets, '\0', nsets * sizeof(u_int));
-	for (set = arc_set_first(msg, ARC_KVSETTYPE_SIGNATURE);
-             set != NULL;
-             set = arc_set_next(set, ARC_KVSETTYPE_SIGNATURE))
-	{
-		inst = arc_param_get(set, "i");
-		n = strtoul(inst, NULL, 10);
-		if (n > nsets)
+		if (msg->arc_sets[c].arcset_aar == NULL ||
+		    msg->arc_sets[c].arcset_ams == NULL ||
+		    msg->arc_sets[c].arcset_as == NULL)
 		{
 			arc_error(msg,
-			          "ARC signature instance %u out of range",
-			          n);
-			free(sets);
+			          "missing or incomplete ARC set at instance %u",
+			          c);
 			return ARC_STAT_SYNTAX;
 		}
-
-		if (sets[n] == 1)
-		{
-			arc_error(msg,
-			          "duplicate ARC signature at instance %u",
-			          n);
-			free(sets);
-			return ARC_STAT_SYNTAX;
-		}
-
-		sets[n] = 1;
 	}
 
-	for (c = 0; c < n; c++)
+	/* process everything */
+	status = arc_canon_runheaders(msg);
+	if (status != ARC_STAT_OK)
 	{
-		if (sets[c] == 0)
-		{
-			arc_error(msg, "ARC signature gap at instance %u",
-			          c + 1);
-			free(sets);
-			return ARC_STAT_SYNTAX;
-		}
+		arc_error(msg, "arc_canon_runheaders() failed");
+		return ARC_STAT_SYNTAX;
 	}
 
-	/* make sure all the seals have A-Rs */
-	memset(sets, '\0', nsets * sizeof(u_int));
-	for (set = arc_set_first(msg, ARC_KVSETTYPE_AR);
-             set != NULL;
-             set = arc_set_next(set, ARC_KVSETTYPE_AR))
+	status = arc_canon_runheaders_seal(msg);
+	if (status != ARC_STAT_OK)
 	{
-		inst = arc_param_get(set, "i");
-		n = strtoul(inst, NULL, 10);
-		if (n > nsets)
-		{
-			arc_error(msg,
-			          "ARC authentication results instance %u out of range",
-			          n);
-			free(sets);
-			return ARC_STAT_SYNTAX;
-		}
-
-		if (sets[n] == 1)
-		{
-			arc_error(msg,
-			          "duplicate ARC authentication results at instance %u",
-			          n);
-			free(sets);
-			return ARC_STAT_SYNTAX;
-		}
-
-		sets[n] = 1;
+		arc_error(msg, "arc_canon_runheaders_seal() failed");
+		return ARC_STAT_SYNTAX;
 	}
 
-	for (c = 0; c < n; c++)
-	{
-		if (sets[c] == 0)
-		{
-			arc_error(msg,
-			          "ARC authentication results gap at instance %u",
-			          c + 1);
-			free(sets);
-			return ARC_STAT_SYNTAX;
-		}
-	}
-
-	/* ...finally! */
-	msg->arc_nsets = nsets;
-
-	/* process everything else */
-	return arc_canon_runheaders(msg);
+	return ARC_STAT_OK;
 }
 
 /*
@@ -1875,7 +1870,6 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *selector,
 	u_char *b64sig;
 	ARC_HDRFIELD *h;
 	ARC_HDRFIELD hdr;
-	ARC_CANON *hc;
 	struct arc_dstring *dstr;
 	BIO *keydata;
 	EVP_PKEY *pkey;
@@ -1887,6 +1881,10 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *selector,
 	assert(domain != NULL);
 	assert(key != NULL);
 	assert(keylen > 0);
+
+	/* copy required stuff */
+	msg->arc_domain = domain;
+	msg->arc_selector = selector;
 
 	/* load the key */
 	keydata = BIO_new_mem_buf(key, keylen);
@@ -1973,6 +1971,7 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *selector,
 	                                arc_dstring_len(dstr), &h);
 	if (status != ARC_STAT_OK)
 	{
+		arc_error(msg, "arc_parse_header_field() failed");
 		arc_dstring_free(dstr);
 		free(sigout);
 		RSA_free(rsa);
@@ -1991,6 +1990,7 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *selector,
 	status = arc_canon_closebody(msg);
 	if (status != ARC_STAT_OK)
 	{
+		arc_error(msg, "arc_canon_closebody() failed");
 		arc_dstring_free(dstr);
 		free(sigout);
 		RSA_free(rsa);
@@ -2001,11 +2001,13 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *selector,
 	/* construct the AMS */
 	arc_dstring_blank(dstr);
 	arc_dstring_catn(dstr, (u_char *) ARC_MSGSIG_HDRNAME ": ",
-	                 sizeof ARC_MSGSIG_HDRNAME + 1);
+	                 sizeof ARC_MSGSIG_HDRNAME);
 
-	status = arc_getamshdr_d(msg, arc_dstring_len(dstr), &sighdr, &len);
+	status = arc_getamshdr_d(msg, arc_dstring_len(dstr), &sighdr, &len,
+	                         FALSE);
 	if (status != ARC_STAT_OK)
 	{
+		arc_error(msg, "arc_getamshdr_d() failed");
 		arc_dstring_free(dstr);
 		free(sigout);
 		RSA_free(rsa);
@@ -2024,12 +2026,18 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *selector,
 	hdr.hdr_next = NULL;
 
 	/* canonicalize */
-	arc_canon_signature(msg, &hdr);
+	status = arc_canon_signature(msg, &hdr);
+	if (status != ARC_STAT_OK)
+	{
+		arc_error(msg, "arc_canon_signature() failed");
+		arc_dstring_free(dstr);
+		free(sigout);
+		RSA_free(rsa);
+		BIO_free(keydata);
+		return ARC_STAT_INTERNAL;
+	}
 
-	arc_dstring_free(dstr);
-
-	/* finalize */
-	status = arc_canon_getfinal(hc, &digest, &diglen);
+	status = arc_canon_getfinal(msg->arc_hdrcanon, &digest, &diglen);
 	if (status != ARC_STAT_OK)
 	{
 		arc_error(msg, "arc_canon_getfinal() failed");
@@ -2100,34 +2108,128 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *selector,
 
 	memcpy(h, &hdr, sizeof hdr);
 
-	msg->arc_sealhead = h;
+	msg->arc_sealtail->hdr_next = h;
 	msg->arc_sealtail = h;
-	
-	/* clean up */
-	free(b64sig);
-	free(sigout);
-	RSA_free(rsa);
-	BIO_free(keydata);
 
 	/* Part III: Construct a new AS */
 	arc_dstring_blank(dstr);
 
-	/* hash all the existing ARC sets */
-	for (set = 1; set <= msg->arc_nsets; set++)
+	arc_dstring_catn(dstr, (u_char *) ARC_SEAL_HDRNAME ": ",
+	                 sizeof ARC_SEAL_HDRNAME);
+
+	status = arc_getamshdr_d(msg, arc_dstring_len(dstr), &sighdr, &len,
+	                         TRUE);
+	if (status != ARC_STAT_OK)
 	{
-		/* XXX -- find the Nth ARC set */
-		/* XXX -- hash the AAR, then the AMS, then the AS */
+		arc_error(msg, "arc_getamshdr_d() failed");
+		arc_dstring_free(dstr);
+		free(sigout);
+		RSA_free(rsa);
+		BIO_free(keydata);
+		return status;
 	}
 
-	/* XXX -- build our partial AS */
-		/* XXX -- hash our generated AAR, then our AMS */
-		/* XXX -- generate an incomplete AS */
-		/* XXX -- get a digest of it */
-		/* XXX -- encrypt it */
-		/* XXX -- complete the AS */
-		/* XXX -- add it to the seal */
+	status = arc_canon_getfinal(msg->arc_sealcanon, &digest, &diglen);
+	if (status != ARC_STAT_OK)
+	{
+		arc_error(msg, "arc_canon_getseal() failed");
+		arc_dstring_free(dstr);
+		free(sigout);
+		RSA_free(rsa);
+		BIO_free(keydata);
+		return status;
+	}
+
+	/* encrypt the digest; that's our signature */
+	nid = NID_sha256;
+	rstatus = RSA_sign(nid, digest, diglen, sigout, &siglen, rsa);
+	if (rstatus != 1 || siglen == 0)
+	{
+		arc_error(msg, "RSA_sign() failed (status %d, length %d)",
+		          rstatus, siglen);
+		arc_dstring_free(dstr);
+		free(sigout);
+		RSA_free(rsa);
+		BIO_free(keydata);
+		return ARC_STAT_INTERNAL;
+	}
+
+	/* base64 encode it */
+	b64siglen = siglen * 3 + 5;
+	b64siglen += (b64siglen / 60);
+	b64sig = malloc(b64siglen);
+	if (b64sig == NULL)
+	{
+		arc_error(msg, "can't allocate %d bytes for base64 signature",
+		          b64siglen);
+		arc_dstring_free(dstr);
+		free(sigout);
+		RSA_free(rsa);
+		BIO_free(keydata);
+		return ARC_STAT_NORESOURCE;
+	}
+
+	memset(b64sig, '\0', sizeof b64siglen);
+	rstatus = arc_base64_encode(sigout, siglen, b64sig, b64siglen);
+	if (rstatus == -1)
+	{
+		arc_error(msg, "signature base64 encoding failed");
+		arc_dstring_free(dstr);
+		free(b64sig);
+		free(sigout);
+		RSA_free(rsa);
+		BIO_free(keydata);
+		return ARC_STAT_INTERNAL;
+	}
+
+	/* append it to the stub */
+	arc_dstring_cat(dstr, b64sig);
+
+	hdr.hdr_text = arc_dstring_get(dstr);
+	hdr.hdr_colon = hdr.hdr_text + ARC_SEAL_HDRNAMELEN;
+	hdr.hdr_namelen = ARC_SEAL_HDRNAMELEN;
+	hdr.hdr_textlen = len;
+	hdr.hdr_flags = 0;
+	hdr.hdr_next = NULL;
+
+	/* add it to the seal */
+	h = malloc(sizeof hdr);
+	if (h == NULL)
+	{
+		arc_error(msg, "can't allocate %d bytes", sizeof hdr);
+		arc_dstring_free(dstr);
+		free(b64sig);
+		free(sigout);
+		RSA_free(rsa);
+		BIO_free(keydata);
+		return ARC_STAT_INTERNAL;
+	}
+
+	memcpy(h, &hdr, sizeof hdr);
+
+	msg->arc_sealtail->hdr_next = h;
+	msg->arc_sealtail = h;
+	/* add it to the seal */
+	h = malloc(sizeof hdr);
+	if (h == NULL)
+	{
+		arc_error(msg, "can't allocate %d bytes", sizeof hdr);
+		arc_dstring_free(dstr);
+		RSA_free(rsa);
+		BIO_free(keydata);
+		return ARC_STAT_INTERNAL;
+	}
+
+	memcpy(h, &hdr, sizeof hdr);
+
+	msg->arc_sealtail->hdr_next = h;
+	msg->arc_sealtail = h;
 
 	arc_dstring_free(dstr);
+	free(b64sig);
+	free(sigout);
+	RSA_free(rsa);
+	BIO_free(keydata);
 
 	return ARC_STAT_OK;
 }
