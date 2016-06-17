@@ -82,6 +82,7 @@
 #include "config.h"
 #include "openarc-config.h"
 #include "openarc-crypto.h"
+#include "openarc-test.h"
 #include "openarc.h"
 #include "util.h"
 
@@ -215,6 +216,7 @@ _Bool dolog;					/* logging? (exported) */
 _Bool reload;					/* reload requested */
 _Bool no_i_whine;				/* noted ${i} is undefined */
 _Bool die;					/* global "die" flag */
+_Bool testmode;					/* test mode */
 int diesig;					/* signal to distribute */
 char *progname;					/* program name */
 char *sock;					/* listening socket */
@@ -271,6 +273,245 @@ smfi_insheader(SMFICTX *ctx, int idx, char *hname, char *hvalue)
 	return smfi_addheader(ctx, hname, hvalue);
 }
 #endif /* ! HAVE_SMFI_INSHEADER */
+
+/*
+**  ARCF_GETPRIV -- wrapper for smfi_getpriv()
+**
+**  Parameters:
+**  	ctx -- milter (or test) context
+**
+**  Return value:
+**  	The stored private pointer, or NULL.
+*/
+
+void *
+arcf_getpriv(SMFICTX *ctx)
+{
+	assert(ctx != NULL);
+
+	if (testmode)
+		return arcf_test_getpriv((void *) ctx);
+	else
+		return smfi_getpriv(ctx);
+}
+
+/*
+**  ARCF_SETPRIV -- wrapper for smfi_setpriv()
+**
+**  Parameters:
+**  	ctx -- milter (or test) context
+**
+**  Return value:
+**  	An sfsistat.
+*/
+
+sfsistat
+arcf_setpriv(SMFICTX *ctx, void *ptr)
+{
+	assert(ctx != NULL);
+
+	if (testmode)
+		return arcf_test_setpriv((void *) ctx, ptr);
+	else
+		return smfi_setpriv(ctx, ptr);
+}
+
+/*
+**  ARCF_INSHEADER -- wrapper for smfi_insheader()
+**
+**  Parameters:
+**  	ctx -- milter (or test) context
+**  	idx -- index at which to insert
+**  	hname -- header name
+**  	hvalue -- header value
+**
+**  Return value:
+**  	An sfsistat.
+*/
+
+sfsistat
+arcf_insheader(SMFICTX *ctx, int idx, char *hname, char *hvalue)
+{
+	assert(ctx != NULL);
+	assert(hname != NULL);
+	assert(hvalue != NULL);
+
+	if (testmode)
+		return arcf_test_insheader(ctx, idx, hname, hvalue);
+	else
+#ifdef HAVE_SMFI_INSHEADER
+		return smfi_insheader(ctx, idx, hname, hvalue);
+#else /* HAVE_SMFI_INSHEADER */
+		return smfi_addheader(ctx, hname, hvalue);
+#endif /* HAVE_SMFI_INSHEADER */
+}
+
+/*
+**  ARCF_CHGHEADER -- wrapper for smfi_chgheader()
+**
+**  Parameters:
+**  	ctx -- milter (or test) context
+**  	hname -- header name
+**  	idx -- index of header to be changed
+**  	hvalue -- header value
+**
+**  Return value:
+**  	An sfsistat.
+*/
+
+sfsistat
+arcf_chgheader(SMFICTX *ctx, char *hname, int idx, char *hvalue)
+{
+	assert(ctx != NULL);
+	assert(hname != NULL);
+
+	if (testmode)
+		return arcf_test_chgheader(ctx, hname, idx, hvalue);
+	else
+		return smfi_chgheader(ctx, hname, idx, hvalue);
+}
+
+/*
+**  ARCF_QUARANTINE -- wrapper for smfi_quarantine()
+**
+**  Parameters:
+**  	ctx -- milter (or test) context
+**  	reason -- quarantine reason
+**
+**  Return value:
+**  	An sfsistat.
+*/
+
+sfsistat
+arcf_quarantine(SMFICTX *ctx, char *reason)
+{
+	assert(ctx != NULL);
+
+	if (testmode)
+		return arcf_test_quarantine(ctx, reason);
+#ifdef SMFIF_QUARANTINE
+	else
+		return smfi_quarantine(ctx, reason);
+#endif /* SMFIF_QUARANTINE */
+}
+
+/*
+**  ARCF_ADDHEADER -- wrapper for smfi_addheader()
+**
+**  Parameters:
+**  	ctx -- milter (or test) context
+**  	hname -- header name
+**  	hvalue -- header value
+**
+**  Return value:
+**  	An sfsistat.
+*/
+
+sfsistat
+arcf_addheader(SMFICTX *ctx, char *hname, char *hvalue)
+{
+	assert(ctx != NULL);
+	assert(hname != NULL);
+	assert(hvalue != NULL);
+
+	if (testmode)
+		return arcf_test_addheader(ctx, hname, hvalue);
+	else
+		return smfi_addheader(ctx, hname, hvalue);
+}
+
+/*
+**  ARCF_ADDRCPT -- wrapper for smfi_addrcpt()
+**
+**  Parameters:
+**  	ctx -- milter (or test) context
+**  	addr -- address to add
+**
+**  Return value:
+**  	An sfsistat.
+*/
+
+sfsistat
+arcf_addrcpt(SMFICTX *ctx, char *addr)
+{
+	assert(ctx != NULL);
+	assert(addr != NULL);
+
+	if (testmode)
+		return arcf_test_addrcpt(ctx, addr);
+	else
+		return smfi_addrcpt(ctx, addr);
+}
+
+/*
+**  ARCF_DELRCPT -- wrapper for smfi_delrcpt()
+**
+**  Parameters:
+**  	ctx -- milter (or test) context
+**  	addr -- address to delete
+**
+**  Return value:
+**  	An sfsistat.
+*/
+
+sfsistat
+arcf_delrcpt(SMFICTX *ctx, char *addr)
+{
+	assert(ctx != NULL);
+	assert(addr != NULL);
+
+	if (testmode)
+		return arcf_test_delrcpt(ctx, addr);
+	else
+		return smfi_delrcpt(ctx, addr);
+}
+
+/*
+**  ARCF_SETREPLY -- wrapper for smfi_setreply()
+**
+**  Parameters:
+**  	ctx -- milter (or test) context
+**  	rcode -- SMTP reply code
+**  	xcode -- SMTP enhanced status code
+**  	replytxt -- reply text
+**
+**  Return value:
+**  	An sfsistat.
+*/
+
+sfsistat
+arcf_setreply(SMFICTX *ctx, char *rcode, char *xcode, char *replytxt)
+{
+	assert(ctx != NULL);
+
+	if (testmode)
+		return arcf_test_setreply(ctx, rcode, xcode, replytxt);
+	else
+		return smfi_setreply(ctx, rcode, xcode, replytxt);
+}
+
+/*
+**  ARCF_GETSYMVAL -- wrapper for smfi_getsymval()
+**
+**  Parameters:
+**  	ctx -- milter (or test) context
+**  	sym -- symbol to retrieve
+**
+**  Return value:
+**  	Pointer to the value of the requested MTA symbol.
+*/
+
+char *
+arcf_getsymval(SMFICTX *ctx, char *sym)
+{
+	assert(ctx != NULL);
+	assert(sym != NULL);
+
+	if (testmode)
+		return arcf_test_getsymval(ctx, sym);
+	else
+		return smfi_getsymval(ctx, sym);
+}
 
 /*
 **  ARCF_INIT_SYSLOG -- initialize syslog()
@@ -1081,13 +1322,10 @@ arcf_config_load(struct config *data, struct arcf_config *conf,
 
 		str = NULL;
 		(void) config_get(data, "AuthservID", &str, sizeof str);
-		if (str != NULL)
-		{
-			if (strcmp(str, "HOSTNAME") == 0)
-				conf->conf_authservid = strdup(myhostname);
-			else	
-				conf->conf_authservid = strdup(str);
-		}
+		if (str == NULL || strcmp(str, "HOSTNAME") == 0)
+			conf->conf_authservid = strdup(myhostname);
+		else	
+			conf->conf_authservid = strdup(str);
 
 		str = NULL;
 		(void) config_get(data, "BaseDirectory", &str, sizeof str);
@@ -1689,7 +1927,7 @@ arcf_cleanup(SMFICTX *ctx)
 
 	assert(ctx != NULL);
 
-	cc = (connctx) smfi_getpriv(ctx);
+	cc = (connctx) arcf_getpriv(ctx);
 
 	if (cc == NULL)
 		return;
@@ -1771,6 +2009,30 @@ arcf_cleanup(SMFICTX *ctx)
 		free(afc);
 		cc->cctx_msg = NULL;
 	}
+}
+
+/*
+**  ARCF_GETARC -- retrieve ARC handle in use
+**
+**  Parameters:
+**  	vp -- opaque pointer (from test.c)
+**
+**  Return value:
+**  	ARC handle in use, or NULL.
+*/
+
+ARC_MESSAGE *
+arcf_getarc(void *vp)
+{
+	struct connctx *cc;
+
+	assert(vp != NULL);
+
+	cc = vp;
+	if (cc->cctx_msg != NULL)
+		return cc->cctx_msg->mctx_arcmsg;
+	else
+		return NULL;
 }
 
 /*
@@ -2211,7 +2473,7 @@ mlfi_negotiate(SMFICTX *ctx,
 	if ((f1 & SMFIP_SKIP) != 0)
 		cc->cctx_milterv2 = TRUE;
 
-	(void) smfi_setpriv(ctx, cc);
+	(void) arcf_setpriv(ctx, cc);
 
 	return SMFIS_CONTINUE;
 }
@@ -2239,7 +2501,7 @@ mlfi_connect(SMFICTX *ctx, char *host, _SOCK_ADDR *ip)
 	arcf_config_reload();
 
 	/* copy hostname and IP information to a connection context */
-	cc = smfi_getpriv(ctx);
+	cc = arcf_getpriv(ctx);
 	if (cc == NULL)
 	{
 		cc = malloc(sizeof(struct connctx));
@@ -2270,7 +2532,7 @@ mlfi_connect(SMFICTX *ctx, char *host, _SOCK_ADDR *ip)
 
 		pthread_mutex_unlock(&conf_lock);
 
-		smfi_setpriv(ctx, cc);
+		arcf_setpriv(ctx, cc);
 	}
 	else
 	{
@@ -2349,7 +2611,7 @@ mlfi_envfrom(SMFICTX *ctx, char **envfrom)
 	assert(ctx != NULL);
 	assert(envfrom != NULL);
 
-	cc = (connctx) smfi_getpriv(ctx);
+	cc = (connctx) arcf_getpriv(ctx);
 	assert(cc != NULL);
 	conf = cc->cctx_config;
 
@@ -2413,7 +2675,7 @@ mlfi_header(SMFICTX *ctx, char *headerf, char *headerv)
 	assert(headerf != NULL);
 	assert(headerv != NULL);
 
-	cc = (connctx) smfi_getpriv(ctx);
+	cc = (connctx) arcf_getpriv(ctx);
 	assert(cc != NULL);
 	afc = cc->cctx_msg;
 	assert(afc != NULL);
@@ -2590,7 +2852,7 @@ mlfi_eoh(SMFICTX *ctx)
 
 	assert(ctx != NULL);
 
-	cc = (connctx) smfi_getpriv(ctx);
+	cc = (connctx) arcf_getpriv(ctx);
 	assert(cc != NULL);
 	afc = cc->cctx_msg;
 	assert(afc != NULL);
@@ -2600,7 +2862,7 @@ mlfi_eoh(SMFICTX *ctx)
 	**  Determine the message ID for logging.
 	*/
 
-	afc->mctx_jobid = (u_char *) smfi_getsymval(ctx, "i");
+	afc->mctx_jobid = (u_char *) arcf_getsymval(ctx, "i");
 	if (afc->mctx_jobid == NULL || afc->mctx_jobid[0] == '\0')
 		afc->mctx_jobid = (u_char *) JOBIDUNKNOWN;
 
@@ -2778,7 +3040,7 @@ mlfi_body(SMFICTX *ctx, u_char *bodyp, size_t bodylen)
 	assert(ctx != NULL);
 	assert(bodyp != NULL);
 
-	cc = (connctx) smfi_getpriv(ctx);
+	cc = (connctx) arcf_getpriv(ctx);
 	assert(cc != NULL);
 	afc = cc->cctx_msg;
 	assert(afc != NULL);
@@ -2802,9 +3064,9 @@ mlfi_body(SMFICTX *ctx, u_char *bodyp, size_t bodylen)
 				       "%s: error processing body chunk",
 				       afc->mctx_jobid);
 			}
-		}
 
-		return SMFIS_TEMPFAIL;
+			return SMFIS_TEMPFAIL;
+		}
 	}
 
 	return SMFIS_CONTINUE;
@@ -2842,7 +3104,7 @@ mlfi_eom(SMFICTX *ctx)
 
 	assert(ctx != NULL);
 
-	cc = (connctx) smfi_getpriv(ctx);
+	cc = (connctx) arcf_getpriv(ctx);
 	assert(cc != NULL);
 	afc = cc->cctx_msg;
 	assert(afc != NULL);
@@ -2855,7 +3117,7 @@ mlfi_eom(SMFICTX *ctx)
 
 	if (strcmp((char *) afc->mctx_jobid, JOBIDUNKNOWN) == 0)
 	{
-		afc->mctx_jobid = (u_char *) smfi_getsymval(ctx, "i");
+		afc->mctx_jobid = (u_char *) arcf_getsymval(ctx, "i");
 		if (afc->mctx_jobid == NULL || afc->mctx_jobid[0] == '\0')
 		{
 			if (no_i_whine && conf->conf_dolog)
@@ -2869,7 +3131,7 @@ mlfi_eom(SMFICTX *ctx)
 	}
 
 	/* get hostname; used in the X header and in new MIME boundaries */
-	hostname = smfi_getsymval(ctx, "j");
+	hostname = arcf_getsymval(ctx, "j");
 	if (hostname == NULL)
 		hostname = HOSTUNKNOWN;
 
@@ -2897,10 +3159,13 @@ mlfi_eom(SMFICTX *ctx)
 	**  the combined A-R for this authserv-id.
 	*/
 
-	status = arc_getseal(afc->mctx_arcmsg, &seal, conf->conf_selector,
+	status = arc_getseal(afc->mctx_arcmsg, &seal,
                              conf->conf_authservid,
-	                     conf->conf_domain, conf->conf_keydata,
-	                     conf->conf_keylen, NULL);
+	                     conf->conf_selector,
+	                     conf->conf_domain,
+	                     conf->conf_keydata,
+	                     conf->conf_keylen,
+	                     NULL);
 	if (status != ARC_STAT_OK)
 	{
 		if (conf->conf_dolog)
@@ -2923,7 +3188,7 @@ mlfi_eom(SMFICTX *ctx)
 		memset(hfname, '\0', sizeof hfname);
 		strncpy(hfname, hfptr, len);
 
-		status = smfi_insheader(ctx, 1, hfname,
+		status = arcf_insheader(ctx, 1, hfname,
 		                        arc_hdr_value(sealhdr));
 		if (status == MI_FAILURE)
 		{
@@ -2954,7 +3219,7 @@ mlfi_eom(SMFICTX *ctx)
 		         afc->mctx_jobid != NULL ? afc->mctx_jobid
 		                                 : (u_char *) JOBIDUNKNOWN);
 
-		if (smfi_insheader(ctx, 1, SWHEADERNAME, xfhdr) != MI_SUCCESS)
+		if (arcf_insheader(ctx, 1, SWHEADERNAME, xfhdr) != MI_SUCCESS)
 		{
 			if (conf->conf_dolog)
 			{
@@ -2962,7 +3227,6 @@ mlfi_eom(SMFICTX *ctx)
 				       afc->mctx_jobid, SWHEADERNAME);
 			}
 
-			arcf_cleanup(ctx);
 			return SMFIS_TEMPFAIL;
 		}
 	}
@@ -3009,7 +3273,7 @@ mlfi_close(SMFICTX *ctx)
 
 	arcf_cleanup(ctx);
 
-	cc = (connctx) smfi_getpriv(ctx);
+	cc = (connctx) arcf_getpriv(ctx);
 	if (cc != NULL)
 	{
 		pthread_mutex_lock(&conf_lock);
@@ -3023,7 +3287,7 @@ mlfi_close(SMFICTX *ctx)
 		pthread_mutex_unlock(&conf_lock);
 
 		free(cc);
-		smfi_setpriv(ctx, NULL);
+		arcf_setpriv(ctx, NULL);
 	}
 
 	return SMFIS_CONTINUE;
@@ -3108,7 +3372,6 @@ main(int argc, char **argv)
 	_Bool stricttest = FALSE;
 	_Bool configonly = FALSE;
 	_Bool querytest = FALSE;
-	_Bool testmode = FALSE;
 	int c;
 	int status;
 	int n;
@@ -3150,14 +3413,7 @@ main(int argc, char **argv)
 
 	/* initialize */
 	reload = FALSE;
-	testmode = FALSE;
-#ifdef QUERY_CACHE
-	querycache = FALSE;
-#endif /* QUERY_CACHE */
 	sock = NULL;
-#ifdef POPAUTH
-	popdb = NULL;
-#endif /* POPAUTH */
 	no_i_whine = TRUE;
 	conffile = NULL;
 
@@ -4095,7 +4351,7 @@ main(int argc, char **argv)
 
 #ifdef HAVE_SMFI_OPENSOCKET
 	/* try to establish the milter socket */
-	if (smfi_opensocket(FALSE) == MI_FAILURE)
+	if (!testmode && smfi_opensocket(FALSE) == MI_FAILURE)
 	{
 		if (curconf->conf_dolog)
 			syslog(LOG_ERR, "smfi_opensocket() failed");
@@ -4121,6 +4377,15 @@ main(int argc, char **argv)
 
 	pthread_mutex_init(&conf_lock, NULL);
 	pthread_mutex_init(&pwdb_lock, NULL);
+
+	/* perform test mode */
+	if (testfile != NULL)
+	{
+		status = arcf_testfiles(curconf->conf_libopenarc, testfile,
+		                        verbose);
+		arc_close(curconf->conf_libopenarc);
+		return status;
+	}
 
 	memset(argstr, '\0', sizeof argstr);
 	end = &argstr[sizeof argstr - 1];

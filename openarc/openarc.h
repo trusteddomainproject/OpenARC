@@ -75,4 +75,19 @@ struct Header
 extern _Bool dolog;
 extern char *progname;
 
+/* prototypes, exported for test.c */
+extern ARC_MESSAGE *arcf_getarc __P((void *));
+
+#ifdef ARCF_MILTER_PROTOTYPES
+extern sfsistat mlfi_connect __P((SMFICTX *, char *, _SOCK_ADDR *));
+extern sfsistat mlfi_envfrom __P((SMFICTX *, char **));
+extern sfsistat mlfi_envrcpt __P((SMFICTX *, char **));
+extern sfsistat mlfi_header __P((SMFICTX *, char *, char *));
+extern sfsistat mlfi_eoh __P((SMFICTX *));
+extern sfsistat mlfi_body __P((SMFICTX *, u_char *, size_t));
+extern sfsistat mlfi_eom __P((SMFICTX *));
+extern sfsistat mlfi_abort __P((SMFICTX *));
+extern sfsistat mlfi_close __P((SMFICTX *));
+#endif /* ARCF_MILTER_PROTOTYPES */
+
 #endif /* _OPENARC_H_ */
