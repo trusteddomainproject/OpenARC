@@ -1,0 +1,39 @@
+<?xml version='1.0'?>
+<!DOCTYPE service_bundle SYSTEM '/usr/share/lib/xml/dtd/service_bundle.dtd.1'>
+<service_bundle type='manifest' name='openarc'>
+  <service name='site/openarc' type='service' version='0'>
+    <create_default_instance enabled='true'/>
+    <single_instance/>
+    <dependency name='central' grouping='require_all' restart_on='none' type='service'>
+      <service_fmri value='svc:/site/wait-central'/>
+    </dependency>
+    <dependency name='ns' grouping='require_all' restart_on='none' type='service'>
+      <service_fmri value='svc:/milestone/name-services'/>
+    </dependency>
+    <dependency name='log' grouping='require_all' restart_on='none' type='service'>
+      <service_fmri value='svc:/system/system-log'/>
+    </dependency>
+    <dependent name='openarc_sendmail' restart_on='none' grouping='optional_all'>
+      <service_fmri value='svc:/site/sendmail:default'/>
+    </dependent>
+    <exec_method name='start' type='method' exec='/lib/svc/method/site/openarc' timeout_seconds='60'>
+      <method_context>
+        <method_credential user='daemon' group='other'/>
+      </method_context>
+    </exec_method>
+    <exec_method name='stop' type='method' exec=':kill' timeout_seconds='60'>
+      <method_context>
+        <method_credential user='daemon' group='other'/>
+      </method_context>
+    </exec_method>
+    <property_group name='startd' type='framework'>
+      <propval name='ignore_error' type='astring' value='core,signal'/>
+    </property_group>
+    <stability value='Unstable'/>
+    <template>
+      <common_name>
+        <loctext xml:lang='C'>ARC sender authentication</loctext>
+      </common_name>
+    </template>
+  </service>
+</service_bundle>
