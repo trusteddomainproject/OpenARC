@@ -210,6 +210,7 @@ typedef int arc_opts_t;
 /* flags */
 #define	ARC_LIBFLAGS_NONE		0x00000000
 #define	ARC_LIBFLAGS_FIXCRLF		0x00000001
+#define	ARC_LIBFLAGS_KEEPFILES		0x00000002
 
 /* default */
 #define	ARC_LIBFLAGS_DEFAULT		ARC_LIBFLAGS_NONE

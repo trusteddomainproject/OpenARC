@@ -86,7 +86,7 @@
 #include "util.h"
 
 /* macros */
-#define CMDLINEOPTS	"Ac:flnp:P:r:t:u:vV"
+#define CMDLINEOPTS	"Ac:fhlnp:P:r:t:u:vV"
 
 /*
 **  CONFIGVALUE -- a list of configuration values
@@ -112,6 +112,7 @@ struct arcf_config
 	_Bool		conf_reqhdrs;		/* enforce RFC5322 */
 	_Bool		conf_addswhdr;		/* add software header field */
 	_Bool		conf_safekeys;		/* require safe keys */
+	_Bool		conf_keeptmpfiles;	/* keep temp files */
 	u_int		conf_refcnt;		/* reference count */
 	char *		conf_selector;		/* signing selector */
 	char *		conf_keyfile;		/* key file */
@@ -197,6 +198,7 @@ struct lookup log_facilities[] =
 sfsistat mlfi_abort __P((SMFICTX *));
 sfsistat mlfi_close __P((SMFICTX *));
 sfsistat mlfi_connect __P((SMFICTX *, char *, _SOCK_ADDR *));
+sfsistat mlfi_envfrom __P((SMFICTX *, char **));
 sfsistat mlfi_eoh __P((SMFICTX *));
 sfsistat mlfi_body __P((SMFICTX *, u_char *, size_t));
 sfsistat mlfi_eom __P((SMFICTX *));
@@ -1092,6 +1094,10 @@ arcf_config_load(struct config *data, struct arcf_config *conf,
 		if (str != NULL)
 			strlcpy(basedir, str, sizeof basedir);
 
+		(void) config_get(data, "Domain",
+		                  &conf->conf_domain,
+		                  sizeof conf->conf_domain);
+
 		(void) config_get(data, "Selector",
 		                  &conf->conf_selector,
 		                  sizeof conf->conf_selector);
@@ -1107,6 +1113,10 @@ arcf_config_load(struct config *data, struct arcf_config *conf,
 		(void) config_get(data, "TemporaryDirectory",
 		                  &conf->conf_tmpdir,
 		                  sizeof conf->conf_tmpdir);
+
+		(void) config_get(data, "KeepTemporaryFiles",
+		                  &conf->conf_keeptmpfiles,
+		                  sizeof conf->conf_keeptmpfiles);
 
 		(void) config_get(data, "MaximumHeaders",
 		                  &conf->conf_maxhdrsz,
@@ -1390,11 +1400,29 @@ arcf_config_setlib(struct arcf_config *conf, char **err)
 		conf->conf_libopenarc = lib;
 	}
 
-	status = arc_options(conf->conf_libopenarc,
-	                     ARC_OP_SETOPT,
-	                     ARC_OPTS_TMPDIR,
-	                     (void *) conf->conf_tmpdir,
-	                     sizeof conf->conf_tmpdir);
+	status = ARC_STAT_OK;
+
+	if (conf->conf_tmpdir != NULL)
+	{
+		status = arc_options(conf->conf_libopenarc,
+		                     ARC_OP_SETOPT,
+		                     ARC_OPTS_TMPDIR,
+		                     (void *) conf->conf_tmpdir,
+		                     sizeof conf->conf_tmpdir);
+	}
+
+	if (status == ARC_STAT_OK)
+	{
+		opts = ARC_LIBFLAGS_NONE;
+
+		if (conf->conf_keeptmpfiles)
+			opts |= ARC_LIBFLAGS_KEEPFILES;
+
+		status = arc_options(conf->conf_libopenarc,
+		                     ARC_OP_SETOPT,
+		                     ARC_OPTS_FLAGS,
+		                     &opts, sizeof opts);
+	}
 
 	if (status != ARC_STAT_OK)
 	{
@@ -2104,7 +2132,6 @@ mlfi_negotiate(SMFICTX *ctx,
 	unsigned long reqactions = SMFIF_ADDHDRS;
 	unsigned long wantactions = 0;
 	unsigned long protosteps = (SMFIP_NOHELO |
-	                            SMFIP_NOMAIL |
 	                            SMFIP_NORCPT |
 	                            SMFIP_NOUNKNOWN |
 	                            SMFIP_NODATA |
@@ -2300,6 +2327,62 @@ mlfi_helo(SMFICTX *ctx, char *helo)
 	return SMFIS_CONTINUE;
 }
 #endif /* SMFI_VERSION == 2 */
+
+/*
+**  MLFI_ENVFROM -- handler for MAIL FROM command (start of message)
+**
+**  Parameters:
+**  	ctx -- milter context
+**  	envfrom -- envelope from arguments
+**
+**  Return value:
+**  	An SMFIS_* constant.
+*/
+
+sfsistat
+mlfi_envfrom(SMFICTX *ctx, char **envfrom)
+{
+	connctx cc;
+	msgctx afc;
+	struct arcf_config *conf;
+
+	assert(ctx != NULL);
+	assert(envfrom != NULL);
+
+	cc = (connctx) smfi_getpriv(ctx);
+	assert(cc != NULL);
+	conf = cc->cctx_config;
+
+	/*
+	**  Initialize a filter context.
+	*/
+
+	arcf_cleanup(ctx);
+	afc = arcf_initcontext(conf);
+	if (afc == NULL)
+	{
+		if (conf->conf_dolog)
+		{
+			syslog(LOG_INFO,
+			       "message requeueing (internal error)");
+		}
+
+		arcf_cleanup(ctx);
+		return SMFIS_TEMPFAIL;
+	}
+
+	/*
+	**  Save it in this thread's private space.
+	*/
+
+	cc->cctx_msg = afc;
+
+	/*
+	**  Continue processing.
+	*/
+
+	return SMFIS_CONTINUE;
+}
 
 /*
 **  MLFI_HEADER -- handler for mail headers; stores the header in a vector
@@ -2960,7 +3043,7 @@ struct smfiDesc smfilter =
 #else /* SMFI_VERSION == 2 */
 	NULL,		/* SMTP HELO command filter */
 #endif /* SMFI_VERSION == 2 */
-	NULL,		/* envelope sender filter */
+	mlfi_envfrom,	/* envelope sender filter */
 	NULL,		/* envelope recipient filter */
 	mlfi_header,	/* header filter */
 	mlfi_eoh,	/* end of header */
@@ -2994,8 +3077,9 @@ usage(void)
 {
 	fprintf(stderr, "%s: usage: %s -p socketfile [options]\n"
 	                "\t-A          \tauto-restart\n"
-	                "\t-c conffile \tread configuration from conffile\n",
+	                "\t-c conffile \tread configuration from conffile\n"
 	                "\t-f          \tdon't fork-and-exit\n"
+	                "\t-h          \tprint this help message and exit\n"
 	                "\t-l          \tlog activity to system log\n"
 	                "\t-n          \tcheck configuration and exit\n"
 			"\t-P pidfile  \tfile into which to write process ID\n"

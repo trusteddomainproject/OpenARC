@@ -1004,6 +1004,8 @@ arc_canon_runheaders_seal(ARC_MESSAGE *msg)
 			if (status != ARC_STAT_OK)
 				return status;
 		}
+
+		cur->canon_done = TRUE;
 	}
 
 	return ARC_STAT_OK;

@@ -571,7 +571,7 @@ arc_tmpfile(ARC_MESSAGE *msg, int *fp, _Bool keep)
 	assert(msg != NULL);
 	assert(fp != NULL);
 
-	snprintf(path, MAXPATHLEN, "%s/dkim.XXXXXX",
+	snprintf(path, MAXPATHLEN, "%s/arc.XXXXXX",
 	         msg->arc_library->arcl_tmpdir);
 
 	for (p = path + strlen((char *) msg->arc_library->arcl_tmpdir) + 1;

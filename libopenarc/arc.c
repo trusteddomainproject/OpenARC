@@ -636,6 +636,8 @@ arc_init(void)
 	}
 	memset(lib->arcl_flist, '\0', sizeof(u_int) * lib->arcl_flsize);
 
+	strncpy(lib->arcl_tmpdir, DEFTMPDIR, sizeof lib->arcl_tmpdir - 1);
+
 #ifdef HAVE_SHA256
 	FEATURE_ADD(lib, ARC_FEATURE_SHA256);
 #endif /* HAVE_SHA256 */
@@ -1595,6 +1597,7 @@ arc_header_field(ARC_MESSAGE *msg, u_char *hdr, size_t hlen)
 ARC_STAT
 arc_eoh(ARC_MESSAGE *msg)
 {
+	_Bool keep;
 	u_int c;
 	u_int n;
 	u_int nsets = 0;
@@ -1715,6 +1718,49 @@ arc_eoh(ARC_MESSAGE *msg)
 			          c);
 			return ARC_STAT_SYNTAX;
 		}
+	}
+
+	/*
+	**  Request specific canonicalizations we want to run.
+	*/
+
+	/* header */
+	status = arc_add_canon(msg, ARC_CANONTYPE_HEADER, ARC_HASHTYPE_SHA256,
+	                       NULL, NULL, (ssize_t) -1, &msg->arc_hdrcanon);
+	if (status != ARC_STAT_OK)
+	{
+		arc_error(msg,
+			  "failed to initialize header canonicalization object");
+		return status;
+	}
+
+	/* body */
+	status = arc_add_canon(msg, ARC_CANONTYPE_BODY, ARC_HASHTYPE_SHA256,
+	                       NULL, NULL, (ssize_t) -1, &msg->arc_bodycanon);
+	if (status != ARC_STAT_OK)
+	{
+		arc_error(msg,
+			  "failed to initialize body canonicalization object");
+		return status;
+	}
+
+	/* seal */
+	status = arc_add_canon(msg, ARC_CANONTYPE_SEAL, ARC_HASHTYPE_SHA256,
+	                       NULL, NULL, (ssize_t) -1, &msg->arc_sealcanon);
+	if (status != ARC_STAT_OK)
+	{
+		arc_error(msg,
+		          "failed to initialize seal canonicalization object");
+		return status;
+	}
+
+	/* initialize them */
+	keep = ((msg->arc_library->arcl_flags & ARC_LIBFLAGS_KEEPFILES) != 0);
+	status = arc_canon_init(msg, keep, keep);
+	if (status != ARC_STAT_OK)
+	{
+		arc_error(msg, "arc_canon_init() failed");
+		return ARC_STAT_SYNTAX;
 	}
 
 	/* process everything */
@@ -2077,7 +2123,7 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *selector,
 		return ARC_STAT_NORESOURCE;
 	}
 
-	memset(b64sig, '\0', sizeof b64siglen);
+	memset(b64sig, '\0', b64siglen);
 	rstatus = arc_base64_encode(sigout, siglen, b64sig, b64siglen);
 	if (rstatus == -1)
 	{
@@ -2106,7 +2152,24 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *selector,
 		return ARC_STAT_INTERNAL;
 	}
 
-	memcpy(h, &hdr, sizeof hdr);
+	h->hdr_text = strdup(arc_dstring_get(dstr));
+	if (h->hdr_text == NULL)
+	{
+		arc_error(msg, "can't allocate %d bytes",
+		          arc_dstring_len(dstr));
+		arc_dstring_free(dstr);
+		free(h);
+		free(b64sig);
+		free(sigout);
+		RSA_free(rsa);
+		BIO_free(keydata);
+		return ARC_STAT_INTERNAL;
+	}
+	h->hdr_colon = h->hdr_text + ARC_MSGSIG_HDRNAMELEN;
+	h->hdr_namelen = ARC_MSGSIG_HDRNAMELEN;
+	h->hdr_textlen = arc_dstring_len(dstr);
+	h->hdr_flags = 0;
+	h->hdr_next = NULL;
 
 	msg->arc_sealtail->hdr_next = h;
 	msg->arc_sealtail = h;
@@ -2128,6 +2191,8 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *selector,
 		BIO_free(keydata);
 		return status;
 	}
+
+	arc_dstring_catn(dstr, sighdr, len);
 
 	status = arc_canon_getfinal(msg->arc_sealcanon, &digest, &diglen);
 	if (status != ARC_STAT_OK)
@@ -2155,21 +2220,7 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *selector,
 	}
 
 	/* base64 encode it */
-	b64siglen = siglen * 3 + 5;
-	b64siglen += (b64siglen / 60);
-	b64sig = malloc(b64siglen);
-	if (b64sig == NULL)
-	{
-		arc_error(msg, "can't allocate %d bytes for base64 signature",
-		          b64siglen);
-		arc_dstring_free(dstr);
-		free(sigout);
-		RSA_free(rsa);
-		BIO_free(keydata);
-		return ARC_STAT_NORESOURCE;
-	}
-
-	memset(b64sig, '\0', sizeof b64siglen);
+	memset(b64sig, '\0', b64siglen);
 	rstatus = arc_base64_encode(sigout, siglen, b64sig, b64siglen);
 	if (rstatus == -1)
 	{
@@ -2185,13 +2236,6 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *selector,
 	/* append it to the stub */
 	arc_dstring_cat(dstr, b64sig);
 
-	hdr.hdr_text = arc_dstring_get(dstr);
-	hdr.hdr_colon = hdr.hdr_text + ARC_SEAL_HDRNAMELEN;
-	hdr.hdr_namelen = ARC_SEAL_HDRNAMELEN;
-	hdr.hdr_textlen = len;
-	hdr.hdr_flags = 0;
-	hdr.hdr_next = NULL;
-
 	/* add it to the seal */
 	h = malloc(sizeof hdr);
 	if (h == NULL)
@@ -2204,32 +2248,34 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *selector,
 		BIO_free(keydata);
 		return ARC_STAT_INTERNAL;
 	}
-
-	memcpy(h, &hdr, sizeof hdr);
-
-	msg->arc_sealtail->hdr_next = h;
-	msg->arc_sealtail = h;
-	/* add it to the seal */
-	h = malloc(sizeof hdr);
-	if (h == NULL)
+	h->hdr_text = strdup(arc_dstring_get(dstr));
+	if (h->hdr_text == NULL)
 	{
 		arc_error(msg, "can't allocate %d bytes", sizeof hdr);
 		arc_dstring_free(dstr);
+		free(b64sig);
+		free(sigout);
 		RSA_free(rsa);
 		BIO_free(keydata);
 		return ARC_STAT_INTERNAL;
 	}
-
-	memcpy(h, &hdr, sizeof hdr);
+	h->hdr_colon = h->hdr_text + ARC_MSGSIG_HDRNAMELEN;
+	h->hdr_namelen = ARC_MSGSIG_HDRNAMELEN;
+	h->hdr_textlen = len;
+	h->hdr_flags = 0;
+	h->hdr_next = NULL;
 
 	msg->arc_sealtail->hdr_next = h;
 	msg->arc_sealtail = h;
 
+	/* tidy up */
 	arc_dstring_free(dstr);
 	free(b64sig);
 	free(sigout);
 	RSA_free(rsa);
 	BIO_free(keydata);
+
+	*seal = msg->arc_sealhead;
 
 	return ARC_STAT_OK;
 }
@@ -2298,7 +2344,7 @@ arc_hdr_next(ARC_HDRFIELD *hdr)
 uint64_t
 arc_ssl_version(void)
 {
-	return 0;
+	return OPENSSL_VERSION_NUMBER;
 }
 
 /*
