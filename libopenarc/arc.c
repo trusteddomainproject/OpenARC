@@ -2047,7 +2047,7 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *selector,
 	/* construct the AMS */
 	arc_dstring_blank(dstr);
 	arc_dstring_catn(dstr, (u_char *) ARC_MSGSIG_HDRNAME ": ",
-	                 sizeof ARC_MSGSIG_HDRNAME);
+	                 sizeof ARC_MSGSIG_HDRNAME + 1);
 
 	status = arc_getamshdr_d(msg, arc_dstring_len(dstr), &sighdr, &len,
 	                         FALSE);
@@ -2178,7 +2178,7 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *selector,
 	arc_dstring_blank(dstr);
 
 	arc_dstring_catn(dstr, (u_char *) ARC_SEAL_HDRNAME ": ",
-	                 sizeof ARC_SEAL_HDRNAME);
+	                 sizeof ARC_SEAL_HDRNAME + 1);
 
 	status = arc_getamshdr_d(msg, arc_dstring_len(dstr), &sighdr, &len,
 	                         TRUE);
