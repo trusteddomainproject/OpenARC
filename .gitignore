@@ -31,6 +31,9 @@
 # Debug files
 *.dSYM/
 
+# tarballs
+*.tar.gz
+
 # other nonsense
 aclocal.m4
 autom4te.cache
