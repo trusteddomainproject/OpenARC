@@ -295,6 +295,19 @@ ARC_LIB *arc_init(void);
 void arc_close(ARC_LIB *);
 
 /*
+**  ARC_GETERROR -- return any stored error string from within the DKIM
+**                  context handle
+**
+**  Parameters:
+**  	msg -- ARC_MESSAGE handle from which to retrieve an error string
+**
+**  Return value:
+**  	A pointer to the stored string, or NULL if none was stored.
+*/
+
+extern const char *arc_geterror __P((ARC_MESSAGE *));
+
+/*
 ** 
 **  ARC_OPTIONS -- get/set library options
 **

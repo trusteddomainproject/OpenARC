@@ -662,6 +662,25 @@ arc_close(ARC_LIB *lib)
 }
 
 /*
+**  ARC_GETERROR -- return any stored error string from within the ARC
+**                  context handle
+**
+**  Parameters:
+**  	msg -- ARC_MESSAGE handle from which to retrieve an error string
+**
+**  Return value:
+**  	A pointer to the stored string, or NULL if none was stored.
+*/
+
+const char *
+arc_geterror(ARC_MESSAGE *msg)
+{
+	assert(msg != NULL);
+
+	return (const char *) msg->arc_error;
+}
+
+/*
 ** 
 **  ARC_OPTIONS -- get/set library options
 **
@@ -1607,6 +1626,10 @@ arc_eoh(ARC_MESSAGE *msg)
 	ARC_KVSET *set;
 	u_char *inst;
 
+	if (msg->arc_state >= ARC_STATE_EOH)
+		return ARC_STAT_INVALID;
+	msg->arc_state = ARC_STATE_EOH;
+
 	/*
 	**  Process all the header fields that make up ARC sets.
 	*/
@@ -2264,8 +2287,8 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 		BIO_free(keydata);
 		return ARC_STAT_INTERNAL;
 	}
-	h->hdr_colon = h->hdr_text + ARC_MSGSIG_HDRNAMELEN;
-	h->hdr_namelen = ARC_MSGSIG_HDRNAMELEN;
+	h->hdr_colon = h->hdr_text + ARC_SEAL_HDRNAMELEN;
+	h->hdr_namelen = ARC_SEAL_HDRNAMELEN;
 	h->hdr_textlen = len;
 	h->hdr_flags = 0;
 	h->hdr_next = NULL;
