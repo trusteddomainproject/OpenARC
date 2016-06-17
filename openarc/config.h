@@ -39,7 +39,7 @@ struct configdef
 {
 	char *		cd_name;
 	u_int		cd_type;
-	u_int		cd_req;
+	_Bool		cd_req;
 };
 
 /* prototypes */
