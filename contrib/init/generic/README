@@ -1,0 +1,22 @@
+This directory contains a generic start/stop script that can be used on
+most UNIX systems to automate control of the openarc filter.
+
+To install, copy it to /etc/init.d/openarc, and ensure its mode is 0755.
+Then, follow the section below appropriate to your system.  If you don't see
+your system listed, we would appreciate receiving from you instructions
+specific to your system once you get it working so that others who come
+after you can have helpful instructions.
+
+Please submit bug reports and feature requests to
+openarc-users@lists.trustedomain.org or via the trackers on SourceForge.
+
+
+RHEL-based and SLES-based Linux systems:
+
+Execute "chkconfig --add openarc" as root.  This will read parameters found
+in the script and set up symbolic links under /etc/rc.d so that the filter
+is automatically started and stopped as needed.
+
+--
+Copyright (c) 2010, 2011, 2016, The Trusted Domain Project.
+All rights reserved.

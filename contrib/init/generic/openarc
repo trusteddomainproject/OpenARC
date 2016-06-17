@@ -1,0 +1,212 @@
+#!/bin/sh
+#
+# Copyright (c) 2010, 2011, 2016, The Trusted Domain Project.
+# All rights reserved.
+#
+#
+### BEGIN INIT INFO
+# Provides:          openarc
+# Required-Start:    $syslog $time $local_fs $remote_fs $named $network
+# Required-Stop:     $syslog $time $local_fs $remote_fs $named
+# Default-Start:     2 3 4 5
+# Default-Stop:      S 0 1 6
+# Short-Description: OpenARC Milter
+# Description:       The OpenARC milter for signing and verifying email
+#                    messages using the DomainKeys Identified Mail protocol
+### END INIT INFO
+#
+# chkconfig: 345 20 80
+# description: OpenARC milter for signing and verifying email
+# processname: openarc
+#
+# This script should run successfully on any LSB-compliant system. It will
+# attempt to fall back to RedHatisms if LSB isn't available, or to
+# commonly-available utilities if it's not even RedHat.
+
+NAME=openarc
+PATH=/bin:/usr/bin:/sbin:/usr/sbin
+DAEMON=/usr/sbin/$NAME
+PIDFILE=/var/run/$NAME/$NAME.pid
+CONFIG=/etc/$NAME.conf
+USER=openarc
+
+# Implement our own status function per LSB specs. This will be used on
+# non-RedHat systems.
+od_status() {
+	pid=$(od_getpid)
+	if [ $? -ne 0 ]; then
+		if [ -f $PIDFILE ]; then
+			echo "$NAME dead but pid file exists"
+			return 1
+		elif [ -d /var/lock/subsys -a -f /var/lock/subsys/$NAME ]; then
+			echo "$NAME dead but subsys locked"
+			return 2
+		else
+			echo "$NAME is stopped"
+			return 3
+		fi
+	fi
+	echo "$NAME (pid $pid) is running..."
+	return 0
+}
+
+od_getpid() {
+	if [ -n "$1" -a "$1" = "-P" ]; then
+		shift
+		PIDFILE=$1
+		shift
+	else
+		PIDFILE=$(grep -i '^pidfile' $CONFIG | head -n 1 | awk '{print $2}')
+	fi
+	if [ ! -f "$PIDFILE" ]; then
+		return 1
+	fi
+	PID=$(cat "$PIDFILE")
+	if [ -n "$(which pgrep)" ]; then
+		for p in $(pgrep -f $DAEMON); do
+			if [ "$PID" = "$p" ]; then
+				echo $p
+				return 0
+			fi
+		done
+	elif [ -x "/bin/pidof" ]; then
+		for p in $(/bin/pidof -o %PPID $DAEMON); do
+			if [ "$PID" = "$p" ]; then
+				echo $p
+				return 0
+			fi
+		done
+	fi
+	return 1
+}
+
+od_killproc() {
+	[ -z "$1" ] && return 1
+	if [ -n "$2" ]; then 
+		signal=$2
+	else
+		signal="TERM"
+	fi
+	if $(od_getpid); then
+		pkill -"$signal" -f $1
+	fi
+}
+
+# Check for helper functions
+if [ -f /lib/lsb/init-functions ]; then
+	# Use LSB functions, if available
+	. /lib/lsb/init-functions
+	alias od_killproc=killproc
+	alias od_daemon=start_daemon
+elif [ -f /etc/init.d/functions ]; then
+	# Use RedHat init functions if LSB isn't available
+	. /etc/init.d/functions
+	alias od_daemon=daemon
+	alias log_success_msg=success
+	alias log_warning_msg=passed
+	alias log_failure_msg=failure
+	alias od_killproc=killproc
+	alias od_status=status
+elif [ -f /etc/rc.d/init.d/functions ]; then
+	# Legacy RedHat init location
+	. /etc/rc.d/init.d/functions
+	alias od_daemon=daemon
+	alias log_success_msg=success
+	alias log_warning_msg=passed
+	alias log_failure_msg=failure
+	alias od_killproc=killproc
+	alias od_status=status
+else
+	# If all else fails, use generic commands
+	alias od_daemon=''
+	alias log_success_msg=echo
+	alias log_warning_msg=echo
+	alias log_failure_msg=echo
+fi
+
+if [ ! -x "$DAEMON" ]; then
+	exit 5
+fi
+
+if [ ! -f "$CONFIG" ]; then
+	log_failure_msg "$CONFIG not found"
+	exit 6
+fi
+
+[ -r /etc/default/$NAME ] && . /etc/default/$NAME
+
+ARGS="-u $USER $ARGS"
+
+if [ -n "$SOCKET" ]; then
+	ARGS="$ARGS -p $SOCKET"
+fi
+
+od_start() {
+	echo -n "Starting OpenARC Milter: "
+	od_daemon $DAEMON -x $CONFIG $ARGS
+	if [ $? -eq 0 ]; then
+		log_success_msg $NAME
+		if [ -d /var/lock/subsys ]; then
+			touch /var/lock/subsys/$NAME
+		fi
+	else
+		log_failure_msg $NAME
+	fi
+	echo
+}
+
+od_stop() {
+	echo -n "Stopping OpenARC Milter: "
+	CPIDFILE=""
+	if [ -f $CONFIG ]; then
+		CPIDFILE=$(grep -i '^pidfile' $CONFIG | head -n 1 | awk '{print $2}')
+	fi
+	if [ x"$CPIDFILE" != x"" ]; then
+		PIDFILE=$CPIDFILE
+	fi
+
+	od_killproc -p $CPIDFILE $DAEMON
+	if [ $? -eq 0 ]; then
+		log_success_msg $NAME
+		if [ -d /var/lock/subsys ]; then
+			rm -f /var/lock/subsys/$NAME
+		fi
+	else
+		log_failure_msg $NAME
+	fi
+	echo
+}
+
+od_reload() {
+	echo -n "Reloading OpenARC Milter configuration: "
+	od_killproc $DAEMON USR1
+	if [ $? -eq 0 ]; then
+		log_success_msg $NAME
+	else
+		log_failure_msg $NAME
+	fi
+	echo
+}
+
+case "$1" in
+  start)
+  	od_start
+	;;
+	
+  stop)
+  	od_stop
+	;;
+	
+  restart|force-reload)
+  	od_stop
+	od_start
+	;;
+	
+  reload)
+  	od_reload
+	;;
+	
+  status)
+	od_status $NAME
+	;;
+esac
