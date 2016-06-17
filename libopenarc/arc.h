@@ -410,9 +410,10 @@ ARC_STAT arc_eom(ARC_MESSAGE *);
 **  Parameters:
 **  	msg -- ARC_MESSAGE object
 **  	seal -- seal to apply (returned)
+**  	authservid -- authservid to use when generating A-R fields
 **  	selector -- selector name
 **  	domain -- domain name
-**  	key -- secret key, printable
+**  	key -- secret key
 **  	keylen -- key length
 **  	ar -- Authentication-Results to be enshrined
 **
@@ -424,7 +425,7 @@ ARC_STAT arc_eom(ARC_MESSAGE *);
 **  	prepended to the message in the presented order.
 */
 
-ARC_STAT arc_getseal(ARC_MESSAGE *, ARC_HDRFIELD **, char *, char *,
+ARC_STAT arc_getseal(ARC_MESSAGE *, ARC_HDRFIELD **, char *, char *, char *,
                      u_char *, size_t, u_char *);
 
 /*

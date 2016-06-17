@@ -2898,7 +2898,8 @@ mlfi_eom(SMFICTX *ctx)
 	*/
 
 	status = arc_getseal(afc->mctx_arcmsg, &seal, conf->conf_selector,
-                             conf->conf_domain, conf->conf_keydata,
+                             conf->conf_authservid,
+	                     conf->conf_domain, conf->conf_keydata,
 	                     conf->conf_keylen, NULL);
 	if (status != ARC_STAT_OK)
 	{

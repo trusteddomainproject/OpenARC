@@ -1887,6 +1887,7 @@ arc_eom(ARC_MESSAGE *msg)
 **  Parameters:
 **  	msg -- ARC_MESSAGE object
 **  	seal -- seal to apply (returned)
+**      authservid -- authservid to use when generating the seal
 **      selector -- selector name
 **      domain -- domain name
 **      key -- secret key, printable
@@ -1898,8 +1899,9 @@ arc_eom(ARC_MESSAGE *msg)
 */
 
 ARC_STAT
-arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *selector,
-            char *domain, u_char *key, size_t keylen, u_char *ar)
+arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
+            char *selector, char *domain, u_char *key, size_t keylen,
+            u_char *ar)
 {
 	int rstatus;
 	int siglen;
@@ -1923,6 +1925,7 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *selector,
 
 	assert(msg != NULL);
 	assert(seal != NULL);
+	assert(authservid != NULL);
 	assert(selector != NULL);
 	assert(domain != NULL);
 	assert(key != NULL);
@@ -1931,6 +1934,7 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *selector,
 	/* copy required stuff */
 	msg->arc_domain = domain;
 	msg->arc_selector = selector;
+	msg->arc_authservid = authservid;
 
 	/* load the key */
 	keydata = BIO_new_mem_buf(key, keylen);
@@ -2010,8 +2014,9 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *selector,
 	**  Part 1: Construct a new AAR
 	*/
 
-	arc_dstring_printf(dstr, "ARC-Authentication-Results: i=%u; %s",
+	arc_dstring_printf(dstr, "ARC-Authentication-Results: i=%u %s; %s",
 	                   msg->arc_nsets + 1,
+	                   msg->arc_authservid,
 	                   ar == NULL ? "none" : (char *) ar);
 	status = arc_parse_header_field(msg, arc_dstring_get(dstr),
 	                                arc_dstring_len(dstr), &h);
