@@ -2039,7 +2039,7 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 	**  Part 1: Construct a new AAR
 	*/
 
-	arc_dstring_printf(dstr, "ARC-Authentication-Results: i=%u %s; %s",
+	arc_dstring_printf(dstr, "ARC-Authentication-Results: i=%u; %s; %s",
 	                   msg->arc_nsets + 1,
 	                   msg->arc_authservid,
 	                   ar == NULL ? "none" : (char *) ar);
