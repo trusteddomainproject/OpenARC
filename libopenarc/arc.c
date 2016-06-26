@@ -1317,8 +1317,10 @@ arc_process_set(ARC_MESSAGE *msg, arc_kvsettype_t type, u_char *str, size_t len,
 
 		break;
 			
-	  default:
-		assert(0);
+	  /* these have no defaults */
+	  case ARC_KVSETTYPE_SEAL:
+	  case ARC_KVSETTYPE_AR:
+		break;
 	}
 
 	return ARC_STAT_OK;
