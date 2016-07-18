@@ -80,6 +80,7 @@
 
 /* openarc includes */
 #include "config.h"
+#include "openarc-ar.h"
 #include "openarc-config.h"
 #include "openarc-crypto.h"
 #include "openarc-test.h"
@@ -88,6 +89,7 @@
 
 /* macros */
 #define CMDLINEOPTS	"Ac:fhlnp:P:r:t:u:vV"
+#define AR_HEADER_NAME	"Authentication-Results"
 
 /*
 **  CONFIGVALUE -- a list of configuration values
@@ -3100,6 +3102,7 @@ mlfi_eom(SMFICTX *ctx)
 	ARC_HDRFIELD *seal = NULL;
 	ARC_HDRFIELD *sealhdr = NULL;
 	Header hdr;
+	struct authres ar;
 	unsigned char header[ARC_MAXHEADER + 1];
 
 	assert(ctx != NULL);
@@ -3154,10 +3157,51 @@ mlfi_eom(SMFICTX *ctx)
 
 	/*
 	**  Get the seal fields to apply.
-	** 
-	**  XXX -- the last parameter in the call to arc_getseal() should be
-	**  the combined A-R for this authserv-id.
 	*/
+
+	/* assemble authentication results */
+	arcf_dstring_blank(afc->mctx_tmpstr);
+	for (c = 0; ; c++)
+	{
+		hdr = arcf_findheader(afc, AR_HEADER_NAME, c);
+		if (hdr == NULL)
+			break;
+		status = ares_parse(hdr->hdr_val, &ar);
+		if (status != 0)
+		{
+			if (conf->conf_dolog)
+			{
+				syslog(LOG_WARNING,
+				       "%s: can't parse %s",
+				       afc->mctx_jobid, AR_HEADER_NAME);
+			}
+
+			return SMFIS_TEMPFAIL;
+		}
+
+		if (strcasecmp(conf->conf_authservid, ar.ares_host) != 0)
+			continue;
+
+		if (arcf_dstring_len(afc->mctx_tmpstr) > 0)
+		{
+			int n;
+
+			arcf_dstring_cat(afc->mctx_tmpstr, "; ");
+			for (n = 0; n < ar.ares_count; n++)
+			{
+				arcf_dstring_printf(afc->mctx_tmpstr,
+				                    "%s=%s",
+				                    ares_getmethod(ar.ares_result[n].result_method),
+				                    ares_getresult(ar.ares_result[n].result_result));
+				if (ar.ares_result[0].result_reason[0] != '\0')
+				{
+					arcf_dstring_printf(afc->mctx_tmpstr,
+					                    " reason=\"%s\"",
+					                    ar.ares_result[0].result_reason);
+				}
+			}
+		}
+	}
 
 	status = arc_getseal(afc->mctx_arcmsg, &seal,
                              conf->conf_authservid,
