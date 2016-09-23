@@ -56,6 +56,8 @@ extern "C" {
 /* special DNS tokens */
 #define	ARC_DNSKEYNAME		"_domainkey"
 
+#define	DKIM_VERSION_KEY	"DKIM1"
+
 /*
 **  ARC_STAT -- status code type
 */
@@ -223,6 +225,13 @@ typedef int arc_opts_t;
 #define ARC_DNSSEC_BOGUS	0
 #define ARC_DNSSEC_INSECURE	1
 #define ARC_DNSSEC_SECURE	2
+
+/*
+**  ARC_KEYFLAG -- key flags
+*/
+
+#define ARC_KEYFLAG_TESTKEY	0x01
+#define ARC_KEYFLAG_NOSUBDOMAIN	0x02
 
 /*
 **  ARC_LIB -- library handle

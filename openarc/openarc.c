@@ -2519,7 +2519,7 @@ mlfi_connect(SMFICTX *ctx, char *host, _SOCK_ADDR *ip)
 
 			pthread_mutex_unlock(&conf_lock);
 
-			/* XXX result should depend on On-InternalError */
+			/* XXX -- result should be selectable */
 			return SMFIS_TEMPFAIL;
 		}
 

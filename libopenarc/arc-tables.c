@@ -43,6 +43,14 @@ static struct nametable prv_hashes[] =		/* hashes */
 };
 struct nametable *hashes = prv_hashes;
 
+static struct nametable prv_keyflags[] =	/* key flags */
+{
+	{ "y",		ARC_KEYFLAG_TESTKEY },
+	{ "s",		ARC_KEYFLAG_NOSUBDOMAIN },
+	{ NULL,		-1 }
+};
+struct nametable *keyflags = prv_keyflags;
+
 static struct nametable prv_keytypes[] =	/* key types */
 {
 	{ "rsa",	ARC_KEYTYPE_RSA },

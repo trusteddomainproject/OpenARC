@@ -52,10 +52,10 @@ extern void arc_error __P((ARC_MESSAGE *, const char *, ...));
 #endif /* ! T_RRSIG */
 
 /*
-**  ARC_GET_KEY_DNS -- retrieve a DKIM key from DNS
+**  ARC_GET_KEY_DNS -- retrieve a key from DNS
 **
 **  Parameters:
-**  	dkim -- DKIM handle
+**  	msg -- ARC_MESSAGE handle
 **  	sig -- ARC_SIGINFO handle
 **  	buf -- buffer into which to write the result
 **  	buflen -- bytes available at "buf"
@@ -355,10 +355,10 @@ arc_get_key_dns(ARC_MESSAGE *msg, u_char *buf, size_t buflen)
 }
 
 /*
-**  ARC_GET_KEY_FILE -- retrieve a DKIM key from a text file (for testing)
+**  ARC_GET_KEY_FILE -- retrieve a key from a text file (for testing)
 **
 **  Parameters:
-**  	dkim -- DKIM handle
+**  	msg -- ARC_MESSAGE handle
 **  	sig -- ARC_SIGINFO handle
 **  	buf -- buffer into which to write the result
 **  	buflen -- bytes available at "buf"

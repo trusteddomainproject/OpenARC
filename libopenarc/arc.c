@@ -46,6 +46,7 @@
 /* libopenarc includes */
 #include "arc-internal.h"
 #include "arc-canon.h"
+#include "arc-keys.h"
 #include "arc-tables.h"
 #include "arc-types.h"
 #include "arc-util.h"
@@ -163,6 +164,125 @@ arc_error(ARC_MESSAGE *msg, const char *format, ...)
 	}
 
 	errno = saverr;
+}
+
+/*
+**  ARC_KEY_HASHOK -- return TRUE iff a signature's hash is in the approved
+**                    list of hashes for a given key
+**
+**  Parameters:
+**  	msg -- ARC_MESSAGE handle
+**  	hashlist -- colon-separated approved hash list
+**
+**  Return value:
+**  	TRUE iff a particular hash is in the approved list of hashes.
+*/
+
+static _Bool
+arc_key_hashok(ARC_MESSAGE *msg, u_char *hashlist)
+{
+	int hashalg;
+	u_char *x, *y;
+	u_char tmp[BUFRSZ + 1];
+
+	assert(msg != NULL);
+
+	if (hashlist == NULL)
+		return TRUE;
+
+	x = NULL;
+	memset(tmp, '\0', sizeof tmp);
+
+	y = hashlist;
+	for (;;)
+	{
+		if (*y == ':' || *y == '\0')
+		{
+			if (x != NULL)
+			{
+				strlcpy((char *) tmp, (char *) x, sizeof tmp);
+				tmp[y - x] = '\0';
+				hashalg = arc_name_to_code(hashes,
+				                           (char *) tmp);
+				if (hashalg == msg->arc_hashtype)
+					return TRUE;
+			}
+
+			x = NULL;
+		}
+		else if (x == NULL)
+		{
+			x = y;
+		}
+
+		if (*y == '\0')
+			return FALSE;
+		y++;
+	}
+
+	/* NOTREACHED */
+}
+
+/*
+**  ARC_KEY_HASHESOK -- return TRUE iff this key supports at least one
+**                      hash method we know about (or doesn't specify)
+**
+**  Parameters:
+**  	hashlist -- colon-separated list of hashes (or NULL)
+**
+**  Return value:
+**  	TRUE iff this key supports at least one hash method we know about
+**  	(or doesn't specify)
+*/
+
+static _Bool
+arc_key_hashesok(ARC_LIB *lib, u_char *hashlist)
+{
+	u_char *x, *y;
+	u_char tmp[BUFRSZ + 1];
+
+	assert(lib != NULL);
+
+	if (hashlist == NULL)
+		return TRUE;
+
+	x = NULL;
+	memset(tmp, '\0', sizeof tmp);
+
+	y = hashlist;
+	for (;;)
+	{
+		if (*y == ':' || *y == '\0')
+		{
+			if (x != NULL)
+			{
+				int hashcode;
+
+				strlcpy((char *) tmp, (char *) x, sizeof tmp);
+				tmp[y - x] = '\0';
+
+				hashcode = arc_name_to_code(hashes,
+				                            (char *) tmp);
+
+				if (hashcode != -1 &&
+				    (hashcode != ARC_HASHTYPE_SHA256 ||
+				     arc_libfeature(lib, ARC_FEATURE_SHA256)))
+					return TRUE;
+			}
+
+			x = NULL;
+		}
+		else if (x == NULL)
+		{
+			x = y;
+		}
+
+		if (*y == '\0')
+			return FALSE;
+		y++;
+	}
+
+	/* NOTREACHED */
 }
 
 /*
@@ -917,7 +1037,46 @@ arc_set_udata(ARC_KVSET *set)
 }
 
 /*
-**  ARC_ADD_PLIST -- add an entry to a parameter-value set
+**  ARC_KEY_SMTP -- return TRUE iff a parameter set defines an SMTP key
+**
+**  Parameters:
+**  	set -- set to be checked
+**
+**  Return value:
+**  	TRUE iff "set" contains an "s" parameter whose value is either
+**  	"email" or "*".
+*/
+
+static _Bool
+arc_key_smtp(ARC_KVSET *set)
+{
+	u_char *val;
+	char *last;
+	u_char *p;
+	char buf[BUFRSZ + 1];
+
+	assert(set != NULL);
+	assert(set->set_type == ARC_KVSETTYPE_KEY);
+
+	val = arc_param_get(set, (u_char * ) "s");
+
+	if (val == NULL)
+		return TRUE;
+
+	strlcpy(buf, (char *) val, sizeof buf);
+
+	for (p = (u_char *) strtok_r(buf, ":", &last);
+	     p != NULL;
+	     p = (u_char *) strtok_r(NULL, ":", &last))
+	{
+		if (strcmp((char *) p, "*") == 0 ||
+		    strcasecmp((char *) p, "email") == 0)
+			return TRUE;
+	}
+
+	return FALSE;
+}
+
 /*
 **  ARC_ADD_PLIST -- add an entry to a parameter-value set
 **
@@ -1327,6 +1486,227 @@ arc_process_set(ARC_MESSAGE *msg, arc_kvsettype_t type, u_char *str, size_t len,
 }
 
 /*
+**  ARC_GET_KEY -- acquire a public key used for verification
+**
+**  Parameters:
+**  	msg -- ARC_MESSAGE handle
+**  	test -- skip signature-specific validity checks
+**
+**  Return value:
+**  	An ARC_STAT_* constant.
+*/
+
+ARC_STAT
+arc_get_key(ARC_MESSAGE *msg, _Bool test)
+{
+	_Bool gotkey = FALSE;			/* key stored */
+	_Bool gotset = FALSE;			/* set parsed */
+	_Bool gotreply = FALSE;			/* reply received */
+	int status;
+	int c;
+	struct arc_kvset *set = NULL;
+	struct arc_kvset *nextset;
+	unsigned char *p;
+	unsigned char buf[BUFRSZ + 1];
+
+	assert(msg != NULL);
+	assert(msg->arc_selector != NULL);
+	assert(msg->arc_domain != NULL);
+
+	memset(buf, '\0', sizeof buf);
+
+	/* use appropriate get method */
+	switch (msg->arc_query)
+	{
+	  case ARC_QUERY_DNS:
+		status = (int) arc_get_key_dns(msg, buf, sizeof buf);
+		if (status != (int) ARC_STAT_OK)
+			return (ARC_STAT) status;
+		break;
+
+	  case ARC_QUERY_FILE:
+		status = (int) arc_get_key_file(msg, buf, sizeof buf);
+		if (status != (int) ARC_STAT_OK)
+			return (ARC_STAT) status;
+		break;
+
+	  default:
+		assert(0);
+	}
+
+	/* decode the payload */
+	if (buf[0] == '\0')
+	{
+		arc_error(msg, "empty key record");
+		return ARC_STAT_SYNTAX;
+	}
+
+	status = arc_process_set(msg, ARC_KVSETTYPE_KEY, buf,
+				 strlen((char *) buf), NULL);
+	if (status != ARC_STAT_OK)
+		return status;
+
+	/* get the last key */
+	set = arc_set_first(msg, ARC_KVSETTYPE_KEY);
+	assert(set != NULL);
+	for (;;)
+	{
+		nextset = arc_set_next(set, ARC_KVSETTYPE_KEY);
+		if (nextset == NULL)
+			break;
+		set = nextset;
+	}
+	assert(set != NULL);
+
+	/* verify key version first */
+	p = arc_param_get(set, (u_char *) "v");
+	if (p != NULL && strcmp((char *) p, DKIM_VERSION_KEY) != 0)
+	{
+		arc_error(msg, "invalid key version '%s'", p);
+		return ARC_STAT_SYNTAX;
+	}
+
+	/* then make sure the hash type is something we can handle */
+	p = arc_param_get(set, (u_char *) "h");
+	if (!arc_key_hashesok(msg->arc_library, p))
+	{
+		arc_error(msg, "unknown hash '%s'", p);
+		return ARC_STAT_SYNTAX;
+	}
+	/* ...and that this key is approved for this signature's hash */
+	else if (!test && !arc_key_hashok(msg, p))
+	{
+		arc_error(msg, "signature-key hash mismatch");
+		return ARC_STAT_CANTVRFY;
+	}
+
+	/* make sure it's a key designated for e-mail */
+	if (!arc_key_smtp(set))
+	{
+		arc_error(msg, "key type mismatch");
+		return ARC_STAT_CANTVRFY;
+	}
+
+	/* then key type */
+	p = arc_param_get(set, (u_char *) "k");
+	if (p == NULL)
+	{
+		arc_error(msg, "key type missing");
+		return ARC_STAT_SYNTAX;
+	}
+	else if (arc_name_to_code(keytypes, (char *) p) == -1)
+	{
+		arc_error(msg, "unknown key type '%s'", p);
+		return ARC_STAT_SYNTAX;
+	}
+
+	if (!gotkey)
+	{
+		/* decode the key */
+		msg->arc_b64key = arc_param_get(set, (u_char *) "p");
+		if (msg->arc_b64key == NULL)
+		{
+			arc_error(msg, "key missing");
+			return ARC_STAT_SYNTAX;
+		}
+		else if (msg->arc_b64key[0] == '\0')
+		{
+			return ARC_STAT_REVOKED;
+		}
+		msg->arc_b64keylen = strlen((char *) msg->arc_b64key);
+
+		msg->arc_key = malloc(msg->arc_b64keylen);
+		if (msg->arc_key == NULL)
+		{
+			arc_error(msg, "unable to allocate %d byte(s)",
+			          msg->arc_b64keylen);
+			return ARC_STAT_NORESOURCE;
+		}
+
+		status = arc_base64_decode(msg->arc_b64key, msg->arc_key,
+		                           msg->arc_b64keylen);
+		if (status < 0)
+		{
+			arc_error(msg, "key missing");
+			return ARC_STAT_SYNTAX;
+		}
+
+		msg->arc_keylen = status;
+	}
+
+	/* store key flags */
+	p = arc_param_get(set, (u_char *) "t");
+	if (p != NULL)
+	{
+		u_int flag;
+		char *t;
+		char *last;
+		char tmp[BUFRSZ + 1];
+
+		strlcpy(tmp, (char *) p, sizeof tmp);
+
+		for (t = strtok_r(tmp, ":", &last);
+		     t != NULL;
+		     t = strtok_r(NULL, ":", &last))
+		{
+			flag = (u_int) arc_name_to_code(keyflags, t);
+			if (flag != (u_int) -1)
+				msg->arc_flags |= flag;
+		}
+	}
+
+	return ARC_STAT_OK;
+}
+
+/*
+**  ARC_VALIDATE_MSG -- validate a specific ARC message signature
+**
+**  Parameters:
+**  	msg -- ARC message handle
+**  	set -- ARC set number whose AMS should be validated (zero-based)
+**
+**  Return value:
+**  	An ARC_STAT_* constant.
+*/
+
+static ARC_STAT
+arc_validate_msg(ARC_MESSAGE *msg, u_int setnum)
+{
+	ARC_STAT status;
+	struct arc_set *set;
+	BIO *keydata;
+	EVP_PKEY *pkey;
+	RSA *rsa;
+
+	assert(msg != NULL);
+
+	/* pull the (set-1)th ARC Set */
+	set = &msg->arc_sets[setnum];
+
+	/*
+	**  Validate the ARC-Message-Signature.
+	*/
+
+	/* finalize body canonicalizations */
+	status = arc_canon_closebody(msg);
+	if (status != ARC_STAT_OK)
+	{
+		arc_error(msg, "arc_canon_closebody() failed");
+		return status;
+	}
+
+	/*
+	**  The stub AMS was generated, canonicalized, and hashed by
+	**  arc_canon_runheaders(), and then everything was finalized.
+	**  We just have to do the verification here.
+	*/
+
+	
+
+	return ARC_STAT_OK;
+}
+
+/*
 **  ARC_VALIDATE -- validate a specific ARC seal
 **
 **  Parameters:
@@ -1335,22 +1715,23 @@ arc_process_set(ARC_MESSAGE *msg, arc_kvsettype_t type, u_char *str, size_t len,
 **
 **  Return value:
 **  	An ARC_STAT_* constant.
+**
+**  Side effects:
+**  	Updates msg->arc_cstate.
 */
 
 static ARC_STAT
-arc_validate(ARC_MESSAGE *msg, u_int set)
+arc_validate(ARC_MESSAGE *msg, u_int setnum)
 {
-	ARC_KVSET *seal = NULL;
-	ARC_KVSET *ar = NULL;
-	ARC_KVSET *sig = NULL;
-	u_char *i;
+	struct arc_set *set;
 
 	assert(msg != NULL);
 
-	/* XXX -- pull the (set-1)th ARC Set */
+	/* pull the (set-1)th ARC Set */
+	set = &msg->arc_sets[setnum];
+
 	/* XXX -- validate the ARC-Seal */
-	/* XXX -- validate the ARC-Message-Signature */
-	/* XXX -- return corresponding ARC_STAT_* constant */
+	/* XXX -- set msg->arc_cstate */
 
 	return ARC_STAT_OK;
 }
@@ -1857,7 +2238,8 @@ arc_eom(ARC_MESSAGE *msg)
 	{
 		u_int set;
 
-		if (arc_validate(msg, msg->arc_nsets - 1) == ARC_STAT_BADSIG)
+		if (arc_validate_msg(msg,
+		                     msg->arc_nsets - 1) == ARC_STAT_BADSIG)
 		{
 			msg->arc_cstate = ARC_CHAIN_FAIL;
 		}
@@ -1867,7 +2249,7 @@ arc_eom(ARC_MESSAGE *msg)
 			u_char *cv;
 			ARC_KVSET *kvset;
 
-			for (set = msg->arc_nsets - 1; set >= 0; set++)
+			for (set = msg->arc_nsets - 1; set >= 0; set--)
 			{
 				for (kvset = arc_set_first(msg,
 				                           ARC_KVSETTYPE_SEAL);
@@ -1994,7 +2376,7 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 	if (rsa == NULL)
 	{
 		arc_error(msg, "EVP_PKEY_get1_RSA() failed");
-		/* XXX -- free the pkey */
+		EVP_PKEY_free(pkey);
 		BIO_free(keydata);
 		return ARC_STAT_NORESOURCE;
 	}
@@ -2005,7 +2387,7 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 	{
 		arc_error(msg, "can't allocate %d bytes for signature",
 		          keysize);
-		/* XXX -- free the pkey */
+		EVP_PKEY_free(pkey);
 		RSA_free(rsa);
 		BIO_free(keydata);
 		return ARC_STAT_NORESOURCE;
@@ -2050,6 +2432,7 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 		arc_error(msg, "arc_parse_header_field() failed");
 		arc_dstring_free(dstr);
 		free(sigout);
+		EVP_PKEY_free(pkey);
 		RSA_free(rsa);
 		BIO_free(keydata);
 		return status;
@@ -2070,6 +2453,7 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 		arc_dstring_free(dstr);
 		free(sigout);
 		RSA_free(rsa);
+		EVP_PKEY_free(pkey);
 		BIO_free(keydata);
 		return status;
 	}
@@ -2087,6 +2471,7 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 		arc_dstring_free(dstr);
 		free(sigout);
 		RSA_free(rsa);
+		EVP_PKEY_free(pkey);
 		BIO_free(keydata);
 		return status;
 	}
@@ -2109,6 +2494,7 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 		arc_dstring_free(dstr);
 		free(sigout);
 		RSA_free(rsa);
+		EVP_PKEY_free(pkey);
 		BIO_free(keydata);
 		return ARC_STAT_INTERNAL;
 	}
@@ -2120,6 +2506,7 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 		arc_dstring_free(dstr);
 		free(sigout);
 		RSA_free(rsa);
+		EVP_PKEY_free(pkey);
 		BIO_free(keydata);
 		return ARC_STAT_INTERNAL;
 	}
@@ -2134,6 +2521,7 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 		arc_dstring_free(dstr);
 		free(sigout);
 		RSA_free(rsa);
+		EVP_PKEY_free(pkey);
 		BIO_free(keydata);
 		return ARC_STAT_INTERNAL;
 	}
@@ -2149,6 +2537,7 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 		arc_dstring_free(dstr);
 		free(sigout);
 		RSA_free(rsa);
+		EVP_PKEY_free(pkey);
 		BIO_free(keydata);
 		return ARC_STAT_NORESOURCE;
 	}
@@ -2162,6 +2551,7 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 		free(b64sig);
 		free(sigout);
 		RSA_free(rsa);
+		EVP_PKEY_free(pkey);
 		BIO_free(keydata);
 		return ARC_STAT_INTERNAL;
 	}
@@ -2178,6 +2568,7 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 		free(b64sig);
 		free(sigout);
 		RSA_free(rsa);
+		EVP_PKEY_free(pkey);
 		BIO_free(keydata);
 		return ARC_STAT_INTERNAL;
 	}
@@ -2192,6 +2583,7 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 		free(b64sig);
 		free(sigout);
 		RSA_free(rsa);
+		EVP_PKEY_free(pkey);
 		BIO_free(keydata);
 		return ARC_STAT_INTERNAL;
 	}
@@ -2218,6 +2610,7 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 		arc_dstring_free(dstr);
 		free(sigout);
 		RSA_free(rsa);
+		EVP_PKEY_free(pkey);
 		BIO_free(keydata);
 		return status;
 	}
@@ -2231,6 +2624,7 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 		arc_dstring_free(dstr);
 		free(sigout);
 		RSA_free(rsa);
+		EVP_PKEY_free(pkey);
 		BIO_free(keydata);
 		return status;
 	}
@@ -2245,6 +2639,7 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 		arc_dstring_free(dstr);
 		free(sigout);
 		RSA_free(rsa);
+		EVP_PKEY_free(pkey);
 		BIO_free(keydata);
 		return ARC_STAT_INTERNAL;
 	}
@@ -2259,6 +2654,7 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 		free(b64sig);
 		free(sigout);
 		RSA_free(rsa);
+		EVP_PKEY_free(pkey);
 		BIO_free(keydata);
 		return ARC_STAT_INTERNAL;
 	}
@@ -2275,6 +2671,7 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 		free(b64sig);
 		free(sigout);
 		RSA_free(rsa);
+		EVP_PKEY_free(pkey);
 		BIO_free(keydata);
 		return ARC_STAT_INTERNAL;
 	}
@@ -2286,6 +2683,7 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 		free(b64sig);
 		free(sigout);
 		RSA_free(rsa);
+		EVP_PKEY_free(pkey);
 		BIO_free(keydata);
 		return ARC_STAT_INTERNAL;
 	}
@@ -2303,6 +2701,7 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 	free(b64sig);
 	free(sigout);
 	RSA_free(rsa);
+		EVP_PKEY_free(pkey);
 	BIO_free(keydata);
 
 	*seal = msg->arc_sealhead;

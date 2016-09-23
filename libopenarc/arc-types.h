@@ -146,6 +146,7 @@ struct arc_msghandle
 	u_char *		arc_selector;
 	u_char *		arc_authservid;
 	u_char *		arc_b64sig;
+	u_char *		arc_b64key;
 	void *			arc_signature;
 	int			arc_dnssec_key;
 	int			arc_signalg;
@@ -156,12 +157,15 @@ struct arc_msghandle
 	u_int			arc_timeout;
 	u_int			arc_keybits;
 	u_int			arc_keytype;
+	u_int			arc_hashtype;
+	u_long			arc_flags;
 	arc_query_t		arc_query;
 	time_t			arc_timestamp;
 	time_t			arc_sigttl;
 	size_t			arc_siglen;
 	size_t			arc_keylen;
 	size_t			arc_errorlen;
+	size_t			arc_b64keylen;
 	ssize_t			arc_bodylen;
 	ARC_CHAIN		arc_cstate;
 	ARC_SIGERROR		arc_sigerror;

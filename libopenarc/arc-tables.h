@@ -32,6 +32,8 @@ extern struct nametable *archdrnames;
 extern struct nametable *canonicalizations;
 extern struct nametable *chainstatus;
 extern struct nametable *hashes;
+extern struct nametable *keyflags;
+extern struct nametable *keytypes;
 extern struct nametable *settypes;
 extern struct nametable *sigerrors;
 
