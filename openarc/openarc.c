@@ -1318,16 +1318,17 @@ arcf_config_load(struct config *data, struct arcf_config *conf,
 	memset(basedir, '\0', sizeof basedir);
 	memset(confstr, '\0', sizeof confstr);
 
+	str = NULL;
+	if (data != NULL)
+		(void) config_get(data, "AuthservID", &str, sizeof str);
+	if (str == NULL || strcmp(str, "HOSTNAME") == 0)
+		conf->conf_authservid = strdup(myhostname);
+	else	
+		conf->conf_authservid = strdup(str);
+
 	if (data != NULL)
 	{
 		int tmpint;
-
-		str = NULL;
-		(void) config_get(data, "AuthservID", &str, sizeof str);
-		if (str == NULL || strcmp(str, "HOSTNAME") == 0)
-			conf->conf_authservid = strdup(myhostname);
-		else	
-			conf->conf_authservid = strdup(str);
 
 		str = NULL;
 		(void) config_get(data, "BaseDirectory", &str, sizeof str);
@@ -3800,6 +3801,13 @@ main(int argc, char **argv)
 		return EX_CONFIG;
 	}
 
+	if (curconf->conf_selector == NULL || curconf->conf_domain == FALSE)
+	{
+		fprintf(stderr, "%s: selector and domain must be specified\n",
+		        progname);
+		return EX_CONFIG;
+	}
+
 	/* suppress a bunch of things if we're in test mode */
 	if (testmode)
 	{
@@ -4354,22 +4362,25 @@ main(int argc, char **argv)
 		(void) smfi_setdbg(mdebug);
 
 	/* try to clean up the socket */
-	status = arcf_socket_cleanup(sock);
-	if (status != 0)
+	if (sock != NULL)
 	{
-		if (curconf->conf_dolog)
+		status = arcf_socket_cleanup(sock);
+		if (status != 0)
 		{
-			syslog(LOG_ERR, "socket cleanup failed: %s",
-			       strerror(status));
+			if (curconf->conf_dolog)
+			{
+				syslog(LOG_ERR, "socket cleanup failed: %s",
+			       	strerror(status));
+			}
+
+			fprintf(stderr, "%s: socket cleanup failed: %s\n",
+		        	progname, strerror(status));
+
+			if (!autorestart && pidfile != NULL)
+				(void) unlink(pidfile);
+
+			return EX_UNAVAILABLE;
 		}
-
-		fprintf(stderr, "%s: socket cleanup failed: %s\n",
-		        progname, strerror(status));
-
-		if (!autorestart && pidfile != NULL)
-			(void) unlink(pidfile);
-
-		return EX_UNAVAILABLE;
 	}
 
 	smfilter.xxfi_flags = SMFIF_ADDHDRS;
