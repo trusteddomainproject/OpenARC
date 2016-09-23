@@ -327,11 +327,11 @@ arc_genamshdr(ARC_MESSAGE *msg, struct arc_dstring *dstr, char *delim,
 
 	/* basic required stuff */
 	if (sizeof(msg->arc_timestamp) == sizeof(unsigned long long))
-		format = "i=%u;%sa=%s;%sd=%s;%ss=%s;%st=%llu;%scv=%s";
+		format = "i=%u;%sa=%s;%sd=%s;%ss=%s;%st=%llu";
 	else if (sizeof(msg->arc_timestamp) == sizeof(unsigned long))
-		format = "i=%u;%sa=%s;%sd=%s;%ss=%s;%st=%lu;%scv=%s";
+		format = "i=%u;%sa=%s;%sd=%s;%ss=%s;%st=%lu";
 	else 
-		format = "i=%u;%sa=%s;%sd=%s;%ss=%s;%st=%u;%scv=%s";
+		format = "i=%u;%sa=%s;%sd=%s;%ss=%s;%st=%u";
 
 
 	(void) arc_dstring_printf(dstr, format,
@@ -340,9 +340,15 @@ arc_genamshdr(ARC_MESSAGE *msg, struct arc_dstring *dstr, char *delim,
 	                                           msg->arc_signalg), delim,
 	                          msg->arc_domain, delim,
 	                          msg->arc_selector, delim,
-	                          msg->arc_timestamp, delim,
-	                          arc_code_to_name(chainstatus,
-	                                           msg->arc_cstate));
+	                          msg->arc_timestamp);
+
+
+	if (seal)
+	{
+		arc_dstring_printf(dstr, ";%scv=%s", delim,
+	                           arc_code_to_name(chainstatus,
+	                                            msg->arc_cstate));
+	}
 
 	if (msg->arc_querymethods != NULL)
 	{
@@ -455,7 +461,7 @@ arc_genamshdr(ARC_MESSAGE *msg, struct arc_dstring *dstr, char *delim,
 }
 
 /*
-**  ARC_GETSIGHDR_D -- for signing operations, retrieve the complete signature
+**  ARC_GETAMSHDR_D -- for signing operations, retrieve the complete signature
 **                     header, doing so dynamically
 **
 **  Parameters:
@@ -2497,12 +2503,13 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 	hdr.hdr_next = NULL;
 
 	/* canonicalize */
-	status = arc_canon_signature(msg, &hdr);
+	status = arc_canon_signature(msg, &hdr, FALSE);
 	if (status != ARC_STAT_OK)
 	{
 		arc_error(msg, "arc_canon_signature() failed");
 		arc_dstring_free(dstr);
 		free(sigout);
+		free(sighdr);
 		RSA_free(rsa);
 		EVP_PKEY_free(pkey);
 		BIO_free(keydata);
@@ -2608,7 +2615,6 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 
 	/* Part III: Construct a new AS */
 	arc_dstring_blank(dstr);
-
 	arc_dstring_catn(dstr, (u_char *) ARC_SEAL_HDRNAME ": ",
 	                 sizeof ARC_SEAL_HDRNAME + 1);
 
@@ -2626,6 +2632,27 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 	}
 
 	arc_dstring_catn(dstr, sighdr, len);
+
+	hdr.hdr_text = arc_dstring_get(dstr);
+	hdr.hdr_colon = hdr.hdr_text + ARC_SEAL_HDRNAMELEN;
+	hdr.hdr_namelen = ARC_SEAL_HDRNAMELEN;
+	hdr.hdr_textlen = len;
+	hdr.hdr_flags = 0;
+	hdr.hdr_next = NULL;
+
+	/* canonicalize */
+	status = arc_canon_signature(msg, &hdr, TRUE);
+	if (status != ARC_STAT_OK)
+	{
+		arc_error(msg, "arc_canon_signature() failed");
+		arc_dstring_free(dstr);
+		free(sigout);
+		free(sighdr);
+		RSA_free(rsa);
+		EVP_PKEY_free(pkey);
+		BIO_free(keydata);
+		return ARC_STAT_INTERNAL;
+	}
 
 	status = arc_canon_getfinal(msg->arc_sealcanon, &digest, &diglen);
 	if (status != ARC_STAT_OK)
