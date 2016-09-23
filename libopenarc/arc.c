@@ -327,11 +327,11 @@ arc_genamshdr(ARC_MESSAGE *msg, struct arc_dstring *dstr, char *delim,
 
 	/* basic required stuff */
 	if (sizeof(msg->arc_timestamp) == sizeof(unsigned long long))
-		format = "i=%u;%sa=%s;%sd=%s;%ss=%s;%st=%llu";
+		format = "i=%u;%sa=%s;%sd=%s;%ss=%s;%st=%llu;%scv=%s";
 	else if (sizeof(msg->arc_timestamp) == sizeof(unsigned long))
-		format = "i=%u;%sa=%s;%sd=%s;%ss=%s;%st=%lu";
+		format = "i=%u;%sa=%s;%sd=%s;%ss=%s;%st=%lu;%scv=%s";
 	else 
-		format = "i=%u;%sa=%s;%sd=%s;%ss=%s;%st=%u";
+		format = "i=%u;%sa=%s;%sd=%s;%ss=%s;%st=%u;%scv=%s";
 
 
 	(void) arc_dstring_printf(dstr, format,
@@ -340,7 +340,9 @@ arc_genamshdr(ARC_MESSAGE *msg, struct arc_dstring *dstr, char *delim,
 	                                           msg->arc_signalg), delim,
 	                          msg->arc_domain, delim,
 	                          msg->arc_selector, delim,
-	                          msg->arc_timestamp);
+	                          msg->arc_timestamp, delim,
+	                          arc_code_to_name(chainstatus,
+	                                           msg->arc_cstate));
 
 	if (msg->arc_querymethods != NULL)
 	{
@@ -1163,10 +1165,11 @@ arc_add_plist(ARC_MESSAGE *msg, ARC_KVSET *set, u_char *param, u_char *value,
 */
 
 static ARC_STAT
-arc_process_set(ARC_MESSAGE *msg, arc_kvsettype_t type, u_char *str, size_t len,
-                void *data)
+arc_process_set(ARC_MESSAGE *msg, arc_kvsettype_t type, u_char *str,
+                size_t len, void *data)
 {
 	_Bool spaced;
+	_Bool stop = FALSE;
 	int state;
 	int status;
 	u_char *p;
@@ -1222,7 +1225,7 @@ arc_process_set(ARC_MESSAGE *msg, arc_kvsettype_t type, u_char *str, size_t len,
 	set->set_data = hcopy;
 	set->set_bad = FALSE;
 
-	for (p = hcopy; *p != '\0'; p++)
+	for (p = hcopy; *p != '\0' && !stop; p++)
 	{
 		if (!isascii(*p) || (!isprint(*p) && !isspace(*p)))
 		{
@@ -1328,6 +1331,14 @@ arc_process_set(ARC_MESSAGE *msg, arc_kvsettype_t type, u_char *str, size_t len,
 					return ARC_STAT_INTERNAL;
 				}
 
+				/*
+				**  Short-circuit ARC-Authentication-Results
+				**  after one tag, which should be the "i="
+				*/
+
+				if (type == ARC_KVSETTYPE_AR)
+					stop = TRUE;
+
 				/* reset */
 				param = NULL;
 				value = NULL;
@@ -1390,7 +1401,6 @@ arc_process_set(ARC_MESSAGE *msg, arc_kvsettype_t type, u_char *str, size_t len,
 		    arc_param_get(set, (u_char *) "h") == NULL ||
 		    arc_param_get(set, (u_char *) "d") == NULL ||
 		    arc_param_get(set, (u_char *) "b") == NULL ||
-		    arc_param_get(set, (u_char *) "v") == NULL ||
 		    arc_param_get(set, (u_char *) "i") == NULL ||
 		    arc_param_get(set, (u_char *) "a") == NULL)
 		{
@@ -1415,9 +1425,7 @@ arc_process_set(ARC_MESSAGE *msg, arc_kvsettype_t type, u_char *str, size_t len,
 		     p != NULL;
 		     p = strtok_r(NULL, ":", &ctx))
 		{
-			if (strcasecmp(p, ARC_AR_HDRNAME) == 0 ||
-			    strcasecmp(p, ARC_MSGSIG_HDRNAME) == 0 ||
-			    strcasecmp(p, ARC_SEAL_HDRNAME) == 0)
+			if (strcasecmp(p, ARC_SEAL_HDRNAME) == 0)
 			{
 				arc_error(msg, "ARC-Message-Signature signs %s",
 				          p);
@@ -1427,7 +1435,9 @@ arc_process_set(ARC_MESSAGE *msg, arc_kvsettype_t type, u_char *str, size_t len,
 		}
 
 		/* test validity of "t", "x", and "i" */
-		if (!arc_check_uint(arc_param_get(set, (u_char *) "t")))
+		
+		p = arc_param_get(set, (u_char *) "t");
+		if (p != NULL && !arc_check_uint(p))
 		{
 			arc_error(msg,
 			          "invalid \"t\" value in %s data",
@@ -1436,7 +1446,8 @@ arc_process_set(ARC_MESSAGE *msg, arc_kvsettype_t type, u_char *str, size_t len,
 			return ARC_STAT_SYNTAX;
 		}
 
-		if (!arc_check_uint(arc_param_get(set, (u_char *) "x")))
+		p = arc_param_get(set, (u_char *) "x");
+		if (p != NULL && !arc_check_uint(p))
 		{
 			arc_error(msg,
 			          "invalid \"x\" value in %s data",
@@ -1659,7 +1670,7 @@ arc_get_key(ARC_MESSAGE *msg, _Bool test)
 }
 
 /*
-**  ARC_VALIDATE_MSG -- validate a specific ARC message signature
+**  ARC_VALIDATE_MSG -- validate a specific ARC-Message-Signature
 **
 **  Parameters:
 **  	msg -- ARC message handle
@@ -1701,8 +1712,6 @@ arc_validate_msg(ARC_MESSAGE *msg, u_int setnum)
 	**  We just have to do the verification here.
 	*/
 
-	
-
 	return ARC_STAT_OK;
 }
 
@@ -1730,6 +1739,7 @@ arc_validate(ARC_MESSAGE *msg, u_int setnum)
 	/* pull the (set-1)th ARC Set */
 	set = &msg->arc_sets[setnum];
 
+	/* XXX -- validate the ARC-Message-Signature */
 	/* XXX -- validate the ARC-Seal */
 	/* XXX -- set msg->arc_cstate */
 
@@ -2249,7 +2259,7 @@ arc_eom(ARC_MESSAGE *msg)
 			u_char *cv;
 			ARC_KVSET *kvset;
 
-			for (set = msg->arc_nsets - 1; set >= 0; set--)
+			for (set = msg->arc_nsets; set > 0; set--)
 			{
 				for (kvset = arc_set_first(msg,
 				                           ARC_KVSETTYPE_SEAL);
@@ -2258,13 +2268,13 @@ arc_eom(ARC_MESSAGE *msg)
 				                         ARC_KVSETTYPE_SEAL))
 				{
 					inst = arc_param_get(kvset, "i");
-					if (atoi(inst) == set + 1)
+					if (atoi(inst) == set)
 						break;
 				}
 
 				cv = arc_param_get(kvset, "cv");
-				if ((set == 0 && strcasecmp(cv, "none") == 0) ||
-				    (set != 0 && strcasecmp(cv, "pass") == 0))
+				if ((set == 1 && strcasecmp(cv, "none") == 0) ||
+				    (set != 1 && strcasecmp(cv, "pass") == 0))
 				{
 					ARC_STAT status;
 
