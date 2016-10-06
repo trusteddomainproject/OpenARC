@@ -3357,7 +3357,7 @@ struct smfiDesc smfilter =
 	NULL,		/* envelope recipient filter */
 	mlfi_header,	/* header filter */
 	mlfi_eoh,	/* end of header */
-	NULL,		/* body block filter */
+	mlfi_body,	/* body block filter */
 	mlfi_eom,	/* end of message */
 	mlfi_abort,	/* message aborted */
 	mlfi_close,	/* shutdown */
