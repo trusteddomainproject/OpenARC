@@ -2629,6 +2629,19 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 	arc_dstring_catn(dstr, (u_char *) ARC_SEAL_HDRNAME ": ",
 	                 sizeof ARC_SEAL_HDRNAME + 1);
 
+	/* feed the seal we have so far */
+	status = arc_canon_add_to_seal(msg);
+	if (status != ARC_STAT_OK)
+	{
+		arc_error(msg, "arc_canon_add_to_seal() failed");
+		arc_dstring_free(dstr);
+		free(sigout);
+		RSA_free(rsa);
+		EVP_PKEY_free(pkey);
+		BIO_free(keydata);
+		return status;
+	}
+
 	status = arc_getamshdr_d(msg, arc_dstring_len(dstr), &sighdr, &len,
 	                         TRUE);
 	if (status != ARC_STAT_OK)

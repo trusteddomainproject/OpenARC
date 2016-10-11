@@ -403,7 +403,7 @@ arc_canon_header_string(struct arc_dstring *dstr,
 
 static ARC_STAT
 arc_canon_header(ARC_MESSAGE *msg, ARC_CANON *canon, struct arc_hdrfield *hdr,
-                  _Bool crlf)
+                 _Bool crlf)
 {
 	ARC_STAT status;
 
@@ -1810,6 +1810,35 @@ arc_canon_gethashes(ARC_MESSAGE *msg, void **hh, size_t *hhlen,
 	*hhlen = hdlen;
 	*bh = bd;
 	*bhlen = bdlen;
+
+	return ARC_STAT_OK;
+}
+
+/*
+**  ARC_CANON_ADD_TO_SEAL -- canonicalize partial seal
+**
+**  Parameters:
+**  	msg -- ARC message to update
+**
+**  Return value:
+**  	ARC_STAT_OK -- successful completion
+*/
+
+ARC_STAT
+arc_canon_add_to_seal(ARC_MESSAGE *msg)
+{
+	ARC_STAT status;
+	struct arc_canon *sc;
+	struct arc_hdrfield *hdr;
+
+	sc = msg->arc_sealcanon;
+
+	for (hdr = msg->arc_sealhead; hdr != NULL; hdr = hdr->hdr_next)
+	{
+		status = arc_canon_header(msg, msg->arc_sealcanon, hdr, TRUE);
+		if (status != ARC_STAT_OK)
+			return status;
+	}
 
 	return ARC_STAT_OK;
 }
