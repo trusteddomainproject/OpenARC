@@ -117,6 +117,8 @@ struct arcf_config
 	_Bool		conf_safekeys;		/* require safe keys */
 	_Bool		conf_keeptmpfiles;	/* keep temp files */
 	u_int		conf_refcnt;		/* reference count */
+	u_int		conf_canonhdr;		/* canonicalization for header */
+	u_int		conf_canonbody;		/* canonicalization for body */
 	char *		conf_selector;		/* signing selector */
 	char *		conf_keyfile;		/* key file */
 	char *		conf_tmpdir;		/* temp file directory */
@@ -194,6 +196,12 @@ struct lookup log_facilities[] =
 	{ "local5",		LOG_LOCAL5 },
 	{ "local6",		LOG_LOCAL6 },
 	{ "local7",		LOG_LOCAL7 },
+	{ NULL,			-1 }
+};
+
+struct lookup arcf_canonicalizations[] = {
+	{ "simple",		ARC_CANON_SIMPLE },
+	{ "relaxed",		ARC_CANON_RELAXED },
 	{ NULL,			-1 }
 };
 
@@ -1334,6 +1342,42 @@ arcf_config_load(struct config *data, struct arcf_config *conf,
 		(void) config_get(data, "BaseDirectory", &str, sizeof str);
 		if (str != NULL)
 			strlcpy(basedir, str, sizeof basedir);
+
+		str = NULL;
+		(void) config_get(data, "Canonicalization", &str, sizeof str);
+		if (str == NULL)
+		{
+			conf->conf_canonhdr = ARC_CANON_RELAXED;
+			conf->conf_canonbody = ARC_CANON_SIMPLE;
+		}
+		else
+		{
+			_Bool which = FALSE;
+			char *copy;
+			char *mode;
+			char *ctx;
+
+			copy = strdup(str);
+			mode = strtok_r(copy, "/", &ctx);
+			conf->conf_canonhdr = arcf_lookup_strtoint(mode,
+			                                           arcf_canonicalizations);
+			mode = strtok_r(NULL, "/", &ctx);
+			if (mode != NULL)
+			{
+				conf->conf_canonbody = arcf_lookup_strtoint(mode,
+				                                            arcf_canonicalizations);
+			}
+			else
+			{
+				conf->conf_canonbody = ARC_CANON_SIMPLE;
+			}
+
+			if (conf->conf_canonhdr == -1 || conf->conf_canonbody == -1)
+			{
+				strlcpy(err, "unknown canonicalization", errlen);
+				return -1;
+			}
+		}
 
 		(void) config_get(data, "Domain",
 		                  &conf->conf_domain,
@@ -2930,7 +2974,9 @@ mlfi_eoh(SMFICTX *ctx)
 	}
 
 	/* run the header fields */
-	afc->mctx_arcmsg = arc_message(conf->conf_libopenarc, &err);
+	afc->mctx_arcmsg = arc_message(conf->conf_libopenarc,
+	                               conf->conf_canonhdr, conf->conf_canonbody,
+	                               &err);
 	if (afc->mctx_arcmsg == NULL)
 	{
 		if (conf->conf_dolog)

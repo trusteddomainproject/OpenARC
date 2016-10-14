@@ -247,6 +247,7 @@ arc_canon_buffer(ARC_CANON *canon, u_char *buf, size_t buflen)
 **
 **  Parameters:
 **  	dstr -- arc_dstring to use for output
+**  	canon -- arc_canon_t
 **  	hdr -- header field input
 **  	hdrlen -- bytes to process at "hdr"
 **  	crlf -- write a CRLF at the end?
@@ -256,7 +257,7 @@ arc_canon_buffer(ARC_CANON *canon, u_char *buf, size_t buflen)
 */
 
 ARC_STAT
-arc_canon_header_string(struct arc_dstring *dstr,
+arc_canon_header_string(struct arc_dstring *dstr, arc_canon_t canon,
                         unsigned char *hdr, size_t hdrlen, _Bool crlf)
 {
 	_Bool space;
@@ -271,74 +272,102 @@ arc_canon_header_string(struct arc_dstring *dstr,
 	tmp = tmpbuf;
 	end = tmpbuf + sizeof tmpbuf - 1;
 
-	/* process header field name (before colon) first */
-	for (p = hdr; p < hdr + hdrlen; p++)
+	switch (canon)
 	{
-		/*
-		**  Discard spaces before the colon or before the end
-		**  of the first word.
-		*/
+	  case ARC_CANON_SIMPLE:
+		if (!arc_dstring_catn(dstr, hdr, hdrlen) ||
+		    (crlf && !arc_dstring_catn(dstr, CRLF, 2)))
+			return ARC_STAT_NORESOURCE;
+		break;
 
-		if (isascii(*p))
+	  case ARC_CANON_RELAXED:
+		/* process header field name (before colon) first */
+		for (p = hdr; p < hdr + hdrlen; p++)
 		{
-			/* discard spaces */
-			if (ARC_ISLWSP(*p))
-				continue;
+			/*
+			**  Discard spaces before the colon or before the end
+			**  of the first word.
+			*/
 
-			/* convert to lowercase */
-			if (isupper(*p))
-				*tmp++ = tolower(*p);
+			if (isascii(*p))
+			{
+				/* discard spaces */
+				if (ARC_ISLWSP(*p))
+					continue;
+
+				/* convert to lowercase */
+				if (isupper(*p))
+					*tmp++ = tolower(*p);
+				else
+					*tmp++ = *p;
+			}
 			else
+			{
 				*tmp++ = *p;
-		}
-		else
-		{
-			*tmp++ = *p;
-		}
+			}
 
-		/* reaching the end of the cache buffer, flush it */
-		if (tmp == end)
-		{
-			*tmp = '\0';
+			/* reaching the end of the cache buffer, flush it */
+			if (tmp == end)
+			{
+				*tmp = '\0';
 
-			if (!arc_dstring_catn(dstr,
-			                      tmpbuf, tmp - tmpbuf))
-				return ARC_STAT_NORESOURCE;
+				if (!arc_dstring_catn(dstr,
+				                       tmpbuf, tmp - tmpbuf))
+					return ARC_STAT_NORESOURCE;
 
-			tmp = tmpbuf;
-		}
+				tmp = tmpbuf;
+			}
 			
-		if (*p == ':')
-		{
+			if (*p == ':')
+			{
+				p++;
+				break;
+			}
+		}
+
+		/* skip all spaces before first word */
+		while (*p != '\0' && ARC_ISLWSP(*p))
 			p++;
-			break;
-		}
-	}
 
-	/* skip all spaces before first word */
-	while (*p != '\0' && ARC_ISLWSP(*p))
-		p++;
+		space = FALSE;				/* just saw a space */
 
-	space = FALSE;				/* just saw a space */
-
-	for ( ; *p != '\0'; p++)
-	{
-		if (isascii(*p) && isspace(*p))
+		for ( ; *p != '\0'; p++)
 		{
-			/* mark that there was a space and continue */
-			space = TRUE;
+			if (isascii(*p) && isspace(*p))
+			{
+				/* mark that there was a space and continue */
+				space = TRUE;
 
-			continue;
-		}
+				continue;
+			}
 
-		/*
-		**  Any non-space marks the beginning of a word.
-		**  If there's a stored space, use it up.
-		*/
+			/*
+			**  Any non-space marks the beginning of a word.
+			**  If there's a stored space, use it up.
+			*/
 
-		if (space)
-		{
-			*tmp++ = ' ';
+			if (space)
+			{
+				*tmp++ = ' ';
+
+				/* flush buffer? */
+				if (tmp == end)
+				{
+					*tmp = '\0';
+
+					if (!arc_dstring_catn(dstr,
+					                      tmpbuf,
+					                      tmp - tmpbuf))
+						return ARC_STAT_NORESOURCE;
+
+					tmp = tmpbuf;
+				}
+
+				space = FALSE;
+			}
+
+			/* copy the byte */
+			*tmp++ = *p;
 
 			/* flush buffer? */
 			if (tmp == end)
@@ -346,44 +375,28 @@ arc_canon_header_string(struct arc_dstring *dstr,
 				*tmp = '\0';
 
 				if (!arc_dstring_catn(dstr,
-				                      tmpbuf,
-				                      tmp - tmpbuf))
+				                      tmpbuf, tmp - tmpbuf))
 					return ARC_STAT_NORESOURCE;
 
 				tmp = tmpbuf;
 			}
-
-			space = FALSE;
 		}
 
-		/* copy the byte */
-		*tmp++ = *p;
-
-		/* flush buffer? */
-		if (tmp == end)
+		/* flush any cached data */
+		if (tmp != tmpbuf)
 		{
 			*tmp = '\0';
 
 			if (!arc_dstring_catn(dstr,
-			                      tmpbuf, tmp - tmpbuf))
+			                       tmpbuf, tmp - tmpbuf))
 				return ARC_STAT_NORESOURCE;
-
-			tmp = tmpbuf;
 		}
-	}
 
-	/* flush any cached data */
-	if (tmp != tmpbuf)
-	{
-		*tmp = '\0';
-
-		if (!arc_dstring_catn(dstr,
-		                      tmpbuf, tmp - tmpbuf))
+		if (crlf && !arc_dstring_catn(dstr, CRLF, 2))
 			return ARC_STAT_NORESOURCE;
-	}
 
-	if (crlf && !arc_dstring_catn(dstr, CRLF, 2))
-		return ARC_STAT_NORESOURCE;
+		break;
+	}
 
 	return ARC_STAT_OK;
 }
@@ -424,7 +437,7 @@ arc_canon_header(ARC_MESSAGE *msg, ARC_CANON *canon, struct arc_hdrfield *hdr,
 
 	arc_canon_buffer(canon, NULL, 0);
 
-	status = arc_canon_header_string(msg->arc_canonbuf,
+	status = arc_canon_header_string(msg->arc_canonbuf, canon->canon_canon,
 	                                 hdr->hdr_text, hdr->hdr_textlen,
 	                                 crlf);
 	if (status != ARC_STAT_OK)
@@ -685,6 +698,7 @@ arc_canon_cleanup(ARC_MESSAGE *msg)
 **  	msg -- verification handle
 **  	hdr -- TRUE iff this is specifying a header canonicalization
 **  	type -- an ARC_CANONTYPE_* constant
+**  	canon -- arc_canon_t
 **  	hashtype -- hash type
 **  	hdrlist -- for header canonicalization, the header list
 **  	sighdr -- pointer to header being verified (NULL for signing)
@@ -696,7 +710,7 @@ arc_canon_cleanup(ARC_MESSAGE *msg)
 */
 
 ARC_STAT
-arc_add_canon(ARC_MESSAGE *msg, int type, int hashtype,
+arc_add_canon(ARC_MESSAGE *msg, int type, arc_canon_t canon, int hashtype,
                u_char *hdrlist, struct arc_hdrfield *sighdr,
                ssize_t length, ARC_CANON **cout)
 {
@@ -704,6 +718,7 @@ arc_add_canon(ARC_MESSAGE *msg, int type, int hashtype,
 	ARC_CANON *new;
 
 	assert(msg != NULL);
+	assert(canon == ARC_CANON_SIMPLE || canon == ARC_CANON_RELAXED);
 
 	if (arc_libfeature(msg->arc_library, ARC_FEATURE_SHA256))
 	{
@@ -747,6 +762,7 @@ arc_add_canon(ARC_MESSAGE *msg, int type, int hashtype,
 	new->canon_hashtype = hashtype;
 	new->canon_hash = NULL;
 	new->canon_wrote = 0;
+	new->canon_canon = canon;
 	if (type != ARC_CANONTYPE_BODY)
 	{
 		new->canon_length = (ssize_t) -1;

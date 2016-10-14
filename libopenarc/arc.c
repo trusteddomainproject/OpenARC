@@ -327,11 +327,11 @@ arc_genamshdr(ARC_MESSAGE *msg, struct arc_dstring *dstr, char *delim,
 
 	/* basic required stuff */
 	if (sizeof(msg->arc_timestamp) == sizeof(unsigned long long))
-		format = "i=%u;%sa=%s;%sd=%s;%ss=%s;%st=%llu";
+		format = "i=%u;%sa=%s;%sd=%s;%ss=%s;%sc=%s/%s;%st=%llu";
 	else if (sizeof(msg->arc_timestamp) == sizeof(unsigned long))
-		format = "i=%u;%sa=%s;%sd=%s;%ss=%s;%st=%lu";
+		format = "i=%u;%sa=%s;%sd=%s;%ss=%s;%sc=%s/%s;%st=%lu";
 	else 
-		format = "i=%u;%sa=%s;%sd=%s;%ss=%s;%st=%u";
+		format = "i=%u;%sa=%s;%sd=%s;%ss=%s;%sc=%s/%s;%st=%u";
 
 
 	(void) arc_dstring_printf(dstr, format,
@@ -340,8 +340,11 @@ arc_genamshdr(ARC_MESSAGE *msg, struct arc_dstring *dstr, char *delim,
 	                                           msg->arc_signalg), delim,
 	                          msg->arc_domain, delim,
 	                          msg->arc_selector, delim,
+	                          arc_code_to_name(canonicalizations,
+	                                           msg->arc_canonhdr),
+	                          arc_code_to_name(canonicalizations,
+	                                           msg->arc_canonbody), delim,
 	                          msg->arc_timestamp);
-
 
 	if (seal)
 	{
@@ -1768,6 +1771,8 @@ arc_validate(ARC_MESSAGE *msg, u_int setnum)
 **
 **  Parameters:
 **  	lib -- containing library instance
+**  	canonhdr -- canonicalization mode to use on the header
+**  	canonbody -- canonicalization mode to use on the body
 **  	err -- error string (returned)
 **
 **  Return value:
@@ -1775,7 +1780,8 @@ arc_validate(ARC_MESSAGE *msg, u_int setnum)
 */
 
 ARC_MESSAGE *
-arc_message(ARC_LIB *lib, const u_char **err)
+arc_message(ARC_LIB *lib, arc_canon_t canonhdr, arc_canon_t canonbody,
+            const u_char **err)
 {
 	ARC_MESSAGE *msg;
 
@@ -1791,6 +1797,9 @@ arc_message(ARC_LIB *lib, const u_char **err)
 		msg->arc_library = lib;
 		(void) time(&msg->arc_timestamp);
 	}
+
+	msg->arc_canonhdr = canonhdr;
+	msg->arc_canonbody = canonbody;
 
 	return msg;
 }
@@ -2158,8 +2167,9 @@ arc_eoh(ARC_MESSAGE *msg)
 	*/
 
 	/* header */
-	status = arc_add_canon(msg, ARC_CANONTYPE_HEADER, ARC_HASHTYPE_SHA256,
-	                       NULL, NULL, (ssize_t) -1, &msg->arc_hdrcanon);
+	status = arc_add_canon(msg, ARC_CANONTYPE_HEADER, msg->arc_canonhdr,
+	                       ARC_HASHTYPE_SHA256, NULL, NULL, (ssize_t) -1,
+	                       &msg->arc_hdrcanon);
 	if (status != ARC_STAT_OK)
 	{
 		arc_error(msg,
@@ -2168,8 +2178,9 @@ arc_eoh(ARC_MESSAGE *msg)
 	}
 
 	/* body */
-	status = arc_add_canon(msg, ARC_CANONTYPE_BODY, ARC_HASHTYPE_SHA256,
-	                       NULL, NULL, (ssize_t) -1, &msg->arc_bodycanon);
+	status = arc_add_canon(msg, ARC_CANONTYPE_BODY, msg->arc_canonbody,
+	                       ARC_HASHTYPE_SHA256, NULL, NULL, (ssize_t) -1,
+	                       &msg->arc_bodycanon);
 	if (status != ARC_STAT_OK)
 	{
 		arc_error(msg,
@@ -2178,8 +2189,9 @@ arc_eoh(ARC_MESSAGE *msg)
 	}
 
 	/* seal */
-	status = arc_add_canon(msg, ARC_CANONTYPE_SEAL, ARC_HASHTYPE_SHA256,
-	                       NULL, NULL, (ssize_t) -1, &msg->arc_sealcanon);
+	status = arc_add_canon(msg, ARC_CANONTYPE_SEAL, ARC_CANON_RELAXED,
+	                       ARC_HASHTYPE_SHA256, NULL, NULL, (ssize_t) -1,
+	                       &msg->arc_sealcanon);
 	if (status != ARC_STAT_OK)
 	{
 		arc_error(msg,

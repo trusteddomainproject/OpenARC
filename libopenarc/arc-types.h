@@ -127,6 +127,7 @@ struct arc_canon
 	ssize_t			canon_remain;
 	ssize_t			canon_wrote;
 	ssize_t			canon_length;
+	arc_canon_t		canon_canon;
 	u_char *		canon_hashbuf;
 	u_char *		canon_hdrlist;
 	void *			canon_hash;
@@ -167,6 +168,8 @@ struct arc_msghandle
 	size_t			arc_errorlen;
 	size_t			arc_b64keylen;
 	ssize_t			arc_bodylen;
+	arc_canon_t		arc_canonhdr;
+	arc_canon_t		arc_canonbody;
 	ARC_CHAIN		arc_cstate;
 	ARC_SIGERROR		arc_sigerror;
 	struct arc_qmethod *	arc_querymethods;

@@ -35,6 +35,14 @@ static struct nametable prv_archdrnames[] =	/* header field names:types */
 };
 struct nametable *archdrnames = prv_archdrnames;
 
+static struct nametable prv_canonicalizations[] = /* canonicalizations */
+{
+	{ "simple",	ARC_CANON_SIMPLE },
+	{ "relaxed",	ARC_CANON_RELAXED },
+	{ NULL,		-1 },
+};
+struct nametable *canonicalizations = prv_canonicalizations;
+
 static struct nametable prv_hashes[] =		/* hashes */
 {
 	{ "sha1",	ARC_HASHTYPE_SHA1 },

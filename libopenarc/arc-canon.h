@@ -28,9 +28,10 @@
 #define	ARC_CANONTYPE_SEAL	2
 
 /* prototypes */
-extern ARC_STAT arc_add_canon __P((ARC_MESSAGE *, int, int,
+extern ARC_STAT arc_add_canon __P((ARC_MESSAGE *, int, arc_canon_t, int,
                                    u_char *, struct arc_hdrfield *,
                                    ssize_t length, ARC_CANON **));
+extern ARC_STAT arc_canon_add_to_seal __P((ARC_MESSAGE *));
 extern ARC_STAT arc_canon_bodychunk __P((ARC_MESSAGE *, u_char *, size_t));
 extern void arc_canon_cleanup __P((ARC_MESSAGE *));
 extern ARC_STAT arc_canon_closebody __P((ARC_MESSAGE *));
@@ -38,6 +39,7 @@ extern ARC_STAT arc_canon_getfinal __P((ARC_CANON *, u_char **, size_t *));
 extern ARC_STAT arc_canon_gethashes __P((ARC_MESSAGE *, void **, size_t *,
                                          void **, size_t *));
 extern ARC_STAT arc_canon_header_string __P((struct arc_dstring *,
+                                             arc_canon_t,
                                              unsigned char *,
                                              size_t, _Bool));
 extern ARC_STAT arc_canon_init __P((ARC_MESSAGE *, _Bool, _Bool));

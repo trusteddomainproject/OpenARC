@@ -27,6 +27,7 @@ struct configdef arcf_config[] =
 	{ "AutoRestartRate",		CONFIG_TYPE_STRING,	FALSE },
 	{ "Background",			CONFIG_TYPE_BOOLEAN,	FALSE },
 	{ "BaseDirectory",		CONFIG_TYPE_STRING,	FALSE },
+	{ "Canonicalization",		CONFIG_TYPE_STRING,	FALSE },
 	{ "ChangeRootDirectory",	CONFIG_TYPE_STRING,	FALSE },
 	{ "Domain",			CONFIG_TYPE_STRING,	TRUE },
 	{ "EnableCoredumps",		CONFIG_TYPE_BOOLEAN,	FALSE },

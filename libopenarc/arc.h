@@ -91,6 +91,16 @@ typedef int ARC_CHAIN;
 #define	ARC_CHAIN_PASS		2	/* pass */
 
 /*
+** ARC_CANON_T -- a canoncalization mode
+*/
+
+typedef int arc_canon_t;
+
+#define	ARC_CANON_UNKNOWN	(-1)
+#define	ARC_CANON_SIMPLE	0
+#define	ARC_CANON_RELAXED	1
+
+/*
 **  ARC_SIGERROR -- signature errors
 */
 
@@ -351,13 +361,15 @@ const char *arc_getsslbuf(ARC_LIB *);
 **
 **  Parameters:
 **  	lib -- containing library instance
+**  	canonhdr -- canonicalization to use for the header
+**  	canonbody -- canonicalization to use for the body
 **  	err -- error string (returned)
 **
 **  Return value:
 **  	A new message instance, or NULL on failure (and "err" is updated).
 */
 
-ARC_MESSAGE *arc_message(ARC_LIB *, const u_char **);
+ARC_MESSAGE *arc_message(ARC_LIB *, int, int, const u_char **);
 
 /*
 **  ARC_FREE -- deallocate a message object
