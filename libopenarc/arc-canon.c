@@ -1512,131 +1512,221 @@ arc_canon_bodychunk(ARC_MESSAGE *msg, u_char *buf, size_t buflen)
 		wrote = start;
 		wlen = 0;
 
-		for (p = start; p <= eob; p++)
+		switch (cur->canon_canon)
 		{
-			switch (cur->canon_bodystate)
+		  case ARC_CANON_SIMPLE:
+			for (p = start; p <= eob; p++)
 			{
-			  case 0:
-				if (ARC_ISWSP(*p))
+				if (*p == '\n')
 				{
-					cur->canon_bodystate = 1;
-				}
-				else if (*p == '\r')
-				{
-					cur->canon_bodystate = 2;
-				}
-				else
-				{
-					cur->canon_blankline = FALSE;
-					arc_dstring_cat1(cur->canon_buf, *p);
-					cur->canon_bodystate = 3;
-				}
-				break;
-
-			  case 1:
-				if (ARC_ISWSP(*p))
-				{
-					break;
-				}
-				else if (*p == '\r')
-				{
-					cur->canon_bodystate = 2;
-				}
-				else
-				{
-					arc_canon_flushblanks(cur);
-					arc_canon_buffer(cur, SP, 1);
-					cur->canon_blankline = FALSE;
-					arc_dstring_cat1(cur->canon_buf, *p);
-					cur->canon_bodystate = 3;
-				}
-				break;
-
-			  case 2:
-				if (fixcrlf || *p == '\n')
-				{
-					if (cur->canon_blankline)
+					if (cur->canon_lastchar == '\r')
 					{
-						cur->canon_blanks++;
-						cur->canon_bodystate = 0;
+						if (cur->canon_blankline)
+						{
+							cur->canon_blanks++;
+						}
+						else if (wlen == 1 ||
+						         p == start)
+						{
+							arc_canon_buffer(cur,
+							                 CRLF,
+							                 2);
+						}
+						else
+						{
+							arc_canon_buffer(cur,
+							                 wrote,
+							                 wlen + 1);
+						}
+
+						wrote = p + 1;
+						wlen = 0;
+						cur->canon_blankline = TRUE;
+					}
+				}
+				else
+				{
+					if (p == start &&
+					    cur->canon_lastchar == '\r')
+					{
+						if (fixcrlf)
+						{
+							arc_canon_buffer(cur,
+							                 CRLF,
+							                 2);
+							cur->canon_lastchar = '\n';
+							cur->canon_blankline = TRUE;
+						}
+						else
+						{
+							arc_canon_buffer(cur,
+							                 (u_char *) "\r",
+							                 1);
+						}
+					}
+
+					if (*p != '\r')
+					{
+						if (cur->canon_blanks > 0)
+							arc_canon_flushblanks(cur);
+						cur->canon_blankline = FALSE;
+					}
+
+					wlen++;
+				}
+
+				cur->canon_lastchar = *p;
+			}
+
+			if (wlen > 0 && wrote[wlen - 1] == '\r')
+				wlen--;
+
+			arc_canon_buffer(cur, wrote, wlen);
+
+			break;
+
+		  case ARC_CANON_RELAXED:
+			for (p = start; p <= eob; p++)
+			{
+				switch (cur->canon_bodystate)
+				{
+				  case 0:
+					if (ARC_ISWSP(*p))
+					{
+						cur->canon_bodystate = 1;
+					}
+					else if (*p == '\r')
+					{
+						cur->canon_bodystate = 2;
 					}
 					else
+					{
+						cur->canon_blankline = FALSE;
+						arc_dstring_cat1(cur->canon_buf,
+						                 *p);
+						cur->canon_bodystate = 3;
+					}
+					break;
+
+				  case 1:
+					if (ARC_ISWSP(*p))
+					{
+						break;
+					}
+					else if (*p == '\r')
+					{
+						cur->canon_bodystate = 2;
+					}
+					else
+					{
+						arc_canon_flushblanks(cur);
+						arc_canon_buffer(cur, SP, 1);
+						cur->canon_blankline = FALSE;
+						arc_dstring_cat1(cur->canon_buf,
+						                 *p);
+						cur->canon_bodystate = 3;
+					}
+					break;
+
+				  case 2:
+					if (fixcrlf || *p == '\n')
+					{
+						if (cur->canon_blankline)
+						{
+							cur->canon_blanks++;
+							cur->canon_bodystate = 0;
+						}
+						else
+						{
+							arc_canon_flushblanks(cur);
+							arc_canon_buffer(cur,
+							                 arc_dstring_get(cur->canon_buf),
+							                 arc_dstring_len(cur->canon_buf));
+							arc_canon_buffer(cur,
+							                 CRLF,
+							                 2);
+							arc_dstring_blank(cur->canon_buf);
+
+							if (*p == '\n')
+							{
+								cur->canon_blankline = TRUE;
+								cur->canon_bodystate = 0;
+							}
+							else if (*p == '\r')
+							{
+								cur->canon_blankline = TRUE;
+							}
+							else
+							{
+								if (ARC_ISWSP(*p))
+								{
+									cur->canon_bodystate = 1;
+								}
+								else
+								{
+									arc_dstring_cat1(cur->canon_buf,
+									                 *p);
+									cur->canon_bodystate = 3;
+								}
+							}
+						}
+					}
+					else if (*p == '\r')
+					{
+						cur->canon_blankline = FALSE;
+						arc_dstring_cat1(cur->canon_buf,
+						                 *p);
+					}
+					else if (ARC_ISWSP(*p))
 					{
 						arc_canon_flushblanks(cur);
 						arc_canon_buffer(cur,
 						                 arc_dstring_get(cur->canon_buf),
 						                 arc_dstring_len(cur->canon_buf));
-						arc_canon_buffer(cur, CRLF, 2);
 						arc_dstring_blank(cur->canon_buf);
-
-						if (*p == '\n')
-						{
-							cur->canon_blankline = TRUE;
-							cur->canon_bodystate = 0;
-						}
-						else if (*p == '\r')
-						{
-							cur->canon_blankline = TRUE;
-						}
-						else
-						{
-							if (ARC_ISWSP(*p))
-							{
-								cur->canon_bodystate = 1;
-							}
-							else
-							{
-								arc_dstring_cat1(cur->canon_buf,
-								                 *p);
-								cur->canon_bodystate = 3;
-							}
-						}
+						cur->canon_bodystate = 1;
 					}
-				}
-				else if (*p == '\r')
-				{
-					cur->canon_blankline = FALSE;
-					arc_dstring_cat1(cur->canon_buf, *p);
-				}
-				else if (ARC_ISWSP(*p))
-				{
-					arc_canon_flushblanks(cur);
-					arc_canon_buffer(cur,
-					                 arc_dstring_get(cur->canon_buf),
-					                 arc_dstring_len(cur->canon_buf));
-					arc_dstring_blank(cur->canon_buf);
-					cur->canon_bodystate = 1;
-				}
-				else
-				{
-					cur->canon_blankline = FALSE;
-					arc_dstring_cat1(cur->canon_buf, *p);
-					cur->canon_bodystate = 3;
-				}
-				break;
+					else
+					{
+						cur->canon_blankline = FALSE;
+						arc_dstring_cat1(cur->canon_buf,
+						                 *p);
+						cur->canon_bodystate = 3;
+					}
+					break;
 
-			  case 3:
-				if (ARC_ISWSP(*p))
-				{
-					arc_canon_flushblanks(cur);
-					arc_canon_buffer(cur,
-					                 arc_dstring_get(cur->canon_buf),
-					                 arc_dstring_len(cur->canon_buf));
-					arc_dstring_blank(cur->canon_buf);
-					cur->canon_bodystate = 1;
+				  case 3:
+					if (ARC_ISWSP(*p))
+					{
+						arc_canon_flushblanks(cur);
+						arc_canon_buffer(cur,
+						                 arc_dstring_get(cur->canon_buf),
+						                 arc_dstring_len(cur->canon_buf));
+						arc_dstring_blank(cur->canon_buf);
+						cur->canon_bodystate = 1;
+					}
+					else if (*p == '\r')
+					{
+						cur->canon_bodystate = 2;
+					}
+					else
+					{
+						arc_dstring_cat1(cur->canon_buf,
+						                 *p);
+					}
+					break;
 				}
-				else if (*p == '\r')
-				{
-					cur->canon_bodystate = 2;
-				}
-				else
-				{
-					arc_dstring_cat1(cur->canon_buf, *p);
-				}
-				break;
+
+				cur->canon_lastchar = *p;
 			}
 
-			cur->canon_lastchar = *p;
+			arc_canon_buffer(cur, NULL, 0);
+
+			break;
+
+		  default:
+			assert(0);
+			/* NOTREACHED */
 		}
 
 		arc_canon_buffer(cur, NULL, 0);
