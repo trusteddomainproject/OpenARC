@@ -1773,6 +1773,7 @@ arc_validate(ARC_MESSAGE *msg, u_int setnum)
 **  	lib -- containing library instance
 **  	canonhdr -- canonicalization mode to use on the header
 **  	canonbody -- canonicalization mode to use on the body
+**  	signalg -- signing algorithm
 **  	err -- error string (returned)
 **
 **  Return value:
@@ -1781,7 +1782,7 @@ arc_validate(ARC_MESSAGE *msg, u_int setnum)
 
 ARC_MESSAGE *
 arc_message(ARC_LIB *lib, arc_canon_t canonhdr, arc_canon_t canonbody,
-            const u_char **err)
+            arc_alg_t signalg, const u_char **err)
 {
 	ARC_MESSAGE *msg;
 
@@ -1800,6 +1801,7 @@ arc_message(ARC_LIB *lib, arc_canon_t canonhdr, arc_canon_t canonbody,
 
 	msg->arc_canonhdr = canonhdr;
 	msg->arc_canonbody = canonbody;
+	msg->arc_signalg = signalg;
 
 	return msg;
 }
@@ -2168,7 +2170,7 @@ arc_eoh(ARC_MESSAGE *msg)
 
 	/* header */
 	status = arc_add_canon(msg, ARC_CANONTYPE_HEADER, msg->arc_canonhdr,
-	                       ARC_HASHTYPE_SHA256, NULL, NULL, (ssize_t) -1,
+	                       msg->arc_signalg, NULL, NULL, (ssize_t) -1,
 	                       &msg->arc_hdrcanon);
 	if (status != ARC_STAT_OK)
 	{
@@ -2179,7 +2181,7 @@ arc_eoh(ARC_MESSAGE *msg)
 
 	/* body */
 	status = arc_add_canon(msg, ARC_CANONTYPE_BODY, msg->arc_canonbody,
-	                       ARC_HASHTYPE_SHA256, NULL, NULL, (ssize_t) -1,
+	                       msg->arc_signalg, NULL, NULL, (ssize_t) -1,
 	                       &msg->arc_bodycanon);
 	if (status != ARC_STAT_OK)
 	{

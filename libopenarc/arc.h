@@ -363,13 +363,15 @@ const char *arc_getsslbuf(ARC_LIB *);
 **  	lib -- containing library instance
 **  	canonhdr -- canonicalization to use for the header
 **  	canonbody -- canonicalization to use for the body
+**  	signalg -- signing algorithm
 **  	err -- error string (returned)
 **
 **  Return value:
 **  	A new message instance, or NULL on failure (and "err" is updated).
 */
 
-ARC_MESSAGE *arc_message(ARC_LIB *, int, int, const u_char **);
+ARC_MESSAGE *arc_message(ARC_LIB *, arc_canon_t, arc_canon_t, arc_alg_t,
+                         const u_char **);
 
 /*
 **  ARC_FREE -- deallocate a message object

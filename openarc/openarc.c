@@ -117,8 +117,9 @@ struct arcf_config
 	_Bool		conf_safekeys;		/* require safe keys */
 	_Bool		conf_keeptmpfiles;	/* keep temp files */
 	u_int		conf_refcnt;		/* reference count */
-	u_int		conf_canonhdr;		/* canonicalization for header */
-	u_int		conf_canonbody;		/* canonicalization for body */
+	arc_canon_t	conf_canonhdr;		/* canonicalization for header */
+	arc_canon_t	conf_canonbody;		/* canonicalization for body */
+	arc_alg_t	conf_signalg;		/* signing algorithm */
 	char *		conf_selector;		/* signing selector */
 	char *		conf_keyfile;		/* key file */
 	char *		conf_tmpdir;		/* temp file directory */
@@ -2976,6 +2977,7 @@ mlfi_eoh(SMFICTX *ctx)
 	/* run the header fields */
 	afc->mctx_arcmsg = arc_message(conf->conf_libopenarc,
 	                               conf->conf_canonhdr, conf->conf_canonbody,
+	                               conf->conf_signalg,
 	                               &err);
 	if (afc->mctx_arcmsg == NULL)
 	{
