@@ -206,6 +206,12 @@ struct lookup arcf_canonicalizations[] = {
 	{ NULL,			-1 }
 };
 
+struct lookup arcf_signalgorithms[] = {
+	{ "rsa-sha1",		ARC_SIGN_RSASHA1 },
+	{ "rsa-sha256",		ARC_SIGN_RSASHA256 },
+	{ NULL,			-1 }
+};
+
 /* PROTOTYPES */
 sfsistat mlfi_abort __P((SMFICTX *));
 sfsistat mlfi_close __P((SMFICTX *));
@@ -1378,6 +1384,15 @@ arcf_config_load(struct config *data, struct arcf_config *conf,
 				strlcpy(err, "unknown canonicalization", errlen);
 				return -1;
 			}
+		}
+
+		str = NULL;
+		(void) config_get(data, "SignatureAlgorithm",
+		                  &str, sizeof str);
+		if (str != NULL)
+		{
+			conf->conf_signalg = arcf_lookup_strtoint(str,
+			                                          arcf_signalgorithms);
 		}
 
 		(void) config_get(data, "Domain",

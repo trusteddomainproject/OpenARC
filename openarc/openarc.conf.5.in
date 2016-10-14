@@ -75,6 +75,20 @@ to fork and exits immediately, leaving the service running in the background.
 The default is "true".
 
 .TP
+.I Canonicalization (string)
+Selects the canonicalization method(s) to be used when signing messages.
+When verifying, the message's ARC-Message-Signature: header field specifies
+the canonicalization method.  The recognized values are
+.I relaxed
+and
+.I simple
+as defined by the DKIM specification.  The default is
+.I relaxed/simple.
+The value may include two different canonicalizations separated by a
+slash ("/") character, in which case the first will be applied to the
+header and the second to the body.
+
+.TP
 .I ChangeRootDirectory (string)
 Requests that the operating system change the effective root directory
 of the process to the one specified here prior to beginning execution.
@@ -122,6 +136,13 @@ will be checked.
 .I PidFile (string)
 Specifies the path to a file that should be created at process start
 containing the process ID.
+
+.TP
+.I SignatureAlgorithm (string)
+Selects the signing algorithm to use when generating signatures.
+Use 'openarc \-V' to see the list of supported algorithms.
+The default is
+.I rsa-sha1.
 
 .TP
 .I Socket (string)
