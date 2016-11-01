@@ -327,11 +327,11 @@ arc_genamshdr(ARC_MESSAGE *msg, struct arc_dstring *dstr, char *delim,
 
 	/* basic required stuff */
 	if (sizeof(msg->arc_timestamp) == sizeof(unsigned long long))
-		format = "i=%u;%sa=%s;%sd=%s;%ss=%s;%sc=%s/%s;%st=%llu";
+		format = "i=%u;%sa=%s;%sd=%s;%ss=%s;%st=%llu";
 	else if (sizeof(msg->arc_timestamp) == sizeof(unsigned long))
-		format = "i=%u;%sa=%s;%sd=%s;%ss=%s;%sc=%s/%s;%st=%lu";
+		format = "i=%u;%sa=%s;%sd=%s;%ss=%s;%st=%lu";
 	else 
-		format = "i=%u;%sa=%s;%sd=%s;%ss=%s;%sc=%s/%s;%st=%u";
+		format = "i=%u;%sa=%s;%sd=%s;%ss=%s;%st=%u";
 
 
 	(void) arc_dstring_printf(dstr, format,
@@ -340,10 +340,6 @@ arc_genamshdr(ARC_MESSAGE *msg, struct arc_dstring *dstr, char *delim,
 	                                           msg->arc_signalg), delim,
 	                          msg->arc_domain, delim,
 	                          msg->arc_selector, delim,
-	                          arc_code_to_name(canonicalizations,
-	                                           msg->arc_canonhdr),
-	                          arc_code_to_name(canonicalizations,
-	                                           msg->arc_canonbody), delim,
 	                          msg->arc_timestamp);
 
 	if (seal)
@@ -351,6 +347,15 @@ arc_genamshdr(ARC_MESSAGE *msg, struct arc_dstring *dstr, char *delim,
 		arc_dstring_printf(dstr, ";%scv=%s", delim,
 	                           arc_code_to_name(chainstatus,
 	                                            msg->arc_cstate));
+	}
+
+	if (!seal)
+	{
+		arc_dstring_printf(dstr, ";%sc=%s/%s", delim,
+	                           arc_code_to_name(canonicalizations,
+	                                            msg->arc_canonhdr),
+	                           arc_code_to_name(canonicalizations,
+	                                            msg->arc_canonbody));
 	}
 
 	if (msg->arc_querymethods != NULL)
