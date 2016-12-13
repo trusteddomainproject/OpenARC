@@ -1807,6 +1807,7 @@ arc_message(ARC_LIB *lib, arc_canon_t canonhdr, arc_canon_t canonbody,
 	msg->arc_canonhdr = canonhdr;
 	msg->arc_canonbody = canonbody;
 	msg->arc_signalg = signalg;
+	msg->arc_margin = ARC_HDRMARGIN;
 
 	return msg;
 }
@@ -2606,6 +2607,8 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 	/* append it to the stub */
 	arc_dstring_cat(dstr, b64sig);
 
+	/* XXX -- wrapping needs to happen here */
+
 	/* add it to the seal */
 	h = malloc(sizeof hdr);
 	if (h == NULL)
@@ -2643,7 +2646,10 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 	msg->arc_sealtail->hdr_next = h;
 	msg->arc_sealtail = h;
 
-	/* Part III: Construct a new AS */
+	/*
+	**  Part III: Construct a new AS
+	*/
+
 	arc_dstring_blank(dstr);
 	arc_dstring_catn(dstr, (u_char *) ARC_SEAL_HDRNAME ": ",
 	                 sizeof ARC_SEAL_HDRNAME + 1);
@@ -2741,6 +2747,8 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 
 	/* append it to the stub */
 	arc_dstring_cat(dstr, b64sig);
+
+	/* XXX -- wrapping needs to happen here */
 
 	/* add it to the seal */
 	h = malloc(sizeof hdr);
