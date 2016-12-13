@@ -3243,20 +3243,32 @@ mlfi_eom(SMFICTX *ctx)
 			return SMFIS_TEMPFAIL;
 		}
 
-		if (strcasecmp(conf->conf_authservid, ar.ares_host) != 0)
-			continue;
-
-		if (arcf_dstring_len(afc->mctx_tmpstr) > 0)
+		if (strcasecmp(conf->conf_authservid, ar.ares_host) == 0)
 		{
+			int m;
 			int n;
 
-			arcf_dstring_cat(afc->mctx_tmpstr, "; ");
+			if (arcf_dstring_len(afc->mctx_tmpstr) > 0)
+				arcf_dstring_cat(afc->mctx_tmpstr, "; ");
+
 			for (n = 0; n < ar.ares_count; n++)
 			{
 				arcf_dstring_printf(afc->mctx_tmpstr,
 				                    "%s=%s",
 				                    ares_getmethod(ar.ares_result[n].result_method),
 				                    ares_getresult(ar.ares_result[n].result_result));
+
+				for (m = 0;
+				     m < ar.ares_result[n].result_props;
+				     m++)
+				{
+					arcf_dstring_printf(afc->mctx_tmpstr,
+					                    " %s.%s=%s",
+					                    ares_getptype(ar.ares_result[n].result_ptype[m]),
+					                    ar.ares_result[n].result_property[m],
+					                    ar.ares_result[n].result_value[m]);
+				}
+
 				if (ar.ares_result[0].result_reason[0] != '\0')
 				{
 					arcf_dstring_printf(afc->mctx_tmpstr,
@@ -3273,7 +3285,9 @@ mlfi_eom(SMFICTX *ctx)
 	                     conf->conf_domain,
 	                     conf->conf_keydata,
 	                     conf->conf_keylen,
-	                     NULL);
+	                     arcf_dstring_len(afc->mctx_tmpstr) > 0
+                                 ? arcf_dstring_get(afc->mctx_tmpstr)
+                                 : NULL);
 	if (status != ARC_STAT_OK)
 	{
 		if (conf->conf_dolog)
