@@ -56,7 +56,6 @@ extern void arc_error __P((ARC_MESSAGE *, const char *, ...));
 **
 **  Parameters:
 **  	msg -- ARC_MESSAGE handle
-**  	sig -- ARC_SIGINFO handle
 **  	buf -- buffer into which to write the result
 **  	buflen -- bytes available at "buf"
 **
@@ -359,7 +358,6 @@ arc_get_key_dns(ARC_MESSAGE *msg, u_char *buf, size_t buflen)
 **
 **  Parameters:
 **  	msg -- ARC_MESSAGE handle
-**  	sig -- ARC_SIGINFO handle
 **  	buf -- buffer into which to write the result
 **  	buflen -- bytes available at "buf"
 **
