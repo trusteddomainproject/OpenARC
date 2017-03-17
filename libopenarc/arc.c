@@ -46,6 +46,7 @@
 /* libopenarc includes */
 #include "arc-internal.h"
 #include "arc-canon.h"
+#include "arc-dns.h"
 #include "arc-keys.h"
 #include "arc-tables.h"
 #include "arc-types.h"
@@ -772,6 +773,14 @@ arc_init(void)
 	}
 	memset(lib->arcl_flist, '\0', sizeof(u_int) * lib->arcl_flsize);
 
+	lib->arcl_dns_callback = NULL;
+	lib->arcl_dns_service = NULL;
+	lib->arcl_dnsinit_done = FALSE;
+	lib->arcl_dns_init = arc_res_init;
+	lib->arcl_dns_close = arc_res_close;
+	lib->arcl_dns_start = arc_res_query;
+	lib->arcl_dns_cancel = arc_res_cancel;
+	lib->arcl_dns_waitreply = arc_res_waitreply;
 	strncpy(lib->arcl_tmpdir, DEFTMPDIR, sizeof lib->arcl_tmpdir - 1);
 
 #ifdef HAVE_SHA256
@@ -1173,6 +1182,7 @@ arc_add_plist(ARC_MESSAGE *msg, ARC_KVSET *set, u_char *param, u_char *value,
 **  	str -- string to be scanned
 **  	len -- number of bytes available at "str"
 **  	data -- opaque handle to store with the set
+**  	out -- the set created by this function (returned)
 **
 **  Return value:
 **  	An ARC_STAT constant.
@@ -1180,7 +1190,7 @@ arc_add_plist(ARC_MESSAGE *msg, ARC_KVSET *set, u_char *param, u_char *value,
 
 static ARC_STAT
 arc_process_set(ARC_MESSAGE *msg, arc_kvsettype_t type, u_char *str,
-                size_t len, void *data)
+                size_t len, void *data, ARC_KVSET **out)
 {
 	_Bool spaced;
 	_Bool stop = FALSE;
@@ -1222,6 +1232,7 @@ arc_process_set(ARC_MESSAGE *msg, arc_kvsettype_t type, u_char *str,
 		          sizeof(ARC_KVSET));
 		return ARC_STAT_INTERNAL;
 	}
+	memset(set, '\0', sizeof(ARC_KVSET));
 
 	set->set_udata = data;
 	set->set_type = type;
@@ -1518,6 +1529,9 @@ arc_process_set(ARC_MESSAGE *msg, arc_kvsettype_t type, u_char *str,
 		break;
 	}
 
+	if (out != NULL)
+		*out = set;
+
 	return ARC_STAT_OK;
 }
 
@@ -1578,7 +1592,7 @@ arc_get_key(ARC_MESSAGE *msg, _Bool test)
 	}
 
 	status = arc_process_set(msg, ARC_KVSETTYPE_KEY, buf,
-				 strlen((char *) buf), NULL);
+				 strlen((char *) buf), NULL, NULL);
 	if (status != ARC_STAT_OK)
 		return status;
 
@@ -1710,6 +1724,8 @@ arc_validate_msg(ARC_MESSAGE *msg, u_int setnum)
 {
 	ARC_STAT status;
 	struct arc_set *set;
+	struct arc_hdrfield *h;
+	ARC_KVSET *kvset;
 	BIO *keydata;
 	EVP_PKEY *pkey;
 	RSA *rsa;
@@ -1736,6 +1752,26 @@ arc_validate_msg(ARC_MESSAGE *msg, u_int setnum)
 	**  arc_canon_runheaders(), and then everything was finalized.
 	**  We just have to do the verification here.
 	*/
+
+	/* extract selector and domain */
+	kvset = set->arcset_ams->hdr_data;
+	msg->arc_selector = arc_param_get(kvset, "s");
+	msg->arc_domain = arc_param_get(kvset, "d");
+
+	/* get the key from DNS (or wherever) */
+	status = arc_get_key(msg, FALSE);
+	if (status != ARC_STAT_OK)
+	{
+		arc_error(msg, "arc_get_key() failed");
+		return status;
+	}
+
+	/* XXX -- base64 decode the signature from "b=" */
+	/* XXX -- extract the body hash */
+	/* XXX -- extract/compute the header hash */
+	/* XXX -- verify the signature against the header hash and the key */
+	/* XXX -- verify the body hash against the "bh=" value */
+	/* XXX -- report status */
 
 	return ARC_STAT_OK;
 }
@@ -1766,6 +1802,10 @@ arc_validate(ARC_MESSAGE *msg, u_int setnum)
 
 	/* XXX -- validate the ARC-Message-Signature */
 	/* XXX -- validate the ARC-Seal */
+		/* XXX -- retrieve the public key */
+		/* XXX -- repeat computation of the ARC-Seal minus "b=" */
+		/* XXX -- compute the hash of that */
+		/* XXX -- verify that the hash and key match the signature */
 	/* XXX -- set msg->arc_cstate */
 
 	return ARC_STAT_OK;
@@ -2077,9 +2117,11 @@ arc_eoh(ARC_MESSAGE *msg)
 			status = arc_process_set(msg, kvtype,
 			                         h->hdr_colon + 1,
 			                         h->hdr_textlen - h->hdr_namelen - 1,
-                                                 h);
+			                         h,
+			                         &set);
 			if (status != ARC_STAT_OK)
 				return status;
+			h->hdr_data = set;
 		}
 	}
 

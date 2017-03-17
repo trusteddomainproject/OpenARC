@@ -79,6 +79,7 @@ struct arc_hdrfield
 	size_t			hdr_textlen;
 	u_char *		hdr_colon;
 	u_char *		hdr_text;
+	void *			hdr_data;
 	struct arc_hdrfield *	hdr_next;
 };
 
@@ -195,6 +196,7 @@ struct arc_msghandle
 /* struct arc_lib -- a ARC library context */
 struct arc_lib
 {
+	_Bool			arcl_dnsinit_done;
 	u_int			arcl_flsize;
 	uint32_t		arcl_flags;
 	u_int *			arcl_flist;
