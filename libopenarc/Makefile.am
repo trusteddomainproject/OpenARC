@@ -1,4 +1,4 @@
-# Copyright (c) 2016, The Trusted Domain Project.  All rights reserved.
+# Copyright (c) 2016, 2017, The Trusted Domain Project.  All rights reserved.
 
 #SUBDIRS=tests docs
 
