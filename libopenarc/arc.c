@@ -1896,15 +1896,27 @@ static ARC_STAT
 arc_validate(ARC_MESSAGE *msg, u_int setnum)
 {
 	struct arc_set *set;
+	ARC_KVSET *kvset;
+	ARC_STAT status;
 
 	assert(msg != NULL);
 
 	/* pull the (set-1)th ARC Set */
 	set = &msg->arc_sets[setnum];
 
-	/* validate the ARC-Seal */
+	/* extract selector and domain */
+	kvset = set->arcset_as->hdr_data;
+	msg->arc_selector = arc_param_get(kvset, "s");
+	msg->arc_domain = arc_param_get(kvset, "d");
 
-	/* XXX -- retrieve the public key */
+	/* get the key from DNS (or wherever) */
+	status = arc_get_key(msg, FALSE);
+	if (status != ARC_STAT_OK)
+	{
+		arc_error(msg, "arc_get_key() failed");
+		return status;
+	}
+
 	/* XXX -- repeat computation of the ARC-Seal minus "b=" */
 	/* XXX -- compute the hash of that */
 	/* XXX -- verify that the hash and key match the signature */
@@ -2472,7 +2484,7 @@ arc_eom(ARC_MESSAGE *msg)
 				{
 					ARC_STAT status;
 
-					status = arc_validate(msg, set);
+					status = arc_validate(msg, set - 1);
 					if (status == ARC_STAT_BADSIG)
 					{
 						msg->arc_cstate = ARC_CHAIN_FAIL;
