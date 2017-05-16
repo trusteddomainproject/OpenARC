@@ -218,6 +218,7 @@ typedef int arc_opts_t;
 /* what options can be set */
 #define	ARC_OPTS_FLAGS		0
 #define	ARC_OPTS_TMPDIR		1
+#define	ARC_OPTS_FIXEDTIME	2
 
 /* flags */
 #define	ARC_LIBFLAGS_NONE		0x00000000

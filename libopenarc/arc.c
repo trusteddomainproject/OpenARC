@@ -880,6 +880,20 @@ arc_options(ARC_LIB *lib, int op, int arg, void *val, size_t valsz)
 		}
 		return ARC_STAT_OK;
 
+	  case ARC_OPTS_FIXEDTIME:
+		if (val == NULL)
+			return ARC_STAT_INVALID;
+
+		if (valsz != sizeof lib->arcl_fixedtime)
+			return ARC_STAT_INVALID;
+
+		if (op == ARC_OP_GETOPT)
+			memcpy(val, &lib->arcl_fixedtime, valsz);
+		else
+			memcpy(&lib->arcl_fixedtime, val, valsz);
+
+		return ARC_STAT_OK;
+
 	  default:
 		assert(0);
 	}
@@ -1650,39 +1664,40 @@ arc_get_key(ARC_MESSAGE *msg, _Bool test)
 		return ARC_STAT_SYNTAX;
 	}
 
-	if (!gotkey)
+	/* decode the key */
+	msg->arc_b64key = arc_param_get(set, (u_char *) "p");
+	if (msg->arc_b64key == NULL)
 	{
-		/* decode the key */
-		msg->arc_b64key = arc_param_get(set, (u_char *) "p");
-		if (msg->arc_b64key == NULL)
-		{
-			arc_error(msg, "key missing");
-			return ARC_STAT_SYNTAX;
-		}
-		else if (msg->arc_b64key[0] == '\0')
-		{
-			return ARC_STAT_REVOKED;
-		}
-		msg->arc_b64keylen = strlen((char *) msg->arc_b64key);
-
-		msg->arc_key = malloc(msg->arc_b64keylen);
-		if (msg->arc_key == NULL)
-		{
-			arc_error(msg, "unable to allocate %d byte(s)",
-			          msg->arc_b64keylen);
-			return ARC_STAT_NORESOURCE;
-		}
-
-		status = arc_base64_decode(msg->arc_b64key, msg->arc_key,
-		                           msg->arc_b64keylen);
-		if (status < 0)
-		{
-			arc_error(msg, "key missing");
-			return ARC_STAT_SYNTAX;
-		}
-
-		msg->arc_keylen = status;
+		arc_error(msg, "key missing");
+		return ARC_STAT_SYNTAX;
 	}
+	else if (msg->arc_b64key[0] == '\0')
+	{
+		return ARC_STAT_REVOKED;
+	}
+	msg->arc_b64keylen = strlen((char *) msg->arc_b64key);
+
+	if (msg->arc_key != NULL)
+		free(msg->arc_key);
+
+	msg->arc_key = malloc(msg->arc_b64keylen);
+	if (msg->arc_key == NULL)
+	{
+		arc_error(msg, "unable to allocate %d byte(s)",
+		          msg->arc_b64keylen);
+		return ARC_STAT_NORESOURCE;
+	}
+
+	status = arc_base64_decode(msg->arc_b64key, msg->arc_key,
+	                           msg->arc_b64keylen);
+	if (status < 0)
+	{
+		arc_error(msg, "key missing");
+		return ARC_STAT_SYNTAX;
+	}
+
+	msg->arc_keylen = status;
+	msg->arc_flags = 0;
 
 	/* store key flags */
 	p = arc_param_get(set, (u_char *) "t");
@@ -1714,6 +1729,7 @@ arc_get_key(ARC_MESSAGE *msg, _Bool test)
 **  Parameters:
 **  	msg -- ARC message handle
 **  	set -- ARC set number whose AMS should be validated (zero-based)
+**  	verify -- verify or sign
 **
 **  Return value:
 **  	An ARC_STAT_* constant.
@@ -1722,7 +1738,23 @@ arc_get_key(ARC_MESSAGE *msg, _Bool test)
 static ARC_STAT
 arc_validate_msg(ARC_MESSAGE *msg, u_int setnum)
 {
+	int nid;
+	int rsastat;
+	size_t elen;
+	size_t hhlen;
+	size_t bhlen;
+	size_t b64siglen;
+	size_t b64bhlen;
+	size_t siglen;
 	ARC_STAT status;
+	u_char *alg;
+	u_char *b64sig;
+	u_char *b64bh;
+	u_char *b64bhtag;
+	void *hh;
+	void *bh;
+	void *sig;
+	BIO *key;
 	struct arc_set *set;
 	struct arc_hdrfield *h;
 	ARC_KVSET *kvset;
@@ -1749,8 +1781,7 @@ arc_validate_msg(ARC_MESSAGE *msg, u_int setnum)
 
 	/*
 	**  The stub AMS was generated, canonicalized, and hashed by
-	**  arc_canon_runheaders(), and then everything was finalized.
-	**  We just have to do the verification here.
+	**  arc_canon_runheaders().  It should also have been finalized.
 	*/
 
 	/* extract selector and domain */
@@ -1766,13 +1797,84 @@ arc_validate_msg(ARC_MESSAGE *msg, u_int setnum)
 		return status;
 	}
 
-	/* XXX -- base64 decode the signature from "b=" */
-	/* XXX -- extract the body hash */
-	/* XXX -- extract/compute the header hash */
-	/* XXX -- verify the signature against the header hash and the key */
-	/* XXX -- verify the body hash against the "bh=" value */
-	/* XXX -- report status */
+	/* extract the header and body hashes from the message */
+	status = arc_canon_gethashes(msg, &hh, &hhlen, &bh, &bhlen);
+	if (status != ARC_STAT_OK)
+	{
+		arc_error(msg, "arc_canon_gethashes() failed");
+		return status;
+	}
 
+	/* extract the signature and body hash from the message */
+	b64sig = arc_param_get(kvset, "b");
+	b64siglen = strlen(b64sig);
+	b64bhtag = arc_param_get(kvset, "bh");
+
+	sig = malloc(b64siglen);
+	if (sig == NULL)
+	{
+		arc_error(msg, "unable to allocate %d bytes", b64siglen);
+		return ARC_STAT_INTERNAL;
+	}
+	siglen = arc_base64_decode(b64sig, sig, b64siglen);
+	if (siglen < 0)
+	{
+		arc_error(msg, "unable to decode signature");
+		return ARC_STAT_SYNTAX;
+	}
+
+	/* verify the signature against the header hash and the key */
+	key = BIO_new_mem_buf(msg->arc_key, msg->arc_keylen);
+	if (key == NULL)
+	{
+		arc_error(msg, "BIO_new_mem_buf() failed");
+		return ARC_STAT_INTERNAL;
+	}
+
+	pkey = d2i_PUBKEY_bio(key, NULL);
+	if (pkey == NULL)
+	{
+		arc_error(msg, "d2i_PUBKEY_bio() failed");
+		return ARC_STAT_INTERNAL;
+	}
+
+	rsa = EVP_PKEY_get1_RSA(pkey);
+	if (rsa == NULL)
+	{
+		arc_error(msg, "EVP_PKEY_get1_RSA() failed");
+		return ARC_STAT_INTERNAL;
+	}
+
+	alg = arc_param_get(kvset, "a");
+	nid = NID_sha1;
+	if (alg != NULL && strcmp(alg, "rsa-sha256") == 0)
+		nid = NID_sha256;
+
+	rsastat = RSA_verify(nid, hh, hhlen, sig, siglen, rsa);
+
+	RSA_free(rsa);
+	BIO_free(key);
+
+	if (rsastat != 1)
+		return ARC_STAT_BADSIG;
+
+	/* verify the signature's "bh" against our computed one */
+	b64bhlen = BASE64SIZE(bhlen);
+	b64bh = malloc(b64bhlen) + 1;
+	if (b64bh == NULL)
+	{
+		arc_error(msg, "unable to allocate %d bytes", b64bhlen + 1);
+		return ARC_STAT_INTERNAL;
+	}
+	memset(b64bh, '\0', b64bhlen + 1);
+	elen = arc_base64_encode(bh, bhlen, b64bh, b64bhlen);
+	if (elen != strlen(b64bhtag) || strcmp(b64bh, b64bhtag) != 0)
+	{
+		arc_error(msg, "body hash mismatch");
+		return ARC_STAT_BADSIG;
+	}
+
+	/* if we got this far, the signature was good */
 	return ARC_STAT_OK;
 }
 
@@ -1800,12 +1902,13 @@ arc_validate(ARC_MESSAGE *msg, u_int setnum)
 	/* pull the (set-1)th ARC Set */
 	set = &msg->arc_sets[setnum];
 
-	/* XXX -- validate the ARC-Message-Signature */
-	/* XXX -- validate the ARC-Seal */
-		/* XXX -- retrieve the public key */
-		/* XXX -- repeat computation of the ARC-Seal minus "b=" */
-		/* XXX -- compute the hash of that */
-		/* XXX -- verify that the hash and key match the signature */
+	/* validate the ARC-Seal */
+
+	/* XXX -- retrieve the public key */
+	/* XXX -- repeat computation of the ARC-Seal minus "b=" */
+	/* XXX -- compute the hash of that */
+	/* XXX -- verify that the hash and key match the signature */
+
 	/* XXX -- set msg->arc_cstate */
 
 	return ARC_STAT_OK;
@@ -1841,7 +1944,10 @@ arc_message(ARC_LIB *lib, arc_canon_t canonhdr, arc_canon_t canonbody,
 		memset(msg, '\0', sizeof *msg);
 
 		msg->arc_library = lib;
-		(void) time(&msg->arc_timestamp);
+		if (lib->arcl_fixedtime != 0)
+			msg->arc_timestamp = lib->arcl_fixedtime;
+		else
+			(void) time(&msg->arc_timestamp);
 	}
 
 	msg->arc_canonhdr = canonhdr;
@@ -2092,6 +2198,7 @@ arc_eoh(ARC_MESSAGE *msg)
 	struct arc_hdrfield *h;
 	ARC_KVSET *set;
 	u_char *inst;
+	u_char *htag;
 
 	if (msg->arc_state >= ARC_STATE_EOH)
 		return ARC_STAT_INVALID;
@@ -2217,8 +2324,15 @@ arc_eoh(ARC_MESSAGE *msg)
 	*/
 
 	/* header */
+	h = NULL;
+	htag = NULL;
+	if (nsets > 0)
+	{
+		h = msg->arc_sets[n - 1].arcset_ams;
+		htag = arc_param_get(h->hdr_data, "h");
+	}
 	status = arc_add_canon(msg, ARC_CANONTYPE_HEADER, msg->arc_canonhdr,
-	                       msg->arc_signalg, NULL, NULL, (ssize_t) -1,
+	                       msg->arc_signalg, htag, h, (ssize_t) -1,
 	                       &msg->arc_hdrcanon);
 	if (status != ARC_STAT_OK)
 	{
@@ -2327,6 +2441,7 @@ arc_eom(ARC_MESSAGE *msg)
 	{
 		u_int set;
 
+		/* validate the ARC-Message-Signature */
 		if (arc_validate_msg(msg,
 		                     msg->arc_nsets - 1) == ARC_STAT_BADSIG)
 		{

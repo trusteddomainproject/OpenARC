@@ -120,6 +120,7 @@ struct arcf_config
 	arc_canon_t	conf_canonhdr;		/* canonicalization for header */
 	arc_canon_t	conf_canonbody;		/* canonicalization for body */
 	arc_alg_t	conf_signalg;		/* signing algorithm */
+	uint64_t	conf_fixedtime;		/* fixed timestamp */
 	char *		conf_selector;		/* signing selector */
 	char *		conf_keyfile;		/* key file */
 	char *		conf_tmpdir;		/* temp file directory */
@@ -1323,6 +1324,7 @@ arcf_config_load(struct config *data, struct arcf_config *conf,
 #endif /* USE_LDAP */
 	int maxsign;
 	int dbflags = 0;
+	uint64_t fixedtime = 0UL;
 	char *str;
 	char confstr[BUFRSZ + 1];
 	char basedir[MAXPATHLEN + 1];
@@ -1422,6 +1424,15 @@ arcf_config_load(struct config *data, struct arcf_config *conf,
 		(void) config_get(data, "MaximumHeaders",
 		                  &conf->conf_maxhdrsz,
 		                  sizeof conf->conf_maxhdrsz);
+
+		str = NULL;
+		(void) config_get(data, "FixedTimestamp", &str, sizeof str);
+		if (str != NULL)
+		{
+			char *end;
+
+			conf->conf_fixedtime = strtoul(str, &end, 10);
+		}
 
 		if (!conf->conf_dolog)
 		{
@@ -1723,6 +1734,15 @@ arcf_config_setlib(struct arcf_config *conf, char **err)
 		                     ARC_OP_SETOPT,
 		                     ARC_OPTS_FLAGS,
 		                     &opts, sizeof opts);
+	}
+
+	if (conf->conf_fixedtime != 0)
+	{
+		arc_options(conf->conf_libopenarc,
+		            ARC_OP_SETOPT,
+		            ARC_OPTS_FIXEDTIME,
+		            &conf->conf_fixedtime,
+		            sizeof conf->conf_fixedtime);
 	}
 
 	if (status != ARC_STAT_OK)
@@ -2991,7 +3011,8 @@ mlfi_eoh(SMFICTX *ctx)
 
 	/* run the header fields */
 	afc->mctx_arcmsg = arc_message(conf->conf_libopenarc,
-	                               conf->conf_canonhdr, conf->conf_canonbody,
+	                               conf->conf_canonhdr,
+	                               conf->conf_canonbody,
 	                               conf->conf_signalg,
 	                               &err);
 	if (afc->mctx_arcmsg == NULL)

@@ -31,6 +31,7 @@ struct configdef arcf_config[] =
 	{ "ChangeRootDirectory",	CONFIG_TYPE_STRING,	FALSE },
 	{ "Domain",			CONFIG_TYPE_STRING,	TRUE },
 	{ "EnableCoredumps",		CONFIG_TYPE_BOOLEAN,	FALSE },
+	{ "FixedTimestamp",		CONFIG_TYPE_STRING,	FALSE },
 	{ "Include",			CONFIG_TYPE_INCLUDE,	FALSE },
 	{ "KeepTemporaryFiles",		CONFIG_TYPE_BOOLEAN,	FALSE },
 	{ "KeyFile",			CONFIG_TYPE_STRING,	TRUE },
