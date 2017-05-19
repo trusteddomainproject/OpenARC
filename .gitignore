@@ -49,3 +49,7 @@ config.log
 config.status
 stamp-h1
 .deps/*
+
+# compilation artifacts
+libopenarc/symbols.map
+openarc/.libs/
