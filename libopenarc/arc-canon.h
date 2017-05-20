@@ -38,6 +38,8 @@ extern ARC_STAT arc_canon_closebody __P((ARC_MESSAGE *));
 extern ARC_STAT arc_canon_getfinal __P((ARC_CANON *, u_char **, size_t *));
 extern ARC_STAT arc_canon_gethashes __P((ARC_MESSAGE *, void **, size_t *,
                                          void **, size_t *));
+extern ARC_STAT arc_canon_getsealhash __P((ARC_MESSAGE *, int,
+                                           void **, size_t *));
 extern ARC_STAT arc_canon_header_string __P((struct arc_dstring *,
                                              arc_canon_t,
                                              unsigned char *,

@@ -3240,10 +3240,6 @@ mlfi_eom(SMFICTX *ctx)
 		return SMFIS_TEMPFAIL;
 	}
 
-	/*
-	**  Get the seal fields to apply.
-	*/
-
 	/* assemble authentication results */
 	arcf_dstring_blank(afc->mctx_tmpstr);
 	for (c = 0; ; c++)
@@ -3299,6 +3295,10 @@ mlfi_eom(SMFICTX *ctx)
 			}
 		}
 	}
+
+	/*
+	**  Get the seal fields to apply.
+	*/
 
 	status = arc_getseal(afc->mctx_arcmsg, &seal,
                              conf->conf_authservid,

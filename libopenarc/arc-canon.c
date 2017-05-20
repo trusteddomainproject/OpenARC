@@ -973,6 +973,136 @@ arc_canon_selecthdrs(ARC_MESSAGE *msg, u_char *hdrlist,
 }
 
 /*
+**  ARC_CANON_STRIP_B -- strip "b=" value from a header field
+**
+**  Parameters:
+**  	msg -- ARC_MESSAGE handle
+**  	text -- string containing header field to strip
+**
+**  Return value:
+**  	An ARC_STAT_* constant.
+**
+**  Side effects:
+**  	The stripped header field is left in msg->arc_hdrbuf.
+*/
+
+static ARC_STAT
+arc_canon_strip_b(ARC_MESSAGE *msg, u_char *text)
+{
+	int n;
+	u_char in;
+	u_char last;
+	u_char *p;
+	u_char *tmp;
+	u_char *end;
+	u_char tmpbuf[BUFRSZ];
+
+	assert(msg != NULL);
+	assert(text != NULL);
+
+	arc_dstring_blank(msg->arc_hdrbuf);
+
+	tmp = tmpbuf;
+	end = tmpbuf + sizeof tmpbuf;
+
+	n = 0;
+	in = '\0';
+	for (p = text; *p != '\0'; p++)
+	{
+		if (*p == ';')
+			in = '\0';
+
+		if (in == 'b')
+		{
+			last = *p;
+			continue;
+		}
+
+		if (in == '\0' && *p == '=')
+			in = last;
+
+		*tmp++ = *p;
+
+		/* flush buffer? */
+		if (tmp == end)
+		{
+			*tmp = '\0';
+
+			if (!arc_dstring_catn(msg->arc_hdrbuf,
+			                      tmpbuf, tmp - tmpbuf))
+				return ARC_STAT_NORESOURCE;
+
+			tmp = tmpbuf;
+		}
+
+		last = *p;
+	}
+
+	/* flush anything cached */
+	if (tmp != tmpbuf)
+	{
+		*tmp = '\0';
+
+		if (!arc_dstring_catn(msg->arc_hdrbuf,
+		                      tmpbuf, tmp - tmpbuf))
+			return ARC_STAT_NORESOURCE;
+	}
+
+	return ARC_STAT_OK;
+}
+
+/*
+**  ARC_CANON_FINALIZE -- finalize a canonicalization
+**
+**  Parameters:
+**  	canon -- canonicalization to finalize
+**
+**  Return value:
+**  	None.
+*/
+
+static void
+arc_canon_finalize(ARC_CANON *canon)
+{
+	assert(canon != NULL);
+
+	switch (canon->canon_hashtype)
+	{
+	  case ARC_HASHTYPE_SHA1:
+	  {
+		struct arc_sha1 *sha1;
+
+		sha1 = (struct arc_sha1 *) canon->canon_hash;
+		SHA1_Final(sha1->sha1_out, &sha1->sha1_ctx);
+
+		if (sha1->sha1_tmpbio != NULL)
+			(void) BIO_flush(sha1->sha1_tmpbio);
+
+		break;
+	  }
+
+#ifdef HAVE_SHA256
+	  case ARC_HASHTYPE_SHA256:
+	  {
+		struct arc_sha256 *sha256;
+
+		sha256 = (struct arc_sha256 *) canon->canon_hash;
+		SHA256_Final(sha256->sha256_out, &sha256->sha256_ctx);
+
+		if (sha256->sha256_tmpbio != NULL)
+			(void) BIO_flush(sha256->sha256_tmpbio);
+
+		break;
+	  }
+#endif /* HAVE_SHA256 */
+
+	  default:
+		assert(0);
+		/* NOTREACHED */
+	}
+}
+
+/*
 **  ARC_CANON_RUNHEADERS_SEAL -- run the ARC-specific header fields through
 **                               seal canonicalization(s)
 **
@@ -981,46 +1111,104 @@ arc_canon_selecthdrs(ARC_MESSAGE *msg, u_char *hdrlist,
 **
 **  Return value:
 **  	An ARC_STAT_* constant.
+**
+**  For each ARC set number N, apply it to seal canonicalization handles 0
+**  through N-1.  That way the first one is only set 1, the second one is
+**  sets 1 and 2, etc.  For the final one in each set, strip "b=".  Then
+**  also do one more complete one so that can be used for re-sealing.
 */
 
 ARC_STAT
 arc_canon_runheaders_seal(ARC_MESSAGE *msg)
 {
 	ARC_STAT status;
+	u_int m;
 	u_int n;
+	ARC_CANON *cur;
 
 	assert(msg != NULL);
 
-	ARC_CANON *cur;
-
-	for (cur = msg->arc_canonhead; cur != NULL; cur = cur->canon_next)
+	for (n = 0; n < msg->arc_nsets; n++)
 	{
-		/* skip done hashes and those which are of the wrong type */
-		if (cur->canon_done || cur->canon_type != ARC_CANONTYPE_SEAL)
+		cur = msg->arc_sealcanons[n];
+
+		if (cur->canon_done)
 			continue;
 
-		/* canonicalize each set, in the right order */
-		for (n = 0; n < msg->arc_nsets; n++)
+		/* build up the canonicalized seals for verification */
+		for (m = 0; m <= n; m++)
 		{
 			status = arc_canon_header(msg, cur,
-			                          msg->arc_sets[n].arcset_aar,
+			                          msg->arc_sets[m].arcset_aar,
 			                          TRUE);
 			if (status != ARC_STAT_OK)
 				return status;
 
 			status = arc_canon_header(msg, cur,
-			                          msg->arc_sets[n].arcset_ams,
+			                          msg->arc_sets[m].arcset_ams,
 			                          TRUE);
 			if (status != ARC_STAT_OK)
 				return status;
 
-			status = arc_canon_header(msg, cur,
-			                          msg->arc_sets[n].arcset_as,
-			                          TRUE);
+			if (m != n)
+			{
+				status = arc_canon_header(msg, cur,
+				                          msg->arc_sets[m].arcset_as,
+				                          TRUE);
+			}
+			else
+			{
+				struct arc_hdrfield tmphdr;
+
+				tmphdr.hdr_text = arc_dstring_get(msg->arc_hdrbuf);
+				tmphdr.hdr_namelen = cur->canon_sigheader->hdr_namelen;
+				tmphdr.hdr_colon = tmphdr.hdr_text + (cur->canon_sigheader->hdr_colon - cur->canon_sigheader->hdr_text);
+				tmphdr.hdr_textlen = arc_dstring_len(msg->arc_hdrbuf);
+				tmphdr.hdr_flags = 0;
+				tmphdr.hdr_next = NULL;
+
+				arc_lowerhdr(tmphdr.hdr_text);
+				/* XXX -- void? */
+				(void) arc_canon_header(msg, cur, &tmphdr,
+				                        FALSE);
+				arc_canon_buffer(cur, NULL, 0);
+			}
+
 			if (status != ARC_STAT_OK)
 				return status;
+
+			arc_canon_finalize(cur);
+
+			cur->canon_done = TRUE;
 		}
+
+		cur = msg->arc_sealcanon;
+
+		if (cur->canon_done)
+			continue;
+
+		/* write all the ARC sets once more for re-sealing */
+		status = arc_canon_header(msg, cur,
+		                          msg->arc_sets[n].arcset_aar,
+		                          TRUE);
+		if (status != ARC_STAT_OK)
+			return status;
+
+		status = arc_canon_header(msg, cur,
+		                          msg->arc_sets[n].arcset_ams,
+		                          TRUE);
+		if (status != ARC_STAT_OK)
+			return status;
+
+		status = arc_canon_header(msg, cur,
+		                          msg->arc_sets[n].arcset_as,
+		                          TRUE);
+		if (status != ARC_STAT_OK)
+			return status;
 	}
+
+	/* now finalize the main one */
+	arc_canon_finalize(msg->arc_sealcanon);
 
 	return ARC_STAT_OK;
 }
@@ -1206,57 +1394,11 @@ arc_canon_runheaders(ARC_MESSAGE *msg)
 		**  hashing was done.
 		*/
 
-		arc_dstring_blank(msg->arc_hdrbuf);
-
-		tmp = tmpbuf;
-
-		n = 0;
-		in = '\0';
-		for (p = cur->canon_sigheader->hdr_text; *p != '\0'; p++)
+		status = arc_canon_strip_b(msg, cur->canon_sigheader->hdr_text);
+		if (status != ARC_STAT_OK)
 		{
-			if (*p == ';')
-				in = '\0';
-
-			if (in == 'b')
-			{
-				last = *p;
-				continue;
-			}
-
-			if (in == '\0' && *p == '=')
-				in = last;
-
-			*tmp++ = *p;
-
-			/* flush buffer? */
-			if (tmp == end)
-			{
-				*tmp = '\0';
-
-				if (!arc_dstring_catn(msg->arc_hdrbuf,
-				                      tmpbuf, tmp - tmpbuf))
-				{
-					free(hdrset);
-					return ARC_STAT_NORESOURCE;
-				}
-
-				tmp = tmpbuf;
-			}
-
-			last = *p;
-		}
-
-		/* flush anything cached */
-		if (tmp != tmpbuf)
-		{
-			*tmp = '\0';
-
-			if (!arc_dstring_catn(msg->arc_hdrbuf,
-			                      tmpbuf, tmp - tmpbuf))
-			{
-				free(hdrset);
-				return ARC_STAT_NORESOURCE;
-			}
+			free(hdrset);
+			return status;
 		}
 
 		/* canonicalize */
@@ -1272,40 +1414,7 @@ arc_canon_runheaders(ARC_MESSAGE *msg)
 		arc_canon_buffer(cur, NULL, 0);
 
 		/* finalize */
-		switch (cur->canon_hashtype)
-		{
-		  case ARC_HASHTYPE_SHA1:
-		  {
-			struct arc_sha1 *sha1;
-
-			sha1 = (struct arc_sha1 *) cur->canon_hash;
-			SHA1_Final(sha1->sha1_out, &sha1->sha1_ctx);
-
-			if (sha1->sha1_tmpbio != NULL)
-				(void) BIO_flush(sha1->sha1_tmpbio);
-
-			break;
-		  }
-
-#ifdef HAVE_SHA256
-		  case ARC_HASHTYPE_SHA256:
-		  {
-			struct arc_sha256 *sha256;
-
-			sha256 = (struct arc_sha256 *) cur->canon_hash;
-			SHA256_Final(sha256->sha256_out, &sha256->sha256_ctx);
-
-			if (sha256->sha256_tmpbio != NULL)
-				(void) BIO_flush(sha256->sha256_tmpbio);
-
-			break;
-		  }
-#endif /* HAVE_SHA256 */
-
-		  default:
-			assert(0);
-			/* NOTREACHED */
-		}
+		arc_canon_finalize(cur);
 
 		cur->canon_done = TRUE;
 	}
@@ -1378,40 +1487,7 @@ arc_canon_signature(ARC_MESSAGE *msg, struct arc_hdrfield *hdr, _Bool seal)
 		arc_canon_buffer(cur, NULL, 0);
 
 		/* now close it */
-		switch (cur->canon_hashtype)
-		{
-		  case ARC_HASHTYPE_SHA1:
-		  {
-			struct arc_sha1 *sha1;
-
-			sha1 = (struct arc_sha1 *) cur->canon_hash;
-			SHA1_Final(sha1->sha1_out, &sha1->sha1_ctx);
-
-			if (sha1->sha1_tmpbio != NULL)
-				(void) BIO_flush(sha1->sha1_tmpbio);
-
-			break;
-		  }
-
-#ifdef HAVE_SHA256
-		  case ARC_HASHTYPE_SHA256:
-		  {
-			struct arc_sha256 *sha256;
-
-			sha256 = (struct arc_sha256 *) cur->canon_hash;
-			SHA256_Final(sha256->sha256_out, &sha256->sha256_ctx);
-
-			if (sha256->sha256_tmpbio != NULL)
-				(void) BIO_flush(sha256->sha256_tmpbio);
-
-			break;
-		  }
-#endif /* HAVE_SHA256 */
-
-		  default:
-			assert(0);
-			/* NOTREACHED */
-		}
+		arc_canon_finalize(cur);
 
 		cur->canon_done = TRUE;
 	}
@@ -1875,6 +1951,42 @@ arc_canon_getfinal(ARC_CANON *canon, u_char **digest, size_t *dlen)
 }
 
 /*
+**  ARC_CANON_GETSEALHASHES -- retrieve a seal hash
+**
+**  Parameters:
+**  	msg -- ARC message from which to get completed hashes
+**  	setnum -- which seal's hash to get
+**  	sh -- pointer to seal hash buffer (returned)
+**  	shlen -- bytes used at sh (returned)
+**
+**  Return value:
+**  	ARC_STAT_OK -- successful completion
+**  	ARC_STAT_INVALID -- hashing hasn't been completed
+*/
+
+ARC_STAT
+arc_canon_getsealhash(ARC_MESSAGE *msg, int setnum, void **sh, size_t *shlen)
+{
+	ARC_STAT status;
+	struct arc_canon *sdc;
+	u_char *sd;
+	size_t sdlen;
+
+	assert(msg != NULL);
+	assert(setnum <= msg->arc_nsets);
+
+	sdc = msg->arc_sealcanons[setnum - 1];
+
+	status = arc_canon_getfinal(sdc, &sd, &sdlen);
+	if (status != ARC_STAT_OK)
+		return status;
+	*sh = sd;
+	*shlen = sdlen;
+
+	return ARC_STAT_OK;
+}
+
+/*
 **  ARC_CANON_GETHASHES -- retrieve hashes
 **
 **  Parameters:
@@ -1907,13 +2019,12 @@ arc_canon_gethashes(ARC_MESSAGE *msg, void **hh, size_t *hhlen,
 	status = arc_canon_getfinal(hdc, &hd, &hdlen);
 	if (status != ARC_STAT_OK)
 		return status;
+	*hh = hd;
+	*hhlen = hdlen;
 
 	status = arc_canon_getfinal(bdc, &bd, &bdlen);
 	if (status != ARC_STAT_OK)
 		return status;
-
-	*hh = hd;
-	*hhlen = hdlen;
 	*bh = bd;
 	*bhlen = bdlen;
 

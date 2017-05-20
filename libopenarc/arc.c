@@ -349,8 +349,7 @@ arc_genamshdr(ARC_MESSAGE *msg, struct arc_dstring *dstr, char *delim,
 	                           arc_code_to_name(chainstatus,
 	                                            msg->arc_cstate));
 	}
-
-	if (!seal)
+	else
 	{
 		arc_dstring_printf(dstr, ";%sc=%s/%s", delim,
 	                           arc_code_to_name(canonicalizations,
@@ -1765,7 +1764,7 @@ arc_validate_msg(ARC_MESSAGE *msg, u_int setnum)
 	assert(msg != NULL);
 
 	/* pull the (set-1)th ARC Set */
-	set = &msg->arc_sets[setnum];
+	set = &msg->arc_sets[setnum - 1];
 
 	/*
 	**  Validate the ARC-Message-Signature.
@@ -1879,7 +1878,7 @@ arc_validate_msg(ARC_MESSAGE *msg, u_int setnum)
 }
 
 /*
-**  ARC_VALIDATE -- validate a specific ARC seal
+**  ARC_VALIDATE_SEAL -- validate a specific ARC seal
 **
 **  Parameters:
 **  	msg -- ARC message handle
@@ -1893,16 +1892,28 @@ arc_validate_msg(ARC_MESSAGE *msg, u_int setnum)
 */
 
 static ARC_STAT
-arc_validate(ARC_MESSAGE *msg, u_int setnum)
+arc_validate_seal(ARC_MESSAGE *msg, u_int setnum)
 {
-	struct arc_set *set;
-	ARC_KVSET *kvset;
+	int nid;
+	int rsastat;
 	ARC_STAT status;
+	size_t shlen;
+	size_t siglen;
+	size_t b64siglen;
+	u_char *b64sig;
+	void *sh;
+	void *sig;
+	u_char *alg;
+	struct arc_set *set;
+	BIO *key;
+	EVP_PKEY *pkey;
+	RSA *rsa;
+	ARC_KVSET *kvset;
 
 	assert(msg != NULL);
 
 	/* pull the (set-1)th ARC Set */
-	set = &msg->arc_sets[setnum];
+	set = &msg->arc_sets[setnum - 1];
 
 	/* extract selector and domain */
 	kvset = set->arcset_as->hdr_data;
@@ -1917,12 +1928,69 @@ arc_validate(ARC_MESSAGE *msg, u_int setnum)
 		return status;
 	}
 
-	/* XXX -- repeat computation of the ARC-Seal minus "b=" */
-	/* XXX -- compute the hash of that */
-	/* XXX -- verify that the hash and key match the signature */
+	/* extract the seal hash */
+	status = arc_canon_getsealhash(msg, setnum, &sh, &shlen);
+	if (status != ARC_STAT_OK)
+	{
+		arc_error(msg, "arc_canon_getsealhashes() failed");
+		return status;
+	}
 
-	/* XXX -- set msg->arc_cstate */
+	/* extract the signature from the seal */
+	b64sig = arc_param_get(kvset, "b");
+	b64siglen = strlen(b64sig);
+	sig = malloc(b64siglen);
+	if (sig == NULL)
+	{
+		arc_error(msg, "unable to allocate %d bytes", b64siglen);
+		return ARC_STAT_INTERNAL;
+	}
+	siglen = arc_base64_decode(b64sig, sig, b64siglen);
+	if (siglen < 0)
+	{
+		arc_error(msg, "unable to decode signature");
+		return ARC_STAT_SYNTAX;
+	}
 
+	/* verify the signature against the header hash and the key */
+	key = BIO_new_mem_buf(msg->arc_key, msg->arc_keylen);
+	if (key == NULL)
+	{
+		arc_error(msg, "BIO_new_mem_buf() failed");
+		return ARC_STAT_INTERNAL;
+	}
+
+	pkey = d2i_PUBKEY_bio(key, NULL);
+	if (pkey == NULL)
+	{
+		arc_error(msg, "d2i_PUBKEY_bio() failed");
+		return ARC_STAT_INTERNAL;
+	}
+
+	rsa = EVP_PKEY_get1_RSA(pkey);
+	if (rsa == NULL)
+	{
+		arc_error(msg, "EVP_PKEY_get1_RSA() failed");
+		return ARC_STAT_INTERNAL;
+	}
+
+	alg = arc_param_get(kvset, "a");
+	nid = NID_sha1;
+	if (alg != NULL && strcmp(alg, "rsa-sha256") == 0)
+		nid = NID_sha256;
+
+	rsastat = RSA_verify(nid, sh, shlen, sig, siglen, rsa);
+
+	RSA_free(rsa);
+	BIO_free(key);
+
+	if (rsastat != 1)
+	{
+		msg->arc_cstate = ARC_CHAIN_FAIL;
+		return ARC_STAT_BADSIG;
+	}
+
+	/* if we got this far, the signature was good */
 	return ARC_STAT_OK;
 }
 
@@ -1994,6 +2062,8 @@ arc_free(ARC_MESSAGE *msg)
 		free(h);
 		h = tmp;
 	}
+
+	arc_canon_cleanup(msg);
 
 	free(msg);
 }
@@ -2364,14 +2434,51 @@ arc_eoh(ARC_MESSAGE *msg)
 		return status;
 	}
 
-	/* seal */
-	status = arc_add_canon(msg, ARC_CANONTYPE_SEAL, ARC_CANON_RELAXED,
-	                       ARC_HASHTYPE_SHA256, NULL, NULL, (ssize_t) -1,
+	/* sets already in the chain */
+	if (nsets > 0)
+	{
+		msg->arc_sealcanons = malloc(nsets * sizeof(ARC_CANON *));
+		if (msg->arc_sealcanons == NULL)
+		{
+			arc_error(msg,
+		          	"failed to allocate memory for canonicalizations");
+			return status;
+		}
+
+		for (n = 0; n < nsets; n++)
+		{
+			h = msg->arc_sets[n].arcset_as;
+
+			status = arc_add_canon(msg,
+			                       ARC_CANONTYPE_SEAL,
+			                       ARC_CANON_RELAXED,
+			                       ARC_HASHTYPE_SHA256,
+			                       NULL,
+			                       h,
+			                       (ssize_t) -1,
+			                       &msg->arc_sealcanons[n]);
+			if (status != ARC_STAT_OK)
+			{
+				arc_error(msg,
+			          	"failed to initialize seal canonicalization object");
+				return status;
+			}
+		}
+	}
+
+	/* all sets, for the next chain */
+	status = arc_add_canon(msg,
+	                       ARC_CANONTYPE_SEAL,
+	                       ARC_CANON_RELAXED,
+	                       ARC_HASHTYPE_SHA256,
+	                       NULL,
+	                       NULL,
+	                       (ssize_t) -1,
 	                       &msg->arc_sealcanon);
 	if (status != ARC_STAT_OK)
 	{
 		arc_error(msg,
-		          "failed to initialize seal canonicalization object");
+	          	"failed to initialize seal canonicalization object");
 		return status;
 	}
 
@@ -2453,9 +2560,8 @@ arc_eom(ARC_MESSAGE *msg)
 	{
 		u_int set;
 
-		/* validate the ARC-Message-Signature */
-		if (arc_validate_msg(msg,
-		                     msg->arc_nsets - 1) == ARC_STAT_BADSIG)
+		/* validate the final ARC-Message-Signature */
+		if (arc_validate_msg(msg, msg->arc_nsets) == ARC_STAT_BADSIG)
 		{
 			msg->arc_cstate = ARC_CHAIN_FAIL;
 		}
@@ -2484,7 +2590,7 @@ arc_eom(ARC_MESSAGE *msg)
 				{
 					ARC_STAT status;
 
-					status = arc_validate(msg, set - 1);
+					status = arc_validate_seal(msg, set);
 					if (status == ARC_STAT_BADSIG)
 					{
 						msg->arc_cstate = ARC_CHAIN_FAIL;
