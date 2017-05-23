@@ -265,7 +265,6 @@ arc_canon_header_string(struct arc_dstring *dstr, arc_canon_t canon,
 	u_char *tmp;
 	u_char *end;
 	u_char tmpbuf[BUFRSZ];
-
 	assert(dstr != NULL);
 	assert(hdr != NULL);
 
@@ -317,7 +316,7 @@ arc_canon_header_string(struct arc_dstring *dstr, arc_canon_t canon,
 
 				tmp = tmpbuf;
 			}
-			
+
 			if (*p == ':')
 			{
 				p++;
@@ -440,6 +439,7 @@ arc_canon_header(ARC_MESSAGE *msg, ARC_CANON *canon, struct arc_hdrfield *hdr,
 	status = arc_canon_header_string(msg->arc_canonbuf, canon->canon_canon,
 	                                 hdr->hdr_text, hdr->hdr_textlen,
 	                                 crlf);
+
 	if (status != ARC_STAT_OK)
 		return status;
 
@@ -696,7 +696,6 @@ arc_canon_cleanup(ARC_MESSAGE *msg)
 **
 **  Parameters:
 **  	msg -- verification handle
-**  	hdr -- TRUE iff this is specifying a header canonicalization
 **  	type -- an ARC_CANONTYPE_* constant
 **  	canon -- arc_canon_t
 **  	hashtype -- hash type
@@ -1158,6 +1157,7 @@ arc_canon_runheaders_seal(ARC_MESSAGE *msg)
 			}
 			else
 			{
+        arc_canon_strip_b(msg, msg->arc_sets[m].arcset_as->hdr_text);
 				struct arc_hdrfield tmphdr;
 
 				tmphdr.hdr_text = arc_dstring_get(msg->arc_hdrbuf);
@@ -1479,7 +1479,7 @@ arc_canon_signature(ARC_MESSAGE *msg, struct arc_hdrfield *hdr, _Bool seal)
 		tmphdr.hdr_flags = 0;
 		tmphdr.hdr_next = NULL;
 		arc_lowerhdr(tmphdr.hdr_text);
-		
+
 		/* canonicalize the signature */
 		status = arc_canon_header(msg, cur, &tmphdr, FALSE);
 		if (status != ARC_STAT_OK)

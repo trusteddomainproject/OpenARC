@@ -331,7 +331,7 @@ arc_genamshdr(ARC_MESSAGE *msg, struct arc_dstring *dstr, char *delim,
 		format = "i=%u;%sa=%s;%sd=%s;%ss=%s;%st=%llu";
 	else if (sizeof(msg->arc_timestamp) == sizeof(unsigned long))
 		format = "i=%u;%sa=%s;%sd=%s;%ss=%s;%st=%lu";
-	else 
+	else
 		format = "i=%u;%sa=%s;%sd=%s;%ss=%s;%st=%u";
 
 
@@ -700,7 +700,7 @@ arc_getamshdr_d(ARC_MESSAGE *msg, size_t initial, u_char **buf, size_t *buflen,
 						                  n);
 						x += n;
 						len += n;
-						
+
 					}
 				}
 				else
@@ -825,7 +825,7 @@ arc_geterror(ARC_MESSAGE *msg)
 }
 
 /*
-** 
+**
 **  ARC_OPTIONS -- get/set library options
 **
 **  Parameters:
@@ -1473,7 +1473,7 @@ arc_process_set(ARC_MESSAGE *msg, arc_kvsettype_t type, u_char *str,
 		}
 
 		/* test validity of "t", "x", and "i" */
-		
+
 		p = arc_param_get(set, (u_char *) "t");
 		if (p != NULL && !arc_check_uint(p))
 		{
@@ -1524,7 +1524,7 @@ arc_process_set(ARC_MESSAGE *msg, arc_kvsettype_t type, u_char *str,
 		}
 
 		break;
-			
+
 	  /* these have no defaults */
 	  case ARC_KVSETTYPE_SEAL:
 		/* make sure required stuff is here */
@@ -2548,66 +2548,60 @@ arc_body(ARC_MESSAGE *msg, u_char *buf, size_t len)
 ARC_STAT
 arc_eom(ARC_MESSAGE *msg)
 {
-	/*
-	**  Verify the exisitng chain, if any.
-	*/
+  /*
+  **  Verify the exisitng chain, if any.
+  */
 
-	if (msg->arc_nsets == 0)
-	{
-		msg->arc_cstate = ARC_CHAIN_NONE;
-	}
-	else
-	{
-		u_int set;
+  if (msg->arc_nsets == 0)
+  {
+    msg->arc_cstate = ARC_CHAIN_NONE;
+  }
+  else
+  {
+    /* validate the final ARC-Message-Signature */
+    if (arc_validate_msg(msg, msg->arc_nsets) != ARC_STAT_OK)
+    {
+      msg->arc_cstate = ARC_CHAIN_FAIL;
+    }
+    else
+    {
+      u_int set;
+      u_char *inst;
+      u_char *cv;
+      ARC_KVSET *kvset;
 
-		/* validate the final ARC-Message-Signature */
-		if (arc_validate_msg(msg, msg->arc_nsets) == ARC_STAT_BADSIG)
-		{
-			msg->arc_cstate = ARC_CHAIN_FAIL;
-		}
-		else
-		{
-			u_char *inst;
-			u_char *cv;
-			ARC_KVSET *kvset;
+      msg->arc_cstate = ARC_CHAIN_PASS;
+      for (set = msg->arc_nsets; set > 0; set--)
+      {
+        for (kvset = arc_set_first(msg,
+                                   ARC_KVSETTYPE_SEAL);
+            kvset != NULL;
+            kvset = arc_set_next(kvset,
+                                 ARC_KVSETTYPE_SEAL))
+        {
+          inst = arc_param_get(kvset, "i");
+          if (atoi(inst) == set)
+            break;
+        }
 
-			for (set = msg->arc_nsets; set > 0; set--)
-			{
-				for (kvset = arc_set_first(msg,
-				                           ARC_KVSETTYPE_SEAL);
-				    kvset != NULL;
-				    kvset = arc_set_next(kvset,
-				                         ARC_KVSETTYPE_SEAL))
-				{
-					inst = arc_param_get(kvset, "i");
-					if (atoi(inst) == set)
-						break;
-				}
+        cv = arc_param_get(kvset, "cv");
+        if (!((set == 1 && strcasecmp(cv, "none") == 0) ||
+              (set != 1 && strcasecmp(cv, "pass") == 0)))
+          {
+            msg->arc_cstate = ARC_CHAIN_FAIL;
+            break;
+          }
 
-				cv = arc_param_get(kvset, "cv");
-				if ((set == 1 && strcasecmp(cv, "none") == 0) ||
-				    (set != 1 && strcasecmp(cv, "pass") == 0))
-				{
-					ARC_STAT status;
+        if (arc_validate_seal(msg, set) != ARC_STAT_OK)
+          {
+            msg->arc_cstate = ARC_CHAIN_FAIL;
+            break;
+          }
+      }
+    }
+  }
 
-					status = arc_validate_seal(msg, set);
-					if (status == ARC_STAT_BADSIG)
-					{
-						msg->arc_cstate = ARC_CHAIN_FAIL;
-						break;
-					}
-					else if (status != ARC_STAT_OK)
-					{
-						return status;
-					}
-				}
-			}
-		}
-
-		msg->arc_cstate = ARC_CHAIN_PASS;
-	}
-
-	return ARC_STAT_OK;
+  return ARC_STAT_OK;
 }
 
 /*
@@ -2738,7 +2732,7 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 		msg->arc_sealhead = NULL;
 		msg->arc_sealtail = NULL;
 	}
-	
+
 	/*
 	**  Part 1: Construct a new AAR
 	*/
@@ -2762,7 +2756,7 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 
 	msg->arc_sealhead = h;
 	msg->arc_sealtail = h;
-	
+
 	/*
 	**  Part B: Construct a new AMS (basically a no-frills DKIM signature)
 	*/
