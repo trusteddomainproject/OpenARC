@@ -2410,7 +2410,7 @@ arc_eoh(ARC_MESSAGE *msg)
 	htag = NULL;
 	if (nsets > 0)
 	{
-		h = msg->arc_sets[n - 1].arcset_ams;
+		h = msg->arc_sets[nsets - 1].arcset_ams;
 		htag = arc_param_get(h->hdr_data, "h");
 	}
 	status = arc_add_canon(msg, ARC_CANONTYPE_HEADER, msg->arc_canonhdr,

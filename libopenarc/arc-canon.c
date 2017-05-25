@@ -1176,11 +1176,11 @@ arc_canon_runheaders_seal(ARC_MESSAGE *msg)
 
 			if (status != ARC_STAT_OK)
 				return status;
-
-			arc_canon_finalize(cur);
-
-			cur->canon_done = TRUE;
 		}
+
+    arc_canon_finalize(cur);
+
+    cur->canon_done = TRUE;
 
 		cur = msg->arc_sealcanon;
 
