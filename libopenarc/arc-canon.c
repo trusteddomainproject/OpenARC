@@ -1157,8 +1157,8 @@ arc_canon_runheaders_seal(ARC_MESSAGE *msg)
 			}
 			else
 			{
-        arc_canon_strip_b(msg, msg->arc_sets[m].arcset_as->hdr_text);
 				struct arc_hdrfield tmphdr;
+				arc_canon_strip_b(msg, msg->arc_sets[m].arcset_as->hdr_text);
 
 				tmphdr.hdr_text = arc_dstring_get(msg->arc_hdrbuf);
 				tmphdr.hdr_namelen = cur->canon_sigheader->hdr_namelen;
@@ -1178,9 +1178,8 @@ arc_canon_runheaders_seal(ARC_MESSAGE *msg)
 				return status;
 		}
 
-    arc_canon_finalize(cur);
-
-    cur->canon_done = TRUE;
+		arc_canon_finalize(cur);
+		cur->canon_done = TRUE;
 
 		cur = msg->arc_sealcanon;
 
