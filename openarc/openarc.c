@@ -281,7 +281,7 @@ char myhostname[MAXHOSTNAMELEN + 1];		/* local host's name */
 **  	An sfsistat.
 */
 
-sfsistat 
+sfsistat
 smfi_insheader(SMFICTX *ctx, int idx, char *hname, char *hvalue)
 {
 	assert(ctx != NULL);
@@ -959,7 +959,7 @@ arcf_securefile(const char *path, ino_t *ino, uid_t myuid, char *err,
 			return status;
 
 		if (partial[1] != '\0')
-			strlcat(partial, "/", sizeof partial); 
+			strlcat(partial, "/", sizeof partial);
 	}
 
 	return 1;
@@ -1015,7 +1015,7 @@ arcf_securefile(const char *path, ino_t *ino, uid_t myuid, char *err,
 
 		pthread_mutex_unlock(&pwdb_lock);
 	}
-		
+
 	/* guess we're okay... */
 	*ino = s.st_ino;
 	return 1;
@@ -1340,7 +1340,7 @@ arcf_config_load(struct config *data, struct arcf_config *conf,
 		(void) config_get(data, "AuthservID", &str, sizeof str);
 	if (str == NULL || strcmp(str, "HOSTNAME") == 0)
 		conf->conf_authservid = strdup(myhostname);
-	else	
+	else
 		conf->conf_authservid = strdup(str);
 
 	if (data != NULL)
@@ -1608,7 +1608,7 @@ arcf_config_load(struct config *data, struct arcf_config *conf,
 
 				saveerrno = errno;
 
-				syslog(LOG_ERR, "malloc(): %s", 
+				syslog(LOG_ERR, "malloc(): %s",
 				       strerror(errno));
 
 				errno = saveerrno;
@@ -2059,7 +2059,7 @@ arcf_cleanup(SMFICTX *ctx)
 			while (cur != NULL)
 			{
 				next = cur->se_next;
-	
+
 				free(cur);
 
 				cur = next;
@@ -2844,7 +2844,7 @@ mlfi_header(SMFICTX *ctx, char *headerf, char *headerv)
 		**  feed to the canonicalization algorithms the headers
 		**  exactly as the MTA will modify them, so verification
 		**  should still work.
-		**  
+		**
 		**  This is based on experimentation and on reading
 		**  sendmail/headers.c, and may require more tweaking before
 		**  it's precisely right.  There are other munges the
@@ -3326,7 +3326,7 @@ mlfi_eom(SMFICTX *ctx)
 		size_t len;
 		u_char *hfptr;
 		u_char hfname[BUFRSZ + 1];
-	
+
 		hfptr = arc_hdr_name(sealhdr, &len);
 		memset(hfname, '\0', sizeof hfname);
 		strncpy(hfname, hfptr, len);
