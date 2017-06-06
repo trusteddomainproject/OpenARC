@@ -5,7 +5,7 @@ AUTOMAKE_OPTIONS = foreign
 ACLOCAL_AMFLAGS = -I m4
 
 SUBDIRS = libopenarc contrib docs openarc
-dist_doc_DATA = LICENSE RELEASE_NOTES
+dist_doc_DATA = LICENSE LICENSE.Sendmail RELEASE_NOTES
 dist_noinst_SCRIPTS = libtool
 
 DISTCLEANFILES = openarc-@VERSION@.tar.gz
@@ -39,5 +39,8 @@ dist-hook:
 	echo "looking to see if @VERSION@ is in the RELEASE_NOTES"
 	fgrep @VERSION@ $(srcdir)/RELEASE_NOTES
 	sed -e 's|\(@VERSION@[ \t]*\)[0-9?]\{4\}\(/[0-9?]\{2\}\)\{2\}|\1'`date +%Y/%m/%d`'|' < $(srcdir)/RELEASE_NOTES > $(distdir)/RELEASE_NOTES
+
+rpm: dist-gzip
+	rpmbuild -ta $(distdir).tar.gz
 
 .PHONY: push

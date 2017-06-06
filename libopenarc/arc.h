@@ -288,7 +288,7 @@ typedef struct arc_hdrfield ARC_HDRFIELD;
 **  	None.
 */
 
-void arc_error __P((ARC_MESSAGE *, const char *, ...));
+extern void arc_error __P((ARC_MESSAGE *, const char *, ...));
 
 /*
 **  ARC_INIT -- create a library instance
@@ -355,7 +355,7 @@ extern ARC_STAT arc_options (ARC_LIB *, int, int, void *, size_t);
 **  	Pointer to the SSL buffer in the library handle.
 */
 
-const char *arc_getsslbuf(ARC_LIB *);
+extern const char *arc_getsslbuf(ARC_LIB *);
 
 /*
 **  ARC_MESSAGE -- create a new message handle

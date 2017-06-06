@@ -115,7 +115,7 @@ fi
 
 %clean
 if [ "$RPM_BUILD_ROOT" != "/" ]; then
-	rm -r "$RPM_BUILD_ROOT"
+	rm -rf "$RPM_BUILD_ROOT"
 fi
 
 %files

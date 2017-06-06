@@ -8,7 +8,7 @@ endif
 LDADD = ./libopenarc.la
 
 lib_LTLIBRARIES = libopenarc.la
-libopenarc_la_SOURCES = base64.c arc.c arc.h arc-canon.c arc-canon.h arc-dns.c arc-dns.h arc-internal.h arc-keys.c arc-keys.h arc-tables.c arc-tables.h arc-types.h arc-util.c arc-util.h
+libopenarc_la_SOURCES = base64.c base64.h arc.c arc.h arc-canon.c arc-canon.h arc-dns.c arc-dns.h arc-internal.h arc-keys.c arc-keys.h arc-tables.c arc-tables.h arc-types.h arc-util.c arc-util.h
 libopenarc_la_CPPFLAGS = $(LIBCRYPTO_CPPFLAGS)
 libopenarc_la_CFLAGS = $(LIBCRYPTO_INCDIRS) $(LIBOPENARC_INC)
 libopenarc_la_LDFLAGS = -no-undefined  $(LIBCRYPTO_LIBDIRS) -version-info $(LIBOPENARC_VERSION_INFO)
@@ -31,7 +31,7 @@ DISTCLEANFILES=symbols.map *.gcno *.gcda
 symbols.map: $(libopenarc_include_HEADERS)
 	grep '^extern' $? | \
 		awk '{ for (c = 1; c <= NF; c++) if ($$c ~ /arc_/) { print $$c; break; } }' | \
-		sed -e s/\[\*\;\]//g -e s/\[\\\[\\\]\]//g | \
+		sed -e s/\[\*\;\]//g -e s/\[\\\[\\\]\]//g -e s/\(.*// | \
 		sort -u -o $@
 
 MOSTLYCLEANFILES=symbols.map *.gcno *.gcda
