@@ -2573,11 +2573,9 @@ arc_eom(ARC_MESSAGE *msg)
 			msg->arc_cstate = ARC_CHAIN_PASS;
 			for (set = msg->arc_nsets; set > 0; set--)
 			{
-				for (kvset = arc_set_first(msg,
-																	 ARC_KVSETTYPE_SEAL);
-						kvset != NULL;
-						kvset = arc_set_next(kvset,
-																 ARC_KVSETTYPE_SEAL))
+				for (kvset = arc_set_first(msg, ARC_KVSETTYPE_SEAL);
+				     kvset != NULL;
+				     kvset = arc_set_next(kvset, ARC_KVSETTYPE_SEAL))
 				{
 					inst = arc_param_get(kvset, "i");
 					if (atoi(inst) == set)
@@ -2586,17 +2584,17 @@ arc_eom(ARC_MESSAGE *msg)
 
 				cv = arc_param_get(kvset, "cv");
 				if (!((set == 1 && strcasecmp(cv, "none") == 0) ||
-							(set != 1 && strcasecmp(cv, "pass") == 0)))
-					{
-						msg->arc_cstate = ARC_CHAIN_FAIL;
-						break;
-					}
+				     (set != 1 && strcasecmp(cv, "pass") == 0)))
+				{
+					msg->arc_cstate = ARC_CHAIN_FAIL;
+					break;
+				}
 
 				if (arc_validate_seal(msg, set) != ARC_STAT_OK)
-					{
-						msg->arc_cstate = ARC_CHAIN_FAIL;
-						break;
-					}
+				{
+					msg->arc_cstate = ARC_CHAIN_FAIL;
+					break;
+				}
 			}
 		}
 	}

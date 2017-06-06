@@ -1158,7 +1158,8 @@ arc_canon_runheaders_seal(ARC_MESSAGE *msg)
 			else
 			{
 				struct arc_hdrfield tmphdr;
-				arc_canon_strip_b(msg, msg->arc_sets[m].arcset_as->hdr_text);
+				arc_canon_strip_b(msg,
+				                  msg->arc_sets[m].arcset_as->hdr_text);
 
 				tmphdr.hdr_text = arc_dstring_get(msg->arc_hdrbuf);
 				tmphdr.hdr_namelen = cur->canon_sigheader->hdr_namelen;
