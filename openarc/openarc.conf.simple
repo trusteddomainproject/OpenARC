@@ -1,7 +1,0 @@
-# This is a simple config file for OpenARC
-
-Syslog                  yes
-
-Socket                  inet:8891@localhost
-
-# PidFile		/var/run/opendkim/opendkim.pid
