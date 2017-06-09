@@ -3347,6 +3347,27 @@ mlfi_eom(SMFICTX *ctx)
 	}
 
 	/*
+ 	**  Authentication-Results
+	*/
+
+	arcf_dstring_blank(afc->mctx_tmpstr);
+	arcf_dstring_printf(afc->mctx_tmpstr, "%s; arc=%s header.d=%s",
+	                    conf->conf_authservid,
+	                    arc_chain_str(afc->mctx_arcmsg),
+	                    arc_get_domain(afc->mctx_arcmsg));
+	if (arcf_addheader(ctx, AUTHRESULTSHDR,
+	                   arcf_dstring_get(afc->mctx_tmpstr)) != MI_SUCCESS)
+	{
+		if (conf->conf_dolog)
+		{
+			syslog(LOG_ERR, "%s: %s header add failed",
+			       afc->mctx_jobid, AUTHRESULTSHDR);
+		}
+
+		return SMFIS_TEMPFAIL;
+	}
+
+	/*
 	**  Identify the filter, if requested.
 	*/
 

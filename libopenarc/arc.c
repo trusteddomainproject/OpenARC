@@ -3156,3 +3156,35 @@ arc_libfeature(ARC_LIB *lib, u_int fc)
 		return FALSE;
 	return ((lib->arcl_flist[idx] & (1 << offset)) != 0);
 }
+
+/*
+**  ARC_GET_DOMAIN -- retrieve stored domain for this message
+**
+**  Parameters:
+**  	msg -- ARC_MESSAGE object
+**
+**  Return value:
+**  	Pointer to string containing the domain stored for this message
+*/
+
+char *
+arc_get_domain(ARC_MESSAGE *msg)
+{
+	return msg->arc_domain;
+}
+
+/*
+**  ARC_CHAIN_STR -- retrieve chain status, as a string
+**
+**  Parameters:
+**      msg -- ARC_MESSAGE object
+**
+**  Return value:
+**      Pointer to string containing the current chain status.
+*/
+
+char *
+arc_chain_str(ARC_MESSAGE *msg)
+{
+	return arc_code_to_name(chainstatus, msg->arc_cstate);
+}
