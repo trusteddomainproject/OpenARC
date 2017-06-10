@@ -937,9 +937,9 @@ AC_OUTPUT([	Makefile
 			contrib/systemd/Makefile
 			contrib/systemd/openarc.service
 		libopenarc/openarc.pc libopenarc/Makefile
+		libopenarc/docs/Makefile
 		openarc/Makefile openarc/openarc.8 openarc/openarc.conf.5
 			openarc/openarc.conf.simple
 ])
-		#libopenarc/docs/Makefile
 		#libopenarc/tests/Makefile
 		#openarc/tests/Makefile

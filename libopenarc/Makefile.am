@@ -1,6 +1,7 @@
 # Copyright (c) 2016, 2017, The Trusted Domain Project.  All rights reserved.
 
 #SUBDIRS=tests docs
+SUBDIRS=docs
 
 if DEBUG
 AM_CFLAGS = -g
