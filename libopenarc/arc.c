@@ -458,6 +458,38 @@ arc_genamshdr(ARC_MESSAGE *msg, struct arc_dstring *dstr, char *delim,
 
 			arc_dstring_catn(dstr, hdr->hdr_text, hdr->hdr_namelen);
 		}
+
+		if (msg->arc_library->arcl_oversignhdrs != NULL &&
+				msg->arc_library->arcl_oversignhdrs[0] != NULL)
+		{
+			_Bool wrote = FALSE;
+
+			if (firsthdr)
+			{
+				arc_dstring_cat1(dstr, ';');
+				arc_dstring_catn(dstr, delim, delimlen);
+				arc_dstring_catn(dstr, "h=", 2);
+			}
+			else
+			{
+				arc_dstring_cat1(dstr, ':');
+			}
+
+			for (n = 0;
+			     msg->arc_library->arcl_oversignhdrs[n] != NULL;
+			     n++)
+			{
+				if (msg->arc_library->arcl_oversignhdrs[n][0] == '\0')
+					continue;
+
+				if (wrote)
+					arc_dstring_cat1(dstr, ':');
+
+				arc_dstring_cat(dstr, msg->arc_library->arcl_oversignhdrs[n]);
+
+				wrote = TRUE;
+			}
+		}
 	}
 
 	/* and finally, an empty b= */
@@ -891,6 +923,80 @@ arc_options(ARC_LIB *lib, int op, int arg, void *val, size_t valsz)
 		else
 			memcpy(&lib->arcl_fixedtime, val, valsz);
 
+		return ARC_STAT_OK;
+
+	  case ARC_OPTS_SIGNHDRS:
+		if (valsz != sizeof(char **) || op == ARC_OP_GETOPT)
+		{
+			return ARC_STAT_INVALID;
+		}
+		else if (val == NULL)
+		{
+			if (lib->arcl_signre)
+			{
+				(void) regfree(&lib->arcl_hdrre);
+				lib->arcl_signre = FALSE;
+			}
+		}
+		else
+		{
+			int status;
+			u_char **hdrs;
+			u_char **required_signhdrs;
+			char buf[BUFRSZ + 1];
+
+			if (lib->arcl_signre)
+			{
+				(void) regfree(&lib->arcl_hdrre);
+				lib->arcl_signre = FALSE;
+			}
+			memset(buf, '\0', sizeof buf);
+
+			hdrs = (u_char **) val;
+			(void) strlcpy(buf, "^(", sizeof buf);
+			if (!arc_hdrlist((u_char *) buf, sizeof buf,
+			                  hdrs, TRUE))
+				return ARC_STAT_INVALID;
+
+			if (strlcat(buf, ")$", sizeof buf) >= sizeof buf)
+				return ARC_STAT_INVALID;
+
+			status = regcomp(&lib->arcl_hdrre, buf,
+			                 (REG_EXTENDED|REG_ICASE));
+			if (status != 0)
+				return ARC_STAT_INTERNAL;
+
+			lib->arcl_signre = TRUE;
+		}
+		return ARC_STAT_OK;
+
+	  case ARC_OPTS_OVERSIGNHDRS:
+		if (valsz != sizeof lib->arcl_oversignhdrs)
+			return ARC_STAT_INVALID;
+
+		if (op == ARC_OP_GETOPT)
+		{
+			memcpy(val, &lib->arcl_oversignhdrs, valsz);
+		}
+		else if (val == NULL)
+		{
+			if (lib->arcl_oversignhdrs != NULL)
+				arc_clobber_array((char **) lib->arcl_oversignhdrs);
+			lib->arcl_oversignhdrs = NULL;
+		}
+		else
+		{
+			const char **tmp;
+
+			tmp = arc_copy_array(val);
+			if (tmp == NULL)
+				return ARC_STAT_NORESOURCE;
+
+			if (lib->arcl_oversignhdrs != NULL)
+				arc_clobber_array((char **) lib->arcl_oversignhdrs);
+
+			lib->arcl_oversignhdrs = (u_char **) tmp;
+		}
 		return ARC_STAT_OK;
 
 	  default:
@@ -2405,23 +2511,36 @@ arc_eoh(ARC_MESSAGE *msg)
 	**  Request specific canonicalizations we want to run.
 	*/
 
-	/* header */
+	/* headers, validation */
 	h = NULL;
 	htag = NULL;
 	if (nsets > 0)
 	{
 		h = msg->arc_sets[nsets - 1].arcset_ams;
 		htag = arc_param_get(h->hdr_data, "h");
+
+		status = arc_add_canon(msg, ARC_CANONTYPE_HEADER, msg->arc_canonhdr,
+						               msg->arc_signalg, htag, h, (ssize_t) -1,
+						               &msg->arc_valid_hdrcanon);
+		if (status != ARC_STAT_OK)
+		{
+			arc_error(msg,
+								"failed to initialize header canonicalization object");
+			return status;
+		}
 	}
+
+	/* headers, signing */
 	status = arc_add_canon(msg, ARC_CANONTYPE_HEADER, msg->arc_canonhdr,
-	                       msg->arc_signalg, htag, h, (ssize_t) -1,
-	                       &msg->arc_hdrcanon);
+	                       msg->arc_signalg, NULL, NULL, (ssize_t) -1,
+	                       &msg->arc_sign_hdrcanon);
 	if (status != ARC_STAT_OK)
 	{
 		arc_error(msg,
-			  "failed to initialize header canonicalization object");
+		          "failed to initialize header canonicalization object");
 		return status;
 	}
+
 
 	/* body */
 	status = arc_add_canon(msg, ARC_CANONTYPE_BODY, msg->arc_canonbody,
@@ -2434,7 +2553,7 @@ arc_eoh(ARC_MESSAGE *msg)
 		return status;
 	}
 
-	/* sets already in the chain */
+	/* sets already in the chain, validation */
 	if (nsets > 0)
 	{
 		msg->arc_sealcanons = malloc(nsets * sizeof(ARC_CANON *));
@@ -2466,7 +2585,7 @@ arc_eoh(ARC_MESSAGE *msg)
 		}
 	}
 
-	/* all sets, for the next chain */
+	/* all sets, for the next chain, signing */
 	status = arc_add_canon(msg,
 	                       ARC_CANONTYPE_SEAL,
 	                       ARC_CANON_RELAXED,
@@ -2814,7 +2933,7 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 		return ARC_STAT_INTERNAL;
 	}
 
-	status = arc_canon_getfinal(msg->arc_hdrcanon, &digest, &diglen);
+	status = arc_canon_getfinal(msg->arc_sign_hdrcanon, &digest, &diglen);
 	if (status != ARC_STAT_OK)
 	{
 		arc_error(msg, "arc_canon_getfinal() failed");

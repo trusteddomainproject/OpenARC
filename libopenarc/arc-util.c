@@ -522,6 +522,101 @@ arc_collapse(u_char *str)
 }
 
 /*
+**  ARC_HDRLIST -- build up a header list for use in a regexp
+**
+**  Parameters:
+**  	buf -- where to write
+**  	buflen -- bytes at "buf"
+**  	hdrlist -- array of header names
+**  	first -- first call
+**
+**  Return value:
+**  	TRUE iff everything fit.
+*/
+
+_Bool
+arc_hdrlist(u_char *buf, size_t buflen, u_char **hdrlist, _Bool first)
+{
+	_Bool escape = FALSE;
+	int c;
+	int len;
+	u_char *p;
+	u_char *q;
+	u_char *end;
+
+	assert(buf != NULL);
+	assert(hdrlist != NULL);
+
+	for (c = 0; ; c++)
+	{
+		if (hdrlist[c] == NULL)
+			break;
+
+		if (!first)
+		{
+			len = strlcat((char *) buf, "|", buflen);
+			if (len >= buflen)
+				return FALSE;
+		}
+		else
+		{
+			len = strlen((char *) buf);
+		}
+
+		first = FALSE;
+
+		q = &buf[len];
+		end = &buf[buflen - 1];
+
+		for (p = hdrlist[c]; *p != '\0'; p++)
+		{
+			if (q >= end)
+				return FALSE;
+
+			if (escape)
+			{
+				*q = *p;
+				q++;
+				escape = FALSE;
+			}
+
+			switch (*p)
+			{
+			  case '*':
+				*q = '.';
+				q++;
+				if (q >= end)
+					return FALSE;
+				*q = '*';
+				q++;
+				break;
+
+			  case '.':
+				*q = '\\';
+				q++;
+				if (q >= end)
+					return FALSE;
+				*q = '.';
+				q++;
+				break;
+
+			  case '\\':
+				escape = TRUE;
+				break;
+
+			  default:
+				*q = *p;
+				q++;
+				break;
+			}
+		}
+	}
+
+	return TRUE;
+}
+
+
+/*
 **  ARC_LOWERHDR -- convert a string (presumably a header) to all lowercase,
 **                  but only up to a colon
 **
@@ -793,3 +888,68 @@ arc_check_dns_reply(unsigned char *ansbuf, size_t anslen,
 	return (trunc ? 1 : 0);
 }
 
+
+
+/*
+**  ARC_COPY_ARRAY -- copy an array of char pointers
+**
+**  Parameters:
+**  	in -- input array, must be NULL-terminated
+**
+**  Return value:
+**  	A copy of "in" and its elements, or NULL on failure.
+*/
+
+const char **
+arc_copy_array(char **in)
+{
+	unsigned int c;
+	unsigned int n;
+	char **out;
+
+	assert(in != NULL);
+
+	for (n = 0; in[n] != NULL; n++)
+		continue;
+
+	out = malloc(sizeof(char *) * (n + 1));
+
+	for (c = 0; c < n; c++)
+	{
+		out[c] = strdup(in[c]);
+		if (out[c] == NULL)
+		{
+			for (n = 0; n < c; n++)
+				free(out[n]);
+			free(out);
+			return NULL;
+		}
+	}
+
+	out[c] = NULL;
+
+	return (const char **) out;
+}
+
+/*
+**  ARC_CLOBBER_ARRAY -- clobber a cloned array of char pointers
+**
+**  Parameters:
+**  	in -- input array, must be NULL-terminated
+**
+**  Return value:
+**  	None.
+*/
+
+void
+arc_clobber_array(char **in)
+{
+	unsigned int n;
+
+	assert(in != NULL);
+
+	for (n = 0; in[n] != NULL; n++)
+		free(in[n]);
+
+	free(in);
+}

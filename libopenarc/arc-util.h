@@ -6,6 +6,8 @@
 
 #include "build-config.h"
 
+#include <bsd/string.h>
+
 /* system includes */
 #include <sys/types.h>
 #include <sys/param.h>
@@ -31,10 +33,14 @@ extern size_t arc_dstring_printf __P((struct arc_dstring *dstr, char *fmt,
 extern int arc_check_dns_reply __P((unsigned char *ansbuf, size_t anslen,
                                     int xclass, int xtype));
 extern void arc_collapse __P((u_char *));
+extern _Bool arc_hdrlist __P((u_char *, size_t, u_char **, _Bool));
 extern void arc_lowerhdr __P((u_char *));
 extern void arc_min_timeval __P((struct timeval *, struct timeval *,
                                  struct timeval *, struct timeval **));
 extern u_char *arc_strndup(u_char *, size_t);
 extern ARC_STAT arc_tmpfile __P((ARC_MESSAGE *, int *, _Bool));
+
+extern void arc_clobber_array __P((char **));
+extern const char **arc_copy_array __P((char **));
 
 #endif /* _ARC_UTIL_H_ */

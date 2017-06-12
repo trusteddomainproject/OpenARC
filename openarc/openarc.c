@@ -127,6 +127,10 @@ struct arcf_config
 	char *		conf_authservid;	/* ID for A-R fields */
 	char *		conf_peerfile;		/* peer hosts table */
 	char *		conf_domain;		/* domain */
+	char *		conf_signhdrs_raw;	/* headers to sign (raw) */
+	char **		conf_signhdrs;		/* headers to sign (array) */
+	char *		conf_oversignhdrs_raw;	/* fields to over-sign (raw) */
+	char **		conf_oversignhdrs;	/* fields to over-sign (array) */
 	u_char *	conf_keydata;		/* binary key data */
 	size_t		conf_keylen;		/* key length */
 	ssize_t		conf_maxhdrsz;		/* max. header size */
@@ -1425,6 +1429,14 @@ arcf_config_load(struct config *data, struct arcf_config *conf,
 		                  &conf->conf_maxhdrsz,
 		                  sizeof conf->conf_maxhdrsz);
 
+    (void) config_get(data, "SignHeaders",
+		                  &conf->conf_signhdrs_raw,
+		                  sizeof conf->conf_signhdrs_raw);
+
+    (void) config_get(data, "OverSignHeaders",
+		                  &conf->conf_oversignhdrs_raw,
+		                  sizeof conf->conf_oversignhdrs_raw);
+
 		str = NULL;
 		(void) config_get(data, "FixedTimestamp", &str, sizeof str);
 		if (str != NULL)
@@ -1750,6 +1762,67 @@ arcf_config_setlib(struct arcf_config *conf, char **err)
 		if (err != NULL)
 			*err = "failed to set ARC library options";
 		return FALSE;
+	}
+
+	if (conf->conf_signhdrs_raw != NULL)
+	{
+		char *s = conf->conf_signhdrs_raw;
+		int cnt;
+		for (cnt=0; s[cnt]; s[cnt]==',' ? cnt++ : *s++);
+
+		conf->conf_signhdrs = malloc((cnt + 2) * sizeof(char *)); // TODO - be smarter
+		char *token = strtok (conf->conf_signhdrs_raw, ",");
+		int i = 0;
+
+		while (token != NULL)
+		{
+			conf->conf_signhdrs[i++] = token;
+			token = strtok (NULL, ",");
+		}
+
+		conf->conf_signhdrs[i] = '\0';
+
+		status = arc_options(conf->conf_libopenarc, ARC_OP_SETOPT,
+		                     ARC_OPTS_SIGNHDRS, conf->conf_signhdrs,
+		                     sizeof conf->conf_signhdrs);
+
+		if (status != ARC_STAT_OK)
+		{
+			if (err != NULL)
+				*err = "failed to set ARC library options";
+			return FALSE;
+		}
+	}
+
+	if (conf->conf_oversignhdrs_raw != NULL)
+	{
+		char *s = conf->conf_oversignhdrs_raw;
+		int cnt;
+		for (cnt=0; s[cnt]; s[cnt]==',' ? cnt++ : *s++);
+
+		conf->conf_oversignhdrs = malloc((cnt + 2) * sizeof(char *));
+		char *token = strtok (conf->conf_oversignhdrs_raw, ",");
+		int i = 0;
+
+		while (token != NULL)
+		{
+			conf->conf_oversignhdrs[i++] = token;
+			token = strtok (NULL, ",");
+		}
+
+		conf->conf_oversignhdrs[i] = '\0';
+
+		status = arc_options(conf->conf_libopenarc, ARC_OP_SETOPT,
+		                     ARC_OPTS_OVERSIGNHDRS,
+		                     conf->conf_oversignhdrs,
+		                     sizeof conf->conf_oversignhdrs);
+
+		if (status != ARC_STAT_OK)
+		{
+			if (err != NULL)
+				*err = "failed to set ARC library options";
+			return FALSE;
+		}
 	}
 
 	return TRUE;
