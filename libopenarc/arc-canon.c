@@ -1207,9 +1207,6 @@ arc_canon_runheaders_seal(ARC_MESSAGE *msg)
 			return status;
 	}
 
-	/* now finalize the main one */
-	arc_canon_finalize(msg->arc_sealcanon);
-
 	return ARC_STAT_OK;
 }
 
