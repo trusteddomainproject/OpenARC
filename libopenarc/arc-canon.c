@@ -2051,7 +2051,7 @@ arc_canon_gethashes(ARC_MESSAGE *msg, void **hh, size_t *hhlen,
 	size_t bdlen;
 
 	hdc = msg->arc_valid_hdrcanon;
-	bdc = msg->arc_bodycanon;
+	bdc = msg->arc_valid_bodycanon;
 
 	status = arc_canon_getfinal(hdc, &hd, &hdlen);
 	if (status != ARC_STAT_OK)
