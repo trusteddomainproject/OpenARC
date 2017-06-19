@@ -143,7 +143,7 @@ fi
 
 od_start() {
 	echo -n "Starting OpenARC Milter: "
-	od_daemon $DAEMON -x $CONFIG $ARGS
+	od_daemon $DAEMON -c $CONFIG $ARGS
 	if [ $? -eq 0 ]; then
 		log_success_msg $NAME
 		if [ -d /var/lock/subsys ]; then
