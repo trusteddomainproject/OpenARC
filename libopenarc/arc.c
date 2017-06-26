@@ -1971,7 +1971,6 @@ arc_validate_msg(ARC_MESSAGE *msg, u_int setnum)
 		nid = NID_sha256;
 
 	rsastat = RSA_verify(nid, hh, hhlen, sig, siglen, rsa);
-
 	RSA_free(rsa);
 	BIO_free(key);
 
@@ -2402,6 +2401,8 @@ arc_eoh(ARC_MESSAGE *msg)
 	ARC_KVSET *set;
 	u_char *inst;
 	u_char *htag;
+	arc_canon_t hdr_canon, body_canon;
+
 	if (msg->arc_state >= ARC_STATE_EOH)
 		return ARC_STAT_INVALID;
 	msg->arc_state = ARC_STATE_EOH;
@@ -2522,14 +2523,14 @@ arc_eoh(ARC_MESSAGE *msg)
 	}
 
 	/*
-	**  Request specific canonicalizations we want to run.
+	** Request specific canonicalizations we want to run.
 	*/
 
-	/* headers, validation */
 	h = NULL;
 	htag = NULL;
 	if (nsets > 0)
 	{
+  	/* headers, validation */
 		h = msg->arc_sets[nsets - 1].arcset_ams;
 		htag = arc_param_get(h->hdr_data, "h");
 
@@ -2539,9 +2540,20 @@ arc_eoh(ARC_MESSAGE *msg)
 		else
 			hashtype = ARC_HASHTYPE_SHA256;
 
-		status = arc_add_canon(msg, ARC_CANONTYPE_HEADER, msg->arc_canonhdr,
+		status = arc_parse_canon_t(arc_param_get(h->hdr_data, "c"),
+		                           &hdr_canon, &body_canon);
+
+		if (status != ARC_STAT_OK)
+		{
+			arc_error(msg,
+			          "failed to parse header c= tag");
+			return status;
+		}
+
+		status = arc_add_canon(msg, ARC_CANONTYPE_HEADER, hdr_canon,
 		                       hashtype, htag, h, (ssize_t) -1,
 		                       &msg->arc_valid_hdrcanon);
+
 		if (status != ARC_STAT_OK)
 		{
 			arc_error(msg,
@@ -2550,9 +2562,10 @@ arc_eoh(ARC_MESSAGE *msg)
 		}
 
 		/* body, validation */
-		status = arc_add_canon(msg, ARC_CANONTYPE_BODY, msg->arc_canonbody,
+		status = arc_add_canon(msg, ARC_CANONTYPE_BODY, body_canon,
 		                       hashtype, NULL, NULL, (ssize_t) -1,
 		                       &msg->arc_valid_bodycanon);
+
 		if (status != ARC_STAT_OK)
 		{
 			arc_error(msg,
