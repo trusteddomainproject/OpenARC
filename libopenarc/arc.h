@@ -80,6 +80,7 @@ typedef int ARC_STAT;
 #define	ARC_STAT_KEYFAIL	11	/* key retrieval failed */
 #define	ARC_STAT_MULTIDNSREPLY	12	/* multiple DNS replies */
 #define	ARC_STAT_SIGGEN		13	/* seal generation failed */
+#define	ARC_STAT_BAD_DOMAIN	14	/* an untrusted domain was found in the arc_chain */
 
 /*
 **  ARC_CHAIN -- chain state
@@ -444,6 +445,20 @@ extern ARC_STAT arc_body __P((ARC_MESSAGE *msg, u_char *buf, size_t len));
 */
 
 extern ARC_STAT arc_eom __P((ARC_MESSAGE *));
+
+/*
+**  ARC_CHECK_WHITELIST -- verify that all AS d= domains are present in the provided whitelist
+**
+**  Parameters:
+**  	msg -- ARC_MESSAGE object
+**    domain_whitelist -- an array of domain pointers
+**    whitelist_size -- number of domains in the whitelist
+**  Return value:
+**  	An ARC_STAT_* constant.
+**
+*/
+
+extern ARC_STAT arc_check_whitelist (ARC_MESSAGE *, char **, u_int);
 
 /*
 **  ARC_GETSEAL -- get the "seal" to apply to this message
