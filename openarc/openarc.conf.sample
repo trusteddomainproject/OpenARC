@@ -1,0 +1,225 @@
+##
+## openarc.conf -- configuration file for OpenARC filter
+##
+## Copyright (c) 2010-2015, 2017, The Trusted Domain Project.
+##   All rights reserved.
+##
+
+## CONFIGURATION OPTIONS
+
+##  AuthservID string
+##  	default (local host name)
+##
+##  Defines the "authserv-id" token to be used when generating 
+##  Authentication-Results headers after message verification.
+
+# AuthservID		example.com
+
+##  AutoRestart { yes | no }
+##  	default "no"
+##
+##  Indicate whether or not the filter should arrange to restart automatically
+##  if it crashes.
+
+# AutoRestart		No
+
+##  AutoRestartCount n
+##  	default 0
+##
+##  Sets the maximum automatic restart count.  After this number of
+##  automatic restarts, the filter will give up and terminate.  A value of 0
+##  implies no limit.
+
+# AutoRestartCount	0
+
+##  AutoRestartRate n/t[u]
+##  	default (none)
+## 
+##  Sets the maximum automatic restart rate.  See the opendkim.conf(5)
+##  man page for the format of this parameter.
+
+# AutoRestartRate	n/tu
+
+##  Background { yes | no }
+##  	default "yes"
+##
+##  Indicate whether or not the filter should run in the background.
+
+# Background		Yes
+
+##  BaseDirectory path
+##  	default (none)
+##
+##  Causes the filter to change to the named directory before beginning
+##  operation.  Thus, cores will be dumped here and configuration files
+##  are read relative to this location.
+
+# BaseDirectory		/var/run/opendkim
+
+##  Canonicalization hdrcanon[/bodycanon]
+##  	default "simple/simple"
+##
+##  Select canonicalizations to use when signing.  If the "bodycanon" is
+##  omitted, "simple" is used.  Valid values for each are "simple" and
+##  "relaxed".
+
+# Canonicalization	simple/simple
+
+##  ChangeRootDirectory directory
+##
+##  Changes to the specified directory before beginning execution.
+
+# ChangeRootDirectory	dirname
+
+##  Domain domain-name
+##  	default (none)
+##
+##  Specify the domain to use when generating ARC header fields.  Must
+##  be specified for signing.
+
+Domain			example.com
+
+##  EnableCoredumps { yes | no }
+##  	default "no"
+##
+##  On systems which have support for such, requests that the kernel dump
+##  core even though the process may change user ID during its execution.
+
+# EnableCoredumps	no
+
+##  FixedTimestamp timestamp
+##  	default (none)
+##
+##  Forces a specific timestamp to be used when generating ARC header fields.
+##  By default, uses the current time.
+
+# FixedTimestamp	1234567890
+
+##  KeepTemporaryFiles { yes | no }
+##  	default "no"
+##
+##  If set, causes temporary files generated during message signing or
+##  verifying to be left behind for debugging use.  Not for normal operation;
+##  can fill your disks quite fast on busy systems.
+
+# KeepTemporaryFiles	no
+
+##  KeyFile filename
+##  	default (none)
+##
+##  Specifies the path to the private key to use when signing.  Ignored if
+##  SigningTable and KeyTable are used.  No default; must be specified for 
+##  signing if SigningTable/KeyTable are not in use.
+
+KeyFile			/var/db/dkim/example.private
+
+##  MaximumHeaders n
+##
+##  Disallow messages whose header blocks are bigger than "n" bytes.
+##  Intended to detect and block a denial-of-service attack.  The default
+##  is 65536.  A value of 0 disables this test.
+
+# MaximumHeaders	n
+
+##  MilterDebug n
+##
+##  Request a debug level of "n" from the milter library.  The default is 0.
+
+# MilterDebug		0
+
+##  Minimum n[% | +]
+##  	default 0
+##
+##  Sets a minimum signing volume; one of the following formats:
+##	n	at least n bytes (or the whole message, whichever is less)
+##		must be signed
+##  	n%	at least n% of the message must be signed
+##	n+	if a length limit was presented in the signature, no more than
+##  		n bytes may have been added
+
+# Minimum		n
+
+##  PeerList file
+##  	default (none)
+##
+##  Names a file that contains a list of IP addresses, CIDR blocks, hostnames
+##  or domain names whose mail should be neither signed nor verified by this
+##  filter.  See man page for file format.
+
+# PeerList		filename
+
+##  PidFile filename
+##  	default (none)
+## 
+##  Name of the file where the filter should write its pid before beginning
+##  normal operations.
+
+# PidFile		filename
+
+##  Selector name
+##
+##  The name of the selector to use when signing.  No default; must be
+##  specified for signing.
+
+Selector		my-selector-name
+
+##  SignatureAlgorithm signalg
+##  	default "rsa-sha256"
+##
+##  Signature algorithm to use when generating signatures.  Must be either
+##  "rsa-sha1" or "rsa-sha256".
+
+# SignatureAlgorithm	rsa-sha256
+
+##  Socket socketspec
+##
+##  Names the socket where this filter should listen for milter connections
+##  from the MTA.  Required.  Should be in one of these forms:
+##
+##  inet:port@address		to listen on a specific interface
+##  inet:port			to listen on all interfaces
+##  local:/path/to/socket	to listen on a UNIX domain socket
+
+Socket			inet:port@localhost
+
+##  SoftwareHeader { yes | no }
+##  	default "no"
+##
+##  Add an ARC-Filter header field to messages passing through this filter
+##  to identify messages it has processed.
+
+# SoftwareHeader	no
+
+##  Syslog { yes | no }
+##  	default "yes"
+##
+##  Log informational and error activity to syslog?
+
+Syslog			Yes
+
+##  SyslogFacility      facility
+##  	default "mail"
+##
+##  Valid values are :
+##      auth cron daemon kern lpr mail news security syslog user uucp 
+##      local0 local1 local2 local3 local4 local5 local6 local7
+##
+##  syslog facility to be used
+
+# SyslogFacility	mail
+
+##  TemporaryDirectory path
+##  	default /tmp
+##
+##  Specifies which directory will be used for creating temporary files
+##  during message processing.
+
+# TemporaryDirectory	/tmp
+
+##  Userid userid
+##  	default (none)
+##
+##  Change to user "userid" before starting normal operation?  May include
+##  a group ID as well, separated from the userid by a colon.
+
+# UserID		userid
