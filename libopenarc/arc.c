@@ -2613,6 +2613,63 @@ arc_eom(ARC_MESSAGE *msg)
 }
 
 /*
+**  ARC_CHECK_WHITELIST -- verify that all AS d= domains are present in the provided whitelist
+**
+**  Parameters:
+**  	msg -- ARC_MESSAGE object
+**    domain_whitelist -- an array of domain pointers
+**    whitelist_size -- the number of domains in the whitelist
+**  Return value:
+**  	An ARC_STAT_* constant.
+**
+**  NOTE: This does a binary search, as we've previously alphebetized the whitelist
+*/
+
+ARC_STAT
+arc_check_whitelist(ARC_MESSAGE *msg, char **domain_whitelist, u_int whitelist_size)
+{
+
+	int i, c, bottom, mid, top;
+	_Bool match;
+	char *domain;
+	struct arc_hdrfield *as;
+
+	for (c = 0; c < msg->arc_nsets; c++)
+	{
+		bottom = 0;
+		mid;
+		top = whitelist_size - 1;
+
+		as = msg->arc_sets[c].arcset_as;
+		domain = arc_param_get(as->hdr_data, "d");
+		match = FALSE;
+
+		while (bottom <= top)
+		{
+			mid = (bottom + top) / 2;
+			if (strcmp(domain_whitelist[mid], domain) == 0)
+			{
+				match = TRUE;
+				break;
+			}
+			else if (strcmp(domain_whitelist[mid], domain) > 0)
+			{
+				top = mid - 1;
+			}
+			else if (strcmp(domain_whitelist[mid], domain) < 0)
+			{
+				bottom = mid + 1;
+			}
+		}
+
+		if (match == FALSE)
+			return ARC_STAT_BAD_DOMAIN;
+	}
+
+	return ARC_STAT_OK;
+}
+
+/*
 **  ARC_GETSEAL -- get the "seal" to apply to this message
 **
 **  Parameters:

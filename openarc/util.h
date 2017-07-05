@@ -39,4 +39,6 @@ extern int arcf_dstring_len __P((struct arcf_dstring *));
 extern void arcf_dstring_blank __P((struct arcf_dstring *));
 extern size_t arcf_dstring_printf __P((struct arcf_dstring *, char *, ...));
 
+extern int arcf_qstrcmp __P((const void*, const void*));
+
 #endif /* _UTIL_H_ */
