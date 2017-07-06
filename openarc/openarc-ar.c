@@ -376,7 +376,7 @@ ares_dedup(struct authres *ar, int n)
 **  	hdr -- NULL-terminated contents of an Authentication-Results:
 **  	       header field
 **  	ar -- a pointer to a (struct authres) loaded by values after parsing
-**  
+**
 **  Return value:
 **  	0 on success, -1 on failure.
 */
@@ -410,7 +410,12 @@ ares_parse(u_char *hdr, struct authres *ar)
 	for (c = 0; c < ntoks; c++)
 	{
 		if (tokens[c][0] == '(')		/* comment */
+		{
+			strlcpy((char *) ar->ares_result[n - 1].result_comment,
+			        (char *) tokens[c],
+			        sizeof ar->ares_result[n - 1].result_comment);
 			continue;
+		}
 
 		switch (state)
 		{
@@ -511,6 +516,7 @@ ares_parse(u_char *hdr, struct authres *ar)
 		  case 5:				/* result */
 			ar->ares_result[n - 1].result_result = ares_convert(aresults,
 			                                                    (char *) tokens[c]);
+			ar->ares_result[n - 1].result_comment[0] = '\0';
 			prevstate = state;
 			state = 6;
 
@@ -674,7 +680,7 @@ ares_parse(u_char *hdr, struct authres *ar)
 **
 **  Parameters:
 **  	method -- method to convert
-** 
+**
 **  Return value:
 **  	String matching the provided method, or NULL.
 */
@@ -690,7 +696,7 @@ ares_getmethod(ares_method_t method)
 **
 **  Parameters:
 **  	result -- result to convert
-** 
+**
 **  Return value:
 **  	String matching the provided result, or NULL.
 */
@@ -706,7 +712,7 @@ ares_getresult(ares_result_t result)
 **
 **  Parameters:
 **  	ptype -- ptype to convert
-** 
+**
 **  Return value:
 **  	String matching the provided ptype, or NULL.
 */

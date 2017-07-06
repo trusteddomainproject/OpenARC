@@ -74,6 +74,7 @@ struct result
 	ares_result_t	result_result;
 	ares_ptype_t	result_ptype[MAXPROPS];
 	unsigned char	result_reason[MAXAVALUE + 1];
+	unsigned char	result_comment[MAXAVALUE + 1];
 	unsigned char	result_property[MAXPROPS][MAXAVALUE + 1];
 	unsigned char	result_value[MAXPROPS][MAXAVALUE + 1];
 };
@@ -95,7 +96,7 @@ struct authres
 **  	hdr -- NULL-terminated contents of an Authentication-Results:
 **  	       header field
 **  	ar -- a pointer to a (struct authres) loaded by values after parsing
-**  
+**
 **  Return value:
 **  	0 on success, -1 on failure.
 */
