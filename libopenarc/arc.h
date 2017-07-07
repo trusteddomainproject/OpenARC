@@ -537,6 +537,6 @@ extern char *arc_get_domain __P((ARC_MESSAGE *msg));
 **      Pointer to string containing the current chain status.
 */
 
-extern char *arc_chain_str __P((ARC_MESSAGE *msg));
+extern const char *arc_chain_str __P((ARC_MESSAGE *msg));
 
 #endif /* _ARC_H_ */

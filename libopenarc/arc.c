@@ -3183,7 +3183,7 @@ arc_get_domain(ARC_MESSAGE *msg)
 **      Pointer to string containing the current chain status.
 */
 
-char *
+const char *
 arc_chain_str(ARC_MESSAGE *msg)
 {
 	return arc_code_to_name(chainstatus, msg->arc_cstate);
