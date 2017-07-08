@@ -3682,7 +3682,12 @@ main(int argc, char **argv)
 			printf("%s: %s v%s\n", progname, ARCF_PRODUCT,
 			       VERSION);
 			printf("\tCompiled with %s\n",
-			       SSLeay_version(SSLEAY_VERSION));
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
+			       SSLeay_version(SSLEAY_VERSION)
+#else
+			       OpenSSL_version(OPENSSL_VERSION)
+#endif /* OpenSSL < 1.1.0 */
+			       );
 			printf("\tSMFI_VERSION 0x%x\n", SMFI_VERSION);
 #ifdef HAVE_SMFI_VERSION
 			(void) smfi_version(&mvmajor, &mvminor, &mvrelease);
@@ -4545,6 +4550,7 @@ main(int argc, char **argv)
 	}
 #endif /* HAVE_SMFI_OPENSOCKET */
 
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
 	/* initialize libcrypto mutexes */
 	if (!curconf->conf_disablecryptoinit)
 	{
@@ -4556,6 +4562,7 @@ main(int argc, char **argv)
 			        progname, strerror(status));
 		}
 	}
+#endif /* OpenSSL < 1.1.0 */
 
 	pthread_mutex_init(&conf_lock, NULL);
 	pthread_mutex_init(&pwdb_lock, NULL);
@@ -4631,7 +4638,9 @@ main(int argc, char **argv)
 	if (!autorestart && pidfile != NULL)
 		(void) unlink(pidfile);
 
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
 	arcf_crypto_free();
+#endif /* OpenSSL < 1.1.0 */
 
 	arcf_config_free(curconf);
 

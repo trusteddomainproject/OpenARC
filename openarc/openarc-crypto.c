@@ -4,6 +4,10 @@
 **
 */
 
+#include <openssl/opensslv.h>
+
+#if OPENSSL_VERSION_NUMBER < 0x10100000L || defined(LIBRESSL_VERSION_NUMBER)
+
 #include "build-config.h"
 
 /* system includes */
@@ -310,3 +314,5 @@ arcf_crypto_free(void)
 		crypto_init_done = FALSE;
 	}
 }
+
+#endif /* OpenSSL < 1.1.0 */
