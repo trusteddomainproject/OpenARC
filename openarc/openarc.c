@@ -3257,7 +3257,7 @@ mlfi_eom(SMFICTX *ctx)
 				       afc->mctx_jobid, AR_HEADER_NAME);
 			}
 
-			return SMFIS_TEMPFAIL;
+			continue;
 		}
 
 		if (strcasecmp(conf->conf_authservid, ar.ares_host) == 0)
