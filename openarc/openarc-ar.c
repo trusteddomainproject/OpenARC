@@ -482,7 +482,7 @@ ares_parse(u_char *hdr, struct authres *ar)
 
 			break;
 
-		  case 3:				/* method */
+		  case 3:				/* method/none */
 			if (n == 0 || !ares_dedup(ar, n))
 				n++;
 
@@ -490,6 +490,14 @@ ares_parse(u_char *hdr, struct authres *ar)
 				return 0;
 
 			r = 0;
+
+			if (strcasecmp((char *) tokens[c], "none") == 0)
+			{
+				if (n > 0)
+					n--;
+
+				continue;
+			}
 
 			ar->ares_result[n - 1].result_method = ares_convert(methods,
 			                                                    (char *) tokens[c]);
