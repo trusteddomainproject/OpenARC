@@ -3253,7 +3253,7 @@ mlfi_eom(SMFICTX *ctx)
 			if (conf->conf_dolog)
 			{
 				syslog(LOG_WARNING,
-				       "%s: can't parse %s",
+				       "%s: can't parse %s; ignoring",
 				       afc->mctx_jobid, AR_HEADER_NAME);
 			}
 
