@@ -632,7 +632,7 @@ then
 	AC_SEARCH_LIBS([ERR_peek_error], [crypto], ,
 	               AC_MSG_ERROR([libcrypto not found]))
 
-	AC_SEARCH_LIBS([SSL_library_init], [ssl], ,
+	AC_SEARCH_LIBS([SSL_new], [ssl], ,
 		[
 			if test x"$enable_shared" = x"yes"
 			then
@@ -644,11 +644,11 @@ then
 				              openarc to use.])
 			fi
 
-			# avoid caching issue - last result of SSL_library_init
+			# avoid caching issue - last result of SSL_new
 			# shouldn't be cached for this next check
-			unset ac_cv_search_SSL_library_init
+			unset ac_cv_search_SSL_new
 			LIBCRYPTO_LIBS="$LIBCRYPTO_LIBS -ldl"
-			AC_SEARCH_LIBS([SSL_library_init], [ssl], ,
+			AC_SEARCH_LIBS([SSL_new], [ssl], ,
 			               AC_MSG_ERROR([libssl not found]), [-ldl])
 		]
 	)
