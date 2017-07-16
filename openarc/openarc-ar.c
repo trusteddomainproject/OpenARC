@@ -501,6 +501,9 @@ ares_parse(u_char *hdr, struct authres *ar)
 				if (n > 0)
 					n--;
 
+				prevstate = state;
+				state = 2;
+
 				continue;
 			}
 
