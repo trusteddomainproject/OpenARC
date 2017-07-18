@@ -502,7 +502,7 @@ ares_parse(u_char *hdr, struct authres *ar)
 					n--;
 
 				prevstate = state;
-				state = 2;
+				state = 14;
 
 				continue;
 			}
@@ -667,6 +667,11 @@ ares_parse(u_char *hdr, struct authres *ar)
 			state = 9;
 
 			break;
+
+		  case 14:				/* only reached in case of a malformed A-R */
+			return -1;
+
+			break;				/* not reached, just to make some lint-like sw happy */
 		}
 	}
 
