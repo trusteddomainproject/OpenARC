@@ -3253,11 +3253,11 @@ mlfi_eom(SMFICTX *ctx)
 			if (conf->conf_dolog)
 			{
 				syslog(LOG_WARNING,
-				       "%s: can't parse %s",
+				       "%s: can't parse %s; ignoring",
 				       afc->mctx_jobid, AR_HEADER_NAME);
 			}
 
-			return SMFIS_TEMPFAIL;
+			continue;
 		}
 
 		if (strcasecmp(conf->conf_authservid, ar.ares_host) == 0)

@@ -487,7 +487,7 @@ ares_parse(u_char *hdr, struct authres *ar)
 
 			break;
 
-		  case 3:				/* method */
+		  case 3:				/* method/none */
 			if (n == 0 || !ares_dedup(ar, n))
 				n++;
 
@@ -495,6 +495,17 @@ ares_parse(u_char *hdr, struct authres *ar)
 				return 0;
 
 			r = 0;
+
+			if (strcasecmp((char *) tokens[c], "none") == 0)
+			{
+				if (n > 0)
+					n--;
+
+				prevstate = state;
+				state = 14;
+
+				continue;
+			}
 
 			ar->ares_result[n - 1].result_method = ares_convert(methods,
 			                                                    (char *) tokens[c]);
@@ -656,6 +667,11 @@ ares_parse(u_char *hdr, struct authres *ar)
 			state = 9;
 
 			break;
+
+		  case 14:				/* only reached in case of a malformed A-R */
+			return -1;
+
+			break;				/* not reached, just to make some lint-like sw happy */
 		}
 	}
 
