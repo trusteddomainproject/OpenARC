@@ -2272,6 +2272,7 @@ arc_eoh(ARC_MESSAGE *msg)
 	u_int c;
 	u_int n;
 	u_int nsets = 0;
+	u_int hashtype;
 	arc_kvsettype_t type;
 	ARC_STAT status;
 	struct arc_hdrfield *h;
@@ -2410,8 +2411,14 @@ arc_eoh(ARC_MESSAGE *msg)
 		h = msg->arc_sets[nsets - 1].arcset_ams;
 		htag = arc_param_get(h->hdr_data, "h");
 	}
+
+	if (strcmp(arc_param_get(h->hdr_data, "a"), "rsa-sha1") == 0)
+		hashtype = ARC_HASHTYPE_SHA1;
+	else
+		hashtype = ARC_HASHTYPE_SHA256;
+
 	status = arc_add_canon(msg, ARC_CANONTYPE_HEADER, msg->arc_canonhdr,
-	                       msg->arc_signalg, htag, h, (ssize_t) -1,
+	                       hashtype, htag, h, (ssize_t) -1,
 	                       &msg->arc_hdrcanon);
 	if (status != ARC_STAT_OK)
 	{
@@ -2422,7 +2429,7 @@ arc_eoh(ARC_MESSAGE *msg)
 
 	/* body */
 	status = arc_add_canon(msg, ARC_CANONTYPE_BODY, msg->arc_canonbody,
-	                       msg->arc_signalg, NULL, NULL, (ssize_t) -1,
+	                       hashtype, NULL, NULL, (ssize_t) -1,
 	                       &msg->arc_bodycanon);
 	if (status != ARC_STAT_OK)
 	{
@@ -2446,10 +2453,16 @@ arc_eoh(ARC_MESSAGE *msg)
 		{
 			h = msg->arc_sets[n].arcset_as;
 
+			if (strcmp(arc_param_get(h->hdr_data, "a"),
+			           "rsa-sha1") == 0)
+				hashtype = ARC_HASHTYPE_SHA1;
+			else
+				hashtype = ARC_HASHTYPE_SHA256;
+
 			status = arc_add_canon(msg,
 			                       ARC_CANONTYPE_SEAL,
 			                       ARC_CANON_RELAXED,
-			                       ARC_HASHTYPE_SHA256,
+			                       hashtype,
 			                       NULL,
 			                       h,
 			                       (ssize_t) -1,
@@ -2467,7 +2480,7 @@ arc_eoh(ARC_MESSAGE *msg)
 	status = arc_add_canon(msg,
 	                       ARC_CANONTYPE_SEAL,
 	                       ARC_CANON_RELAXED,
-	                       ARC_HASHTYPE_SHA256,
+	                       msg->arc_signalg,
 	                       NULL,
 	                       NULL,
 	                       (ssize_t) -1,
