@@ -1525,7 +1525,7 @@ arc_process_set(ARC_MESSAGE *msg, arc_kvsettype_t type, u_char *str,
 	  case ARC_KVSETTYPE_SEAL:
 		/* make sure required stuff is here */
 		if (arc_param_get(set, (u_char *) "cv") == NULL ||
-		    arc_param_get(set, (u_char *) "cv") == NULL)
+		    arc_param_get(set, (u_char *) "t") == NULL)
 		{
 			arc_error(msg, "missing parameter(s) in %s data",
 			          settype);
