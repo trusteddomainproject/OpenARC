@@ -676,11 +676,7 @@ arc_getamshdr_d(ARC_MESSAGE *msg, size_t initial, u_char **buf, size_t *buflen,
 
 					len += offset;
 
-					arc_dstring_cat1(msg->arc_hdrbuf,
-					                 *(pv + offset));
-					len++;
-
-					x = pv + offset + 1;
+					x = pv + offset;
 					y = pv + pvlen;
 
 					while (x < y)
