@@ -67,7 +67,6 @@ required for developing applications against libopenarc.
 %autosetup -p1
 
 %build
-autoreconf --install
 %configure --disable-static
 
 make %{?_smp_mflags}
