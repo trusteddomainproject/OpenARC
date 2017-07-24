@@ -2,6 +2,7 @@
 %global gittag0 GIT-TAG
 %global shortcommit0 %(c=%{commit0}; echo ${c:0:7})
 %global systemd (0%{?fedora} >= 18) || (0%{?rhel} >= 7)
+%global tmpfiles (0%{?fedora} >= 15) || (0%{?rhel} >= 7)
 
 Summary: An open source library and milter for providing ARC service
 Name: openarc
@@ -73,7 +74,7 @@ make %{?_smp_mflags}
 %install
 make install DESTDIR=%{buildroot}
 mkdir -p %{buildroot}%{_sysconfdir}
-mkdir -p %{buildroot}%{_localstatedir}/run/%{name}
+mkdir -p -m 0700 %{buildroot}%{_localstatedir}/run/%{name}
 rm -r %{buildroot}%{_prefix}/share/doc/openarc
 rm %{buildroot}/%{_libdir}/*.la
 
@@ -122,12 +123,12 @@ mkdir -p %{buildroot}%{_initrddir}
 install -m 0755 contrib/init/redhat/%{name} %{buildroot}%{_initrddir}/%{name}
 %endif
 
-
+%if %{tmpfiles}
 install -p -d %{buildroot}%{_tmpfilesdir}
 cat > %{buildroot}%{_tmpfilesdir}/%{name}.conf <<EOF
 D %{_localstatedir}/run/%{name} 0700 %{name} %{name} -
 EOF
-
+%endif
 
 %pre
 if ! getent passwd openarc >/dev/null 2>&1; then
@@ -172,12 +173,17 @@ exit 0
 %defattr(-,root,root)
 %doc LICENSE LICENSE.Sendmail README RELEASE_NOTES
 %config(noreplace) %{_sysconfdir}/openarc.conf
+
+%if %{tmpfiles}
 %{_tmpfilesdir}/%{name}.conf
+%else
+%dir %attr(-,%{name},%{name}) %{_localstatedir}/run/%{name}
+%endif
 
 %if %{systemd}
 %{_unitdir}/%{name}.service
 %else
-%config %{_initrddir}/%{name}
+%{_initrddir}/%{name}
 %endif
 %{_mandir}/*/*
 %{_sbindir}/*
