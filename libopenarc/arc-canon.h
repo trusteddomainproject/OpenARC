@@ -52,4 +52,6 @@ extern int arc_canon_selecthdrs __P((ARC_MESSAGE *, u_char *,
                                      struct arc_hdrfield **, int));
 extern ARC_STAT arc_canon_signature __P((ARC_MESSAGE *, struct arc_hdrfield *, _Bool));
 
+extern ARC_STAT arc_parse_canon_t(unsigned char *, arc_canon_t *, arc_canon_t *);
+
 #endif /* ! _ARC_CANON_H_ */
