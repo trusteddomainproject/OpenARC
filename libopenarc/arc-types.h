@@ -179,8 +179,10 @@ struct arc_msghandle
 	struct arc_dstring *	arc_hdrbuf;
 	struct arc_canon *	arc_sealcanon;
 	struct arc_canon **	arc_sealcanons;
-	struct arc_canon *	arc_hdrcanon;
-	struct arc_canon *	arc_bodycanon;
+	struct arc_canon *	arc_valid_hdrcanon;
+	struct arc_canon *	arc_sign_hdrcanon;
+	struct arc_canon *	arc_valid_bodycanon;
+	struct arc_canon *	arc_sign_bodycanon;
 	struct arc_canon *	arc_canonhead;
 	struct arc_canon *	arc_canontail;
 	struct arc_hdrfield *	arc_hhead;
@@ -197,6 +199,9 @@ struct arc_msghandle
 /* struct arc_lib -- a ARC library context */
 struct arc_lib
 {
+	_Bool			arcl_signre;
+	regex_t			arcl_hdrre;
+	u_char **		arcl_oversignhdrs;
 	_Bool			arcl_dnsinit_done;
 	u_int			arcl_flsize;
 	uint32_t		arcl_flags;
