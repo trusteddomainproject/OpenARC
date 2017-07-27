@@ -41,6 +41,8 @@ struct configdef arcf_config[] =
 	{ "PidFile",			CONFIG_TYPE_STRING,	FALSE },
 	{ "Selector",			CONFIG_TYPE_STRING,	TRUE },
 	{ "SignatureAlgorithm",		CONFIG_TYPE_STRING,	FALSE },
+	{ "SignHeaders",		CONFIG_TYPE_STRING,	FALSE },
+	{ "OverSignHeaders",		CONFIG_TYPE_STRING,	FALSE },
 	{ "Socket",			CONFIG_TYPE_STRING,	FALSE },
 	{ "SoftwareHeader",		CONFIG_TYPE_BOOLEAN,	FALSE },
 	{ "Syslog",			CONFIG_TYPE_BOOLEAN,	FALSE },

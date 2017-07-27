@@ -30,6 +30,7 @@
 #include "arc-types.h"
 #include "arc-canon.h"
 #include "arc-util.h"
+#include "arc-tables.h"
 
 /* libbsd if found */
 #ifdef USE_BSD_H
@@ -1272,6 +1273,8 @@ arc_canon_runheaders(ARC_MESSAGE *msg)
 
 	for (cur = msg->arc_canonhead; cur != NULL; cur = cur->canon_next)
 	{
+		arc_dstring_blank(msg->arc_hdrbuf);
+
 		/* skip done hashes and those which are of the wrong type */
 		if (cur->canon_done || cur->canon_type != ARC_CANONTYPE_HEADER)
 			continue;
@@ -1318,6 +1321,8 @@ arc_canon_runheaders(ARC_MESSAGE *msg)
 			regex_t *hdrtest;
 
 			lib = msg->arc_library;
+			hdrtest = &lib->arcl_hdrre;
+
 			memset(hdrset, '\0', sizeof *hdrset);
 			nhdrs = 0;
 
@@ -1326,26 +1331,58 @@ arc_canon_runheaders(ARC_MESSAGE *msg)
 			     hdr != NULL;
 			     hdr = hdr->hdr_next)
 			{
-				if (strncasecmp(ARC_AR_HDRNAME,
-				                hdr->hdr_text,
-				                hdr->hdr_namelen) == 0 ||
-				    strncasecmp(ARC_MSGSIG_HDRNAME,
-				                hdr->hdr_text,
-				                hdr->hdr_namelen) == 0 ||
-				    strncasecmp(ARC_SEAL_HDRNAME,
-				                hdr->hdr_text,
-				                hdr->hdr_namelen) == 0)
+				if (!lib->arcl_signre)
+				{
+					if (strncasecmp(ARC_AR_HDRNAME,
+					                hdr->hdr_text,
+					                hdr->hdr_namelen) == 0 ||
+					    strncasecmp(ARC_MSGSIG_HDRNAME,
+					                hdr->hdr_text,
+					                hdr->hdr_namelen) == 0 ||
+					    strncasecmp(ARC_SEAL_HDRNAME,
+					                hdr->hdr_text,
+					                hdr->hdr_namelen) == 0)
+						continue;
+
+					tmp = arc_dstring_get(msg->arc_hdrbuf);
+
+					if (tmp[0] != '\0')
+						arc_dstring_cat1(msg->arc_hdrbuf, ':');
+
+					arc_dstring_catn(msg->arc_hdrbuf,
+					                  hdr->hdr_text,
+					                  hdr->hdr_namelen);
 					continue;
+				}
 
-				tmp = arc_dstring_get(msg->arc_hdrbuf);
+				/* could be space, could be colon ... */
+				savechar = hdr->hdr_text[hdr->hdr_namelen];
 
-				if (tmp[0] != '\0')
-					arc_dstring_cat1(msg->arc_hdrbuf, ':');
+				/* terminate the header field name and test */
+				hdr->hdr_text[hdr->hdr_namelen] = '\0';
+				status = regexec(hdrtest,
+				                 (char *) hdr->hdr_text,
+				                 0, NULL, 0);
 
-				arc_dstring_catn(msg->arc_hdrbuf,
-				                 hdr->hdr_text,
-				                 hdr->hdr_namelen);
+				/* restore the character */
+				hdr->hdr_text[hdr->hdr_namelen] = savechar;
+
+				if (status == 0)
+				{
+					tmp = arc_dstring_get(msg->arc_hdrbuf);
+
+					if (tmp[0] != '\0')
+					{
+						arc_dstring_cat1(msg->arc_hdrbuf, ':');
+					}
+					arc_dstring_catn(msg->arc_hdrbuf, hdr->hdr_text, hdr->hdr_namelen);
+				}
+				else
+				{
+					assert(status == REG_NOMATCH);
+				}
 			}
+
 
 			memset(hdrset, '\0', n);
 
@@ -1406,7 +1443,6 @@ arc_canon_runheaders(ARC_MESSAGE *msg)
 		tmphdr.hdr_flags = 0;
 		tmphdr.hdr_next = NULL;
 
-		arc_lowerhdr(tmphdr.hdr_text);
 		(void) arc_canon_header(msg, cur, &tmphdr, FALSE);
 		arc_canon_buffer(cur, NULL, 0);
 
@@ -2010,8 +2046,8 @@ arc_canon_gethashes(ARC_MESSAGE *msg, void **hh, size_t *hhlen,
 	size_t hdlen;
 	size_t bdlen;
 
-	hdc = msg->arc_hdrcanon;
-	bdc = msg->arc_bodycanon;
+	hdc = msg->arc_valid_hdrcanon;
+	bdc = msg->arc_valid_bodycanon;
 
 	status = arc_canon_getfinal(hdc, &hd, &hdlen);
 	if (status != ARC_STAT_OK)
@@ -2053,6 +2089,43 @@ arc_canon_add_to_seal(ARC_MESSAGE *msg)
 		if (status != ARC_STAT_OK)
 			return status;
 	}
+
+	return ARC_STAT_OK;
+}
+
+/*
+**  ARC_PARSE_CANON_T -- parse a c= tag
+**
+**  Parameters:
+**    tag        -- c=
+**    hdr_canon  -- the header canon output
+**    body_canon -- the body canon output
+**
+**  Return value:
+**    ARC_STAT_OK -- successful completion
+*/
+
+ARC_STAT
+arc_parse_canon_t(unsigned char *tag, arc_canon_t *hdr_canon, arc_canon_t *body_canon)
+{
+	char *token;
+	int code;
+
+	token = strtok(tag, "/");
+	code = arc_name_to_code(canonicalizations, token);
+
+	if (code == -1)
+		return ARC_STAT_INVALID;
+
+	*hdr_canon = (arc_canon_t) code;
+
+	token = strtok(NULL, "/");
+	code = arc_name_to_code(canonicalizations, token);
+
+	if (code == -1)
+		return ARC_STAT_INVALID;
+
+	*body_canon = (arc_canon_t) code;
 
 	return ARC_STAT_OK;
 }
