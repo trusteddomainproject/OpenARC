@@ -864,17 +864,16 @@ arcf_inet_ntoa(struct in_addr a, char *buf, size_t buflen)
 **
 **  Parameters:
 **  	a -- pointer to first str
-**  	b -- pointer to first str
+**  	b -- pointer to second str
 **
 **  Return value:
-**  	comparison value
+**  	comparison value as required by qsort(3)
 */
-
 
 int
 arcf_qstrcmp(const void* a, const void* b)
 {
-  char **ia = (char **)a;
-  char **ib = (char **)b;
-  return strncmp(*ia, *ib, 2);
+	char **ia = (char **)a;
+	char **ib = (char **)b;
+	return strncmp(*ia, *ib, 2);
 }

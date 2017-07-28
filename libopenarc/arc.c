@@ -51,6 +51,7 @@
 #include "arc-tables.h"
 #include "arc-types.h"
 #include "arc-util.h"
+#include "openarc/util.h"
 #include "arc.h"
 #include "base64.h"
 
@@ -2625,44 +2626,33 @@ arc_eom(ARC_MESSAGE *msg)
 **  NOTE: This does a binary search, as we've previously alphebetized the whitelist
 */
 
+int cmpfunc(const void * a, const void * b)
+{
+   return ( *(int*)a - *(int*)b );
+}
+
+
+
 ARC_STAT
 arc_check_whitelist(ARC_MESSAGE *msg, char **domain_whitelist, u_int whitelist_size)
 {
 
-	int i, c, bottom, mid, top;
-	_Bool match;
+	int c;
+	char *match;
 	char *domain;
 	struct arc_hdrfield *as;
 
 	for (c = 0; c < msg->arc_nsets; c++)
 	{
-		bottom = 0;
-		mid;
-		top = whitelist_size - 1;
-
 		as = msg->arc_sets[c].arcset_as;
 		domain = arc_param_get(as->hdr_data, "d");
-		match = FALSE;
+		match = (char *) bsearch(&domain,
+		                         domain_whitelist,
+		                         whitelist_size,
+		                         sizeof (char *),
+		                         arcf_qstrcmp);
 
-		while (bottom <= top)
-		{
-			mid = (bottom + top) / 2;
-			if (strcmp(domain_whitelist[mid], domain) == 0)
-			{
-				match = TRUE;
-				break;
-			}
-			else if (strcmp(domain_whitelist[mid], domain) > 0)
-			{
-				top = mid - 1;
-			}
-			else if (strcmp(domain_whitelist[mid], domain) < 0)
-			{
-				bottom = mid + 1;
-			}
-		}
-
-		if (match == FALSE)
+		if (match == NULL)
 			return ARC_STAT_BAD_DOMAIN;
 	}
 

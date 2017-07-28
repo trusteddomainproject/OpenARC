@@ -1335,6 +1335,7 @@ arcf_config_load(struct config *data, struct arcf_config *conf,
 	char confstr[BUFRSZ + 1];
 	char basedir[MAXPATHLEN + 1];
 	char *inline_whitelist_domains = NULL;
+	u_char *whitelist_domains = NULL;
 
 	assert(conf != NULL);
 	assert(err != NULL);
@@ -1517,13 +1518,14 @@ arcf_config_load(struct config *data, struct arcf_config *conf,
 		char *s = inline_whitelist_domains;
 		int i;
 
-		for (i=0; s[i]; s[i]==',' ? i++ : *s++);
+		for (i = 0; s[i] != '\0'; s[i] == ',' ? i++ : *s++)
+			continue;
+
 		conf->conf_whitelist_size += i + 1;
 	}
 
 	/* load the whitelist if a file was specified */
-	u_char *whitelist_domains = NULL;
-	if(conf->conf_domain_whitelist_file != NULL)
+	if (conf->conf_domain_whitelist_file != NULL)
 	{
 		int status;
 		int fd;
@@ -1580,7 +1582,6 @@ arcf_config_load(struct config *data, struct arcf_config *conf,
 			close(fd);
 			return -1;
 		}
-
 
 		if (become != NULL)
 		{
@@ -1670,7 +1671,8 @@ arcf_config_load(struct config *data, struct arcf_config *conf,
 		char *s = whitelist_domains;
 		int i;
 
-		for (i=0; s[i]; s[i]=='\n' ? i++ : *s++);
+		for (i = 0; s[i] != '\0'; s[i] == '\n' ? i++ : *s++)
+			continue;
 		conf->conf_whitelist_size += i;
 	}
 
@@ -1681,29 +1683,28 @@ arcf_config_load(struct config *data, struct arcf_config *conf,
 	if (inline_whitelist_domains != NULL)
 	{
 		char *pt;
-		pt = strtok (inline_whitelist_domains, ",");
+		pt = strtok(inline_whitelist_domains, ",");
 		while (pt != NULL) {
 			conf->conf_domain_whitelist[cnt++] = pt;
-			pt = strtok (NULL, ",");
+			pt = strtok(NULL, ",");
 		}
 	}
 
 	if (whitelist_domains != NULL)
 	{
 		char *pt;
-		pt = strtok (whitelist_domains, "\n");
+		pt = strtok(whitelist_domains, "\n");
 		while (pt != NULL) {
-			printf("TOK: %s\n", pt);
 			conf->conf_domain_whitelist[cnt++] = pt;
-			pt = strtok (NULL, "\n");
+			pt = strtok(NULL, "\n");
 		}
 	}
 
 	/* alphebetize whitelist, so we can do binary search on it */
-  qsort(conf->conf_domain_whitelist,
-				conf->conf_whitelist_size,
-				sizeof conf->conf_domain_whitelist[0],
-				arcf_qstrcmp);
+	qsort(conf->conf_domain_whitelist,
+	      conf->conf_whitelist_size,
+	      sizeof conf->conf_domain_whitelist[0],
+	      arcf_qstrcmp);
 
 	/* load the secret key, if one was specified */
 	if (conf->conf_keyfile != NULL)
