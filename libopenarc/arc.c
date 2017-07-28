@@ -51,6 +51,7 @@
 #include "arc-tables.h"
 #include "arc-types.h"
 #include "arc-util.h"
+#include "openarc/util.h"
 #include "arc.h"
 #include "base64.h"
 
@@ -2607,6 +2608,52 @@ arc_eom(ARC_MESSAGE *msg)
 				}
 			}
 		}
+	}
+
+	return ARC_STAT_OK;
+}
+
+/*
+**  ARC_CHECK_WHITELIST -- verify that all AS d= domains are present in the provided whitelist
+**
+**  Parameters:
+**  	msg -- ARC_MESSAGE object
+**    domain_whitelist -- an array of domain pointers
+**    whitelist_size -- the number of domains in the whitelist
+**  Return value:
+**  	An ARC_STAT_* constant.
+**
+**  NOTE: This does a binary search, as we've previously alphebetized the whitelist
+*/
+
+int cmpfunc(const void * a, const void * b)
+{
+   return ( *(int*)a - *(int*)b );
+}
+
+
+
+ARC_STAT
+arc_check_whitelist(ARC_MESSAGE *msg, char **domain_whitelist, u_int whitelist_size)
+{
+
+	int c;
+	char *match;
+	char *domain;
+	struct arc_hdrfield *as;
+
+	for (c = 0; c < msg->arc_nsets; c++)
+	{
+		as = msg->arc_sets[c].arcset_as;
+		domain = arc_param_get(as->hdr_data, "d");
+		match = (char *) bsearch(&domain,
+		                         domain_whitelist,
+		                         whitelist_size,
+		                         sizeof (char *),
+		                         arcf_qstrcmp);
+
+		if (match == NULL)
+			return ARC_STAT_BAD_DOMAIN;
 	}
 
 	return ARC_STAT_OK;

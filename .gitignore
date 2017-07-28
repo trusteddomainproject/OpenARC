@@ -34,6 +34,9 @@
 # tarballs
 *.tar.gz
 
+m4/lt*
+m4/libtool.m4
+
 # other nonsense
 aclocal.m4
 autom4te.cache
@@ -49,6 +52,7 @@ config.log
 config.status
 stamp-h1
 .deps/*
+
 *~
 *.cache
 *#*
