@@ -2519,7 +2519,7 @@ arc_eoh(ARC_MESSAGE *msg)
 		htag = arc_param_get(h->hdr_data, "h");
 	}
 
-	if (strcmp(arc_param_get(h->hdr_data, "a"), "rsa-sha1") == 0)
+	if (msg->arc_signalg == ARC_SIGN_RSASHA1)
 		hashtype = ARC_HASHTYPE_SHA1;
 	else
 		hashtype = ARC_HASHTYPE_SHA256;
