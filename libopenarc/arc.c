@@ -2379,7 +2379,7 @@ arc_eoh(ARC_MESSAGE *msg)
 	u_int c;
 	u_int n;
 	u_int nsets = 0;
-	u_int hashtype;
+	u_int hashtype = ARC_HASHTYPE_SHA256;
 	arc_kvsettype_t type;
 	ARC_STAT status;
 	struct arc_hdrfield *h;
@@ -2517,12 +2517,12 @@ arc_eoh(ARC_MESSAGE *msg)
 	{
 		h = msg->arc_sets[nsets - 1].arcset_ams;
 		htag = arc_param_get(h->hdr_data, "h");
-	}
 
-	if (strcmp(arc_param_get(h->hdr_data, "a"), "rsa-sha1") == 0)
-		hashtype = ARC_HASHTYPE_SHA1;
-	else
-		hashtype = ARC_HASHTYPE_SHA256;
+		if (strcmp(arc_param_get(h->hdr_data, "a"), "rsa-sha1") == 0)
+			hashtype = ARC_HASHTYPE_SHA1;
+		else
+			hashtype = ARC_HASHTYPE_SHA256;
+	}
 
 	status = arc_add_canon(msg, ARC_CANONTYPE_HEADER, msg->arc_canonhdr,
 	                       hashtype, htag, h, (ssize_t) -1,
