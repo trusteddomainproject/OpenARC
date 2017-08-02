@@ -53,6 +53,8 @@ extern "C" {
 #define	ARC_SEAL_HDRNAME	"ARC-Seal"
 #define	ARC_SEAL_HDRNAMELEN	sizeof(ARC_SEAL_HDRNAME) - 1
 
+#define	ARC_EXT_AR_HDRNAME	"Authentication-Results"
+
 /* special DNS tokens */
 #define	ARC_DNSKEYNAME		"_domainkey"
 

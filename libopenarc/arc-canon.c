@@ -1330,29 +1330,40 @@ arc_canon_runheaders(ARC_MESSAGE *msg)
 			     hdr != NULL;
 			     hdr = hdr->hdr_next)
 			{
+				/*
+				**  MUST NOT sign ARC-Seal; SHOULD NOT sign
+				**  Authentication-Results
+				*/
+
+				if (strncasecmp(ARC_EXT_AR_HDRNAME,
+				                hdr->hdr_text,
+				                hdr->hdr_namelen) == 0 ||
+				    strncasecmp(ARC_SEAL_HDRNAME,
+				                hdr->hdr_text,
+				                hdr->hdr_namelen) == 0)
+					continue;
+
 				if (!lib->arcl_signre)
 				{
-					if (strncasecmp(ARC_AR_HDRNAME,
-					                hdr->hdr_text,
-					                hdr->hdr_namelen) == 0 ||
-					    strncasecmp(ARC_MSGSIG_HDRNAME,
-					                hdr->hdr_text,
-					                hdr->hdr_namelen) == 0 ||
-					    strncasecmp(ARC_SEAL_HDRNAME,
-					                hdr->hdr_text,
-					                hdr->hdr_namelen) == 0)
-						continue;
+					/*
+					**  No header list configured, so
+					**  sign everything.
+					*/
 
-					tmp = arc_dstring_get(msg->arc_hdrbuf);
-
-					if (tmp[0] != '\0')
-						arc_dstring_cat1(msg->arc_hdrbuf, ':');
+					if (arc_dstring_len(msg->arc_hdrbuf) > 0)
+						arc_dstring_cat1(msg->arc_hdrbuf,
+						                 ':');
 
 					arc_dstring_catn(msg->arc_hdrbuf,
 					                  hdr->hdr_text,
 					                  hdr->hdr_namelen);
 					continue;
 				}
+
+				/*
+				**  A list of header field names to sign was
+				**  given, so just do those.
+				*/
 
 				/* could be space, could be colon ... */
 				savechar = hdr->hdr_text[hdr->hdr_namelen];
@@ -1368,14 +1379,13 @@ arc_canon_runheaders(ARC_MESSAGE *msg)
 
 				if (status == 0)
 				{
-					tmp = arc_dstring_get(msg->arc_hdrbuf);
+					if (arc_dstring_len(msg->arc_hdrbuf) > 0)
+						arc_dstring_cat1(msg->arc_hdrbuf,
+						                 ':');
 
-					if (tmp[0] != '\0')
-					{
-						arc_dstring_cat1(msg->arc_hdrbuf, ':');
-					}
-
-					arc_dstring_catn(msg->arc_hdrbuf, hdr->hdr_text, hdr->hdr_namelen);
+					arc_dstring_catn(msg->arc_hdrbuf,
+					                 hdr->hdr_text,
+					                 hdr->hdr_namelen);
 				}
 				else
 				{
