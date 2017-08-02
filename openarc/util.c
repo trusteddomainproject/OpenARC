@@ -858,3 +858,42 @@ arcf_inet_ntoa(struct in_addr a, char *buf, size_t buflen)
 	                (addr >> 8) & 0xff, addr & 0xff);
 }
 
+/*
+**  ARCF_MKARRAY -- turn a comma-separated list into an array
+**
+**  Parameters:
+**  	in -- input string
+**
+**  Return value:
+**  	A NULL-terminated array.
+**
+**  Side effects:
+** 	"in" is modified.
+*/
+
+const char **
+arcf_mkarray(char *in)
+{
+	int c;
+	int n = 1;
+	char *p;
+	char **out = NULL;
+
+	assert(in != NULL);
+
+	for (p = in; *p != '\0'; p++)
+	{
+		if (*p == ',')
+			n++;
+	}
+
+	out = (char **) malloc((n + 1) * sizeof(char *));
+	if (out == NULL)
+		return (const char **) NULL;
+
+	for (p = strtok(in, ','); *p != NULL; p = strtok(NULL, ','))
+		out[c] = p;
+	out[c] = NULL;
+
+	return (const char **) out;
+}

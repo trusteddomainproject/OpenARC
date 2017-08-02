@@ -139,6 +139,15 @@ KeyFile			/var/db/dkim/example.private
 
 # Minimum		n
 
+##  OversignHeaders (string)
+##  	default (none)
+##
+##  Specifies the set of header fields that should be "oversigned" when
+##  generating signatures.  The string should be a comma-separated list of
+##  header field names.  See the openarc.conf(5) man page for details.
+
+# OversignHeaders	header1,header2,...
+
 ##  PeerList file
 ##  	default (none)
 ##
@@ -170,6 +179,15 @@ Selector		my-selector-name
 ##  "rsa-sha1" or "rsa-sha256".
 
 # SignatureAlgorithm	rsa-sha256
+
+##  SignHeaders (string)
+##  	default (none)
+##
+##  Specifies the set of header fields that should be included when generating
+##  signatures.  The string should be a comma-separated list of header field
+##  names.
+
+# SignHeaders		header1,header2,...
 
 ##  Socket socketspec
 ##
