@@ -1330,7 +1330,6 @@ arc_canon_runheaders(ARC_MESSAGE *msg)
 			     hdr != NULL;
 			     hdr = hdr->hdr_next)
 			{
-<<<<<<< HEAD
 				/*
 				**  MUST NOT sign ARC-Seal; SHOULD NOT sign
 				**  Authentication-Results
@@ -1342,45 +1341,8 @@ arc_canon_runheaders(ARC_MESSAGE *msg)
 				    strncasecmp(ARC_SEAL_HDRNAME,
 				                hdr->hdr_text,
 				                hdr->hdr_namelen) == 0)
-=======
-				if (!lib->arcl_signre)
-				{
-					if (strncasecmp(ARC_AR_HDRNAME,
-					                hdr->hdr_text,
-					                hdr->hdr_namelen) == 0 ||
-					    strncasecmp(ARC_MSGSIG_HDRNAME,
-					                hdr->hdr_text,
-					                hdr->hdr_namelen) == 0 ||
-					    strncasecmp(ARC_SEAL_HDRNAME,
-					                hdr->hdr_text,
-					                hdr->hdr_namelen) == 0)
-						continue;
-
-					tmp = arc_dstring_get(msg->arc_hdrbuf);
-
-					if (tmp[0] != '\0')
-						arc_dstring_cat1(msg->arc_hdrbuf, ':');
-
-					arc_dstring_catn(msg->arc_hdrbuf,
-					                  hdr->hdr_text,
-					                  hdr->hdr_namelen);
->>>>>>> Additional fixes for validation, Header Configuration & Oversigning, etc, Formatting fixes
 					continue;
-				}
 
-				/* could be space, could be colon ... */
-				savechar = hdr->hdr_text[hdr->hdr_namelen];
-
-				/* terminate the header field name and test */
-				hdr->hdr_text[hdr->hdr_namelen] = '\0';
-				status = regexec(hdrtest,
-				                 (char *) hdr->hdr_text,
-				                 0, NULL, 0);
-
-				/* restore the character */
-				hdr->hdr_text[hdr->hdr_namelen] = savechar;
-
-<<<<<<< HEAD
 				if (!lib->arcl_signre)
 				{
 					/*
@@ -1424,25 +1386,12 @@ arc_canon_runheaders(ARC_MESSAGE *msg)
 					arc_dstring_catn(msg->arc_hdrbuf,
 					                 hdr->hdr_text,
 					                 hdr->hdr_namelen);
-=======
-				if (status == 0)
-				{
-					tmp = arc_dstring_get(msg->arc_hdrbuf);
-
-					if (tmp[0] != '\0')
-					{
-						arc_dstring_cat1(msg->arc_hdrbuf, ':');
-					}
-
-					arc_dstring_catn(msg->arc_hdrbuf, hdr->hdr_text, hdr->hdr_namelen);
->>>>>>> Additional fixes for validation, Header Configuration & Oversigning, etc, Formatting fixes
 				}
 				else
 				{
 					assert(status == REG_NOMATCH);
 				}
 			}
-
 
 			memset(hdrset, '\0', n);
 

@@ -209,7 +209,6 @@ struct arc_lib
 	u_int			arcl_callback_int;
 	u_int *			arcl_flist;
 	struct arc_dstring *	arcl_sslerrbuf;
-	u_char **		arcl_oversignhdrs;
 	void			(*arcl_dns_callback) (const void *context);
 	void			*arcl_dns_service;
 	int			(*arcl_dns_init) (void **srv);
@@ -226,7 +225,6 @@ struct arc_lib
 				                       size_t *bytes,
 				                       int *error,
 				                       int *dnssec);
-	regex_t			arcl_hdrre;
 	u_char			arcl_tmpdir[MAXPATHLEN + 1];
 	u_char			arcl_queryinfo[MAXPATHLEN + 1];
 };
