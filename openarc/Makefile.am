@@ -6,7 +6,6 @@ AM_CFLAGS = -g
 endif
 
 if BUILD_FILTER
-
 dist_doc_DATA = openarc.conf.sample openarc.conf.simple
 
 man_MANS = openarc.conf.5 openarc.8

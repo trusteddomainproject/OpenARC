@@ -887,6 +887,7 @@ arcf_mkarray(char *in)
 		if (*p == ',')
 			n++;
 	}
+
 	out = (char **) malloc((n + 1) * sizeof(char *));
 	if (out == NULL)
 		return (const char **) NULL;
