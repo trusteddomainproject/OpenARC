@@ -89,10 +89,10 @@ static unsigned char alphabet[64] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopq
 **  ARCF_OPTLIST -- print active FFRs
 **
 **  Parameters:
-**  	where -- where to write the list
+**		where -- where to write the list
 **
 **  Return value:
-**   	None.
+**		None.
 */
 
 void
@@ -113,17 +113,17 @@ arcf_optlist(FILE *where)
 
 		fprintf(where, "\t\t%s\n", optlist[c]);
 	}
-        fprintf(where, "\t%s\n", LIBOPENARC_FEATURE_STRING);
+				fprintf(where, "\t%s\n", LIBOPENARC_FEATURE_STRING);
 }
 
 /*
 **  ARCF_SETMAXFD -- increase the file descriptor limit as much as possible
 **
 **  Parameters:
-**  	None.
+**		None.
 **
 **  Return value:
-**  	None.
+**		None.
 */
 
 void
@@ -141,7 +141,7 @@ arcf_setmaxfd(void)
 		if (setrlimit(RLIMIT_NOFILE, &rlp) != 0)
 		{
 			syslog(LOG_WARNING, "setrlimit(): %s",
-			       strerror(errno));
+						 strerror(errno));
 		}
 	}
 }
@@ -150,12 +150,12 @@ arcf_setmaxfd(void)
 **  ARCF_HOSTLIST -- see if a hostname is in a pattern of hosts/domains
 **
 **  Parameters:
-**  	host -- hostname to compare
-**   	list -- NULL-terminated char * array to search
+**		host -- hostname to compare
+**		list -- NULL-terminated char * array to search
 **
 **  Return value:
-**  	TRUE iff either "host" was in the list or it match a domain pattern
-**  	found in the list.
+**		TRUE iff either "host" was in the list or it match a domain pattern
+**		found in the list.
 */
 
 _Bool
@@ -190,16 +190,16 @@ arcf_hostlist(char *host, char **list)
 **  ARCF_DSTRING_RESIZE -- resize a dynamic string (dstring)
 **
 **  Parameters:
-**  	dstr -- ARCF_DSTRING handle
-**  	len -- number of bytes desired
+**		dstr -- ARCF_DSTRING handle
+**		len -- number of bytes desired
 **
 **  Return value:
-**  	TRUE iff the resize worked (or wasn't needed)
+**		TRUE iff the resize worked (or wasn't needed)
 **
 **  Notes:
-**  	This will actually ensure that there are "len" bytes available.
-**  	The caller must account for the NULL byte when requesting a
-**  	specific size.
+**		This will actually ensure that there are "len" bytes available.
+**		The caller must account for the NULL byte when requesting a
+**		specific size.
 */
 
 static _Bool
@@ -216,8 +216,8 @@ arcf_dstring_resize(struct arcf_dstring *dstr, int len)
 
 	/* must resize */
 	for (newsz = dstr->ds_alloc * 2;
-	     newsz < len;
-	     newsz *= 2)
+			 newsz < len;
+			 newsz *= 2)
 	{
 		/* impose ds_max limit, if specified */
 		if (dstr->ds_max > 0 && newsz > dstr->ds_max)
@@ -257,12 +257,12 @@ arcf_dstring_resize(struct arcf_dstring *dstr, int len)
 **  ARCF_DSTRING_NEW -- make a new dstring
 **
 **  Parameters:
-**  	arc -- DKIM handle
-**  	len -- initial number of bytes
-**  	maxlen -- maximum allowed length (0 == unbounded)
+**		arc -- DKIM handle
+**		len -- initial number of bytes
+**		maxlen -- maximum allowed length (0 == unbounded)
 **
 **  Return value:
-**  	A ARCF_DSTRING handle, or NULL on failure.
+**		A ARCF_DSTRING handle, or NULL on failure.
 */
 
 struct arcf_dstring *
@@ -300,10 +300,10 @@ arcf_dstring_new(int len, int maxlen)
 **  ARCF_DSTRING_FREE -- destroy an existing dstring
 **
 **  Parameters:
-**  	dstr -- ARCF_DSTRING handle to be destroyed
+**		dstr -- ARCF_DSTRING handle to be destroyed
 **
 **  Return value:
-**  	None.
+**		None.
 */
 
 void
@@ -319,14 +319,14 @@ arcf_dstring_free(struct arcf_dstring *dstr)
 **  ARCF_DSTRING_COPY -- copy data into a dstring
 **
 **  Parameters:
-**  	dstr -- ARCF_DSTRING handle to update
-**  	str -- input string
+**		dstr -- ARCF_DSTRING handle to update
+**		str -- input string
 **
 **  Return value:
-**  	TRUE iff the copy succeeded.
+**		TRUE iff the copy succeeded.
 **
 **  Side effects:
-**  	The dstring may be resized.
+**		The dstring may be resized.
 */
 
 _Bool
@@ -353,7 +353,7 @@ arcf_dstring_copy(struct arcf_dstring *dstr, u_char *str)
 
 	/* copy */
 	dstr->ds_len = strlcpy((char *) dstr->ds_buf, (char *) str,
-	                       dstr->ds_alloc);
+												 dstr->ds_alloc);
 
 	return TRUE;
 }
@@ -362,14 +362,14 @@ arcf_dstring_copy(struct arcf_dstring *dstr, u_char *str)
 **  ARCF_DSTRING_CAT -- append data onto a dstring
 **
 **  Parameters:
-**  	dstr -- ARCF_DSTRING handle to update
-**  	str -- input string
+**		dstr -- ARCF_DSTRING handle to update
+**		str -- input string
 **
 **  Return value:
-**  	TRUE iff the update succeeded.
+**		TRUE iff the update succeeded.
 **
 **  Side effects:
-**  	The dstring may be resized.
+**		The dstring may be resized.
 */
 
 _Bool
@@ -396,7 +396,7 @@ arcf_dstring_cat(struct arcf_dstring *dstr, u_char *str)
 
 	/* append */
 	dstr->ds_len = strlcat((char *) dstr->ds_buf, (char *) str,
-	                       dstr->ds_alloc);
+												 dstr->ds_alloc);
 
 	return TRUE;
 }
@@ -405,14 +405,14 @@ arcf_dstring_cat(struct arcf_dstring *dstr, u_char *str)
 **  ARCF_DSTRING_CAT1 -- append one byte onto a dstring
 **
 **  Parameters:
-**  	dstr -- ARCF_DSTRING handle to update
-**  	c -- input character
+**		dstr -- ARCF_DSTRING handle to update
+**		c -- input character
 **
 **  Return value:
-**  	TRUE iff the update succeeded.
+**		TRUE iff the update succeeded.
 **
 **  Side effects:
-**  	The dstring may be resized.
+**		The dstring may be resized.
 */
 
 _Bool
@@ -447,20 +447,20 @@ arcf_dstring_cat1(struct arcf_dstring *dstr, int c)
 **  ARCF_DSTRING_CATN -- append 'n' bytes onto a dstring
 **
 **  Parameters:
-**  	dstr -- ARCF_DSTRING handle to update
-**  	str -- input string
-**  	nbytes -- number of bytes to append
+**		dstr -- ARCF_DSTRING handle to update
+**		str -- input string
+**		nbytes -- number of bytes to append
 **
 **  Return value:
-**  	TRUE iff the update succeeded.
+**		TRUE iff the update succeeded.
 **
 **  Side effects:
-**  	The dstring may be resized.
+**		The dstring may be resized.
 */
 
 _Bool
 arcf_dstring_catn(struct arcf_dstring *dstr, unsigned char *str,
-                   size_t nbytes)
+									 size_t nbytes)
 {
 	size_t needed;
 
@@ -493,10 +493,10 @@ arcf_dstring_catn(struct arcf_dstring *dstr, unsigned char *str,
 **  ARCF_DSTRING_GET -- retrieve data in a dstring
 **
 **  Parameters:
-**  	dstr -- ARCF_DSTRING handle whose string should be retrieved
+**		dstr -- ARCF_DSTRING handle whose string should be retrieved
 **
 **  Return value:
-**  	Pointer to the NULL-terminated contents of "dstr".
+**		Pointer to the NULL-terminated contents of "dstr".
 */
 
 u_char *
@@ -511,10 +511,10 @@ arcf_dstring_get(struct arcf_dstring *dstr)
 **  ARCF_DSTRING_LEN -- retrieve length of data in a dstring
 **
 **  Parameters:
-**  	dstr -- ARCF_DSTRING handle whose string should be retrieved
+**		dstr -- ARCF_DSTRING handle whose string should be retrieved
 **
 **  Return value:
-**  	Number of bytes in a dstring.
+**		Number of bytes in a dstring.
 */
 
 int
@@ -529,10 +529,10 @@ arcf_dstring_len(struct arcf_dstring *dstr)
 **  ARCF_DSTRING_BLANK -- clear out the contents of a dstring
 **
 **  Parameters:
-**  	dstr -- ARCF_DSTRING handle whose string should be cleared
+**		dstr -- ARCF_DSTRING handle whose string should be cleared
 **
 **  Return value:
-**  	None.
+**		None.
 */
 
 void
@@ -548,11 +548,11 @@ arcf_dstring_blank(struct arcf_dstring *dstr)
 **  ARCF_DSTRING_CHOP -- truncate contents of a dstring
 **
 **  Parameters:
-**  	dstr -- ARCF_DSTRING handle whose string should be cleared
-**  	len -- length after which to clobber
+**		dstr -- ARCF_DSTRING handle whose string should be cleared
+**		len -- length after which to clobber
 **
 **  Return value:
-**  	None.
+**		None.
 */
 
 void
@@ -571,12 +571,12 @@ arcf_dstring_chop(struct arcf_dstring *dstr, int len)
 **  ARCF_DSTRING_PRINTF -- write variable length formatted output to a dstring
 **
 **  Parameters:
-**  	dstr -- ARCF_STRING handle to be updated
-**  	fmt -- format
-**  	... -- variable arguments
+**		dstr -- ARCF_STRING handle to be updated
+**		fmt -- format
+**		... -- variable arguments
 **
 **  Return value:
-**  	New size, or -1 on error.
+**		New size, or -1 on error.
 */
 
 size_t
@@ -606,7 +606,7 @@ arcf_dstring_printf(struct arcf_dstring *dstr, char *fmt, ...)
 
 		rem = dstr->ds_alloc - dstr->ds_len;
 		len = vsnprintf((char *) dstr->ds_buf + dstr->ds_len, rem,
-		                fmt, ap2);
+										fmt, ap2);
 	}
 
 	va_end(ap2);
@@ -620,11 +620,11 @@ arcf_dstring_printf(struct arcf_dstring *dstr, char *fmt, ...)
 **  ARCF_SOCKET_CLEANUP -- try to clean up the socket
 **
 **  Parameters:
-**  	sockspec -- socket specification
+**		sockspec -- socket specification
 **
 **  Return value:
-**  	0 -- nothing to cleanup or cleanup successful
-**  	other -- an error code (a la errno)
+**		0 -- nothing to cleanup or cleanup successful
+**		other -- an error code (a la errno)
 */
 
 int
@@ -641,7 +641,7 @@ arcf_socket_cleanup(char *sockspec)
 	if (colon != NULL)
 	{
 		if (strncasecmp(sockspec, "local:", 6) != 0 &&
-		    strncasecmp(sockspec, "unix:", 5) != 0)
+				strncasecmp(sockspec, "unix:", 5) != 0)
 			return 0;
 	}
 
@@ -713,14 +713,14 @@ arcf_socket_cleanup(char *sockspec)
 **  ARCF_BASE64_ENCODE_FILE -- base64-encode a file
 **
 **  Parameters:
-**  	infd -- input file descriptor
-**  	out -- output stream
-**  	lm -- left margin
-** 	rm -- right margin
-**  	initial -- space consumed on the initial line
+**		infd -- input file descriptor
+**		out -- output stream
+**		lm -- left margin
+**	rm -- right margin
+**		initial -- space consumed on the initial line
 **
 **  Return value:
-**  	None (yet).
+**		None (yet).
 */
 
 void
@@ -811,10 +811,10 @@ arcf_base64_encode_file(infd, out, lm, rm, initial)
 **  ARCF_LOWERCASE -- lowercase-ize a string
 **
 **  Parameters:
-**  	str -- string to convert
+**		str -- string to convert
 **
 **  Return value:
-**  	None.
+**		None.
 */
 
 void
@@ -835,13 +835,13 @@ arcf_lowercase(u_char *str)
 **  ARCF_INET_NTOA -- thread-safe inet_ntoa()
 **
 **  Parameters:
-**  	a -- (struct in_addr) to be converted
-**  	buf -- destination buffer
-**  	buflen -- number of bytes at buf
+**		a -- (struct in_addr) to be converted
+**		buf -- destination buffer
+**		buflen -- number of bytes at buf
 **
 **  Return value:
-**  	Size of the resultant string.  If the result is greater than buflen,
-**  	then buf does not contain the complete result.
+**		Size of the resultant string.  If the result is greater than buflen,
+**		then buf does not contain the complete result.
 */
 
 size_t
@@ -854,21 +854,21 @@ arcf_inet_ntoa(struct in_addr a, char *buf, size_t buflen)
 	addr = ntohl(a.s_addr);
 
 	return snprintf(buf, buflen, "%d.%d.%d.%d",
-	                (addr >> 24), (addr >> 16) & 0xff,
-	                (addr >> 8) & 0xff, addr & 0xff);
+									(addr >> 24), (addr >> 16) & 0xff,
+									(addr >> 8) & 0xff, addr & 0xff);
 }
 
 /*
 **  ARCF_MKARRAY -- turn a comma-separated list into an array
 **
 **  Parameters:
-**  	in -- input string
+**		in -- input string
 **
 **  Return value:
-**  	A NULL-terminated array.
+**		A NULL-terminated array.
 **
 **  Side effects:
-** 	"in" is modified.
+**	"in" is modified.
 */
 
 const char **
@@ -887,7 +887,6 @@ arcf_mkarray(char *in)
 		if (*p == ',')
 			n++;
 	}
-
 	out = (char **) malloc((n + 1) * sizeof(char *));
 	if (out == NULL)
 		return (const char **) NULL;
