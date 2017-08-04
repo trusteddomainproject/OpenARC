@@ -43,7 +43,7 @@ extern "C" {
 #endif /* __STDC__ */
 
 /* definitions */
-#define ARC_HDRMARGIN		75	/* "standard" header margin */
+#define ARC_HDRMARGIN   0 /* "standard" header margin */
 #define ARC_MAXHEADER		4096	/* buffer for caching one header */
 #define	ARC_MAXHOSTNAMELEN	256	/* max. FQDN we support */
 

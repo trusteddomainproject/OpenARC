@@ -3425,7 +3425,7 @@ mlfi_eom(SMFICTX *ctx)
 
 		return SMFIS_TEMPFAIL;
 	}
-
+	
 	if (BITSET(ARC_MODE_SIGN, cc->cctx_mode))
 	{
 		int arfound = 0;
@@ -3530,7 +3530,7 @@ mlfi_eom(SMFICTX *ctx)
 							       afc->mctx_jobid,
 							       cv);
 						}
-
+						
 						arc_set_cv(afc->mctx_arcmsg,
 						           cv);
 
@@ -3591,7 +3591,7 @@ mlfi_eom(SMFICTX *ctx)
 		/*
 		**  Get the seal fields to apply.
 		*/
-
+		
 		status = arc_getseal(afc->mctx_arcmsg, &seal,
 		                     conf->conf_authservid,
 		                     conf->conf_selector,

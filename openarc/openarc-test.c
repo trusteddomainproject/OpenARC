@@ -626,7 +626,7 @@ arcf_testfile(ARC_LIB *libopenarc, struct test_context *tctx,
 		if (ms != SMFIS_CONTINUE)
 			return EX_SOFTWARE;
 	}
-
+	
 	ms = mlfi_eom((SMFICTX *) tctx);
 	if (MLFI_OUTPUT(ms, tverbose))
 	{

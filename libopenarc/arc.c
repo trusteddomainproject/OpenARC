@@ -438,10 +438,10 @@ arc_genamshdr(ARC_MESSAGE *msg, struct arc_dstring *dstr, char *delim,
 		/* h= */
 		firsthdr = TRUE;
 		for (hdr = msg->arc_hhead; hdr != NULL; hdr = hdr->hdr_next)
-		{
+    {
 			if ((hdr->hdr_flags & ARC_HDR_SIGNED) == 0)
 				continue;
-
+    
 			if (!firsthdr)
 			{
 				arc_dstring_cat1(dstr, ':');
@@ -450,18 +450,18 @@ arc_genamshdr(ARC_MESSAGE *msg, struct arc_dstring *dstr, char *delim,
 			{
 				arc_dstring_cat1(dstr, ';');
 				arc_dstring_catn(dstr, (u_char *) delim,
-				                 delimlen);
+												 delimlen);
 				arc_dstring_catn(dstr, (u_char *) "h=", 2);
 			}
-
+    
 			firsthdr = FALSE;
-
+    
 			arc_dstring_catn(dstr, hdr->hdr_text, hdr->hdr_namelen);
-		}
-
-		if (msg->arc_library->arcl_oversignhdrs != NULL &&
-		    msg->arc_library->arcl_oversignhdrs[0] != NULL)
-		{
+    }
+    
+    if (msg->arc_library->arcl_oversignhdrs != NULL &&
+        msg->arc_library->arcl_oversignhdrs[0] != NULL)			
+		{			
 			_Bool wrote = FALSE;
 
 			if (firsthdr)
@@ -2948,6 +2948,25 @@ arc_eom(ARC_MESSAGE *msg)
 	return ARC_STAT_OK;
 }
 
+
+void arc_insert_sig(struct arc_dstring *dstr, char *sig)
+{
+  struct arc_dstring *dstr2;
+  int idx;
+  char *str = (char *) arc_dstring_get(dstr);
+  for(idx = 0; idx < arc_dstring_len(dstr) - 1; idx++)
+    if(str[idx] == 'b' && str[idx+1] == '=')
+      break;
+
+  dstr2 = arc_dstring_new(dstr->ds_msg, 500, 0);
+  arc_dstring_catn(dstr2, str, idx + 2);
+  arc_dstring_cat(dstr2, sig);
+  arc_dstring_cat(dstr2, str + idx + 2);
+  arc_dstring_copy(dstr, (char *) arc_dstring_get(dstr2));
+  arc_dstring_free(dstr2);
+}
+
+
 /*
 **  ARC_SET_CV -- force the chain state
 **
@@ -3169,6 +3188,9 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 	arc_dstring_catn(dstr, sighdr, len);
 	len = arc_dstring_len(dstr);
 
+	// STANDARDIZE HEADER
+  arc_std_header(dstr);
+
 	hdr.hdr_text = arc_dstring_get(dstr);
 	hdr.hdr_colon = hdr.hdr_text + ARC_MSGSIG_HDRNAMELEN;
 	hdr.hdr_namelen = ARC_MSGSIG_HDRNAMELEN;
@@ -3247,8 +3269,8 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 		return ARC_STAT_INTERNAL;
 	}
 
-	/* append it to the stub */
-	arc_dstring_cat(dstr, b64sig);
+	// STANDARDIZE HEADER	- insert b= value
+  arc_insert_sig(dstr, b64sig);
 
 	/* XXX -- wrapping needs to happen here */
 
@@ -3325,6 +3347,9 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 
 	arc_dstring_catn(dstr, sighdr, len);
 
+	// STANDARDIZE HEADER
+  arc_std_header(dstr);
+
 	hdr.hdr_text = arc_dstring_get(dstr);
 	hdr.hdr_colon = hdr.hdr_text + ARC_SEAL_HDRNAMELEN;
 	hdr.hdr_namelen = ARC_SEAL_HDRNAMELEN;
@@ -3388,8 +3413,8 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 		return ARC_STAT_INTERNAL;
 	}
 
-	/* append it to the stub */
-	arc_dstring_cat(dstr, b64sig);
+	// STANDARDIZE HEADER	- insert b= value
+  arc_insert_sig(dstr, b64sig);
 
 	/* XXX -- wrapping needs to happen here */
 
