@@ -157,7 +157,7 @@ containing the process ID.
 Selects the signing algorithm to use when generating signatures.
 Use 'openarc \-V' to see the list of supported algorithms.
 The default is
-.I rsa-sha1.
+.I rsa-sha256.
 
 .TP
 .I SignHeaders (string)
