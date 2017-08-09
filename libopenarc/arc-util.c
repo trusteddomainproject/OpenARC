@@ -31,6 +31,11 @@
 #include "arc-types.h"
 #include "arc-util.h"
 
+/* libbsd if found */
+#ifdef USE_BSD_H
+# include <bsd/string.h>
+#endif /* USE_BSD_H */
+
 #if defined(__RES) && (__RES >= 19940415)
 # define RES_UNC_T		char *
 #else /* __RES && __RES >= 19940415 */
