@@ -1963,7 +1963,7 @@ arc_validate_msg(ARC_MESSAGE *msg, u_int setnum)
 
 	/* verify the signature's "bh" against our computed one */
 	b64bhlen = BASE64SIZE(bhlen);
-	b64bh = malloc(b64bhlen) + 1;
+	b64bh = malloc(b64bhlen + 1);
 	if (b64bh == NULL)
 	{
 		arc_error(msg, "unable to allocate %d bytes", b64bhlen + 1);
