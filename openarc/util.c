@@ -874,7 +874,7 @@ arcf_inet_ntoa(struct in_addr a, char *buf, size_t buflen)
 const char **
 arcf_mkarray(char *in)
 {
-	int c;
+	int c = 0;
 	int n = 1;
 	char *p;
 	char **out = NULL;
@@ -891,8 +891,11 @@ arcf_mkarray(char *in)
 	if (out == NULL)
 		return (const char **) NULL;
 
-	for (p = strtok(in, ","); *p != '\0'; p = strtok(NULL, ","))
+	for (p = strtok(in, ","); p != NULL; p = strtok(NULL, ","))
+	{
 		out[c] = p;
+		c++;
+	}
 	out[c] = NULL;
 
 	return (const char **) out;
