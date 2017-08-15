@@ -127,6 +127,7 @@ struct arcf_config
 	char *		conf_authservid;	/* ID for A-R fields */
 	char *		conf_peerfile;		/* peer hosts table */
 	char *		conf_domain;		/* domain */
+	char *		conf_mode;		/* mode: s(ign) and/or v(erify) */
 	char *		conf_signhdrs_raw;	/* headers to sign (raw) */
 	const char **	conf_signhdrs;		/* headers to sign (array) */
 	char *		conf_oversignhdrs_raw;	/* fields to over-sign (raw) */
@@ -1434,6 +1435,14 @@ arcf_config_load(struct config *data, struct arcf_config *conf,
 		(void) config_get(data, "MaximumHeaders",
 		                  &conf->conf_maxhdrsz,
 		                  sizeof conf->conf_maxhdrsz);
+
+		str = NULL;
+		(void) config_get(data, "Mode",
+		                  &str, sizeof str);
+		if (str == NULL)
+			conf->conf_mode = "sv";
+		else
+			conf->conf_mode = strdup(str);
 
 		(void) config_get(data, "SignHeaders",
 		                  &conf->conf_signhdrs_raw,
@@ -3377,28 +3386,31 @@ mlfi_eom(SMFICTX *ctx)
 		return SMFIS_TEMPFAIL;
 	}
 
-	for (sealhdr = seal; sealhdr != NULL; sealhdr = arc_hdr_next(sealhdr))
+	if (strstr(conf->conf_mode, "s"))
 	{
-		size_t len;
-		u_char *hfptr;
-		u_char hfname[BUFRSZ + 1];
-
-		hfptr = arc_hdr_name(sealhdr, &len);
-		memset(hfname, '\0', sizeof hfname);
-		strncpy(hfname, hfptr, len);
-
-		status = arcf_insheader(ctx, 1, hfname,
-		                        arc_hdr_value(sealhdr));
-		if (status == MI_FAILURE)
+		for (sealhdr = seal; sealhdr != NULL; sealhdr = arc_hdr_next(sealhdr))
 		{
-			if (conf->conf_dolog)
-			{
-				syslog(LOG_WARNING,
-				       "%s: error inserting header field \"%s\"",
-				       afc->mctx_jobid, hfname);
-			}
+			size_t len;
+			u_char *hfptr;
+			u_char hfname[BUFRSZ + 1];
 
-			return SMFIS_TEMPFAIL;
+			hfptr = arc_hdr_name(sealhdr, &len);
+			memset(hfname, '\0', sizeof hfname);
+			strncpy(hfname, hfptr, len);
+
+			status = arcf_insheader(ctx, 1, hfname,
+						arc_hdr_value(sealhdr));
+			if (status == MI_FAILURE)
+			{
+				if (conf->conf_dolog)
+				{
+					syslog(LOG_WARNING,
+					       "%s: error inserting header field \"%s\"",
+					       afc->mctx_jobid, hfname);
+				}
+
+				return SMFIS_TEMPFAIL;
+			}
 		}
 	}
 
@@ -3406,22 +3418,25 @@ mlfi_eom(SMFICTX *ctx)
  	**  Authentication-Results
 	*/
 
-	arcf_dstring_blank(afc->mctx_tmpstr);
-	arcf_dstring_printf(afc->mctx_tmpstr, "%s%s; arc=%s header.d=%s",
-	                    cc->cctx_noleadspc ? " " : "",
-	                    conf->conf_authservid,
-	                    arc_chain_str(afc->mctx_arcmsg),
-	                    arc_get_domain(afc->mctx_arcmsg));
-	if (arcf_insheader(ctx, 1, AUTHRESULTSHDR,
-	                   arcf_dstring_get(afc->mctx_tmpstr)) != MI_SUCCESS)
+	if (strstr(conf->conf_mode, "v"))
 	{
-		if (conf->conf_dolog)
+		arcf_dstring_blank(afc->mctx_tmpstr);
+		arcf_dstring_printf(afc->mctx_tmpstr, "%s%s; arc=%s header.d=%s",
+				    cc->cctx_noleadspc ? " " : "",
+				    conf->conf_authservid,
+				    arc_chain_str(afc->mctx_arcmsg),
+				    arc_get_domain(afc->mctx_arcmsg));
+		if (arcf_insheader(ctx, 1, AUTHRESULTSHDR,
+				   arcf_dstring_get(afc->mctx_tmpstr)) != MI_SUCCESS)
 		{
-			syslog(LOG_ERR, "%s: %s header add failed",
-			       afc->mctx_jobid, AUTHRESULTSHDR);
-		}
+			if (conf->conf_dolog)
+			{
+				syslog(LOG_ERR, "%s: %s header add failed",
+				       afc->mctx_jobid, AUTHRESULTSHDR);
+			}
 
-		return SMFIS_TEMPFAIL;
+			return SMFIS_TEMPFAIL;
+		}
 	}
 
 	/*

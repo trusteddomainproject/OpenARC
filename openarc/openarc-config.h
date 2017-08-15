@@ -37,6 +37,7 @@ struct configdef arcf_config[] =
 	{ "KeyFile",			CONFIG_TYPE_STRING,	TRUE },
 	{ "MaximumHeaders",		CONFIG_TYPE_INTEGER,	FALSE },
 	{ "MilterDebug",		CONFIG_TYPE_INTEGER,	FALSE },
+	{ "Mode",			CONFIG_TYPE_STRING,	FALSE },
 	{ "PeerList",			CONFIG_TYPE_STRING,	FALSE },
 	{ "PidFile",			CONFIG_TYPE_STRING,	FALSE },
 	{ "Selector",			CONFIG_TYPE_STRING,	TRUE },
