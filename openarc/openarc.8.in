@@ -4,6 +4,7 @@
 \- ARC signing and verifying filter for MTAs
 .SH SYNOPSIS
 .B openarc
+[\-b modes]
 [\-c configfile]
 [\-f]
 [\-n]
@@ -27,6 +28,17 @@ interface, originally distributed as part of version 8.11 of
 to provide ARC signing and/or verifying service for mail transiting
 a milter-aware MTA.
 .SH OPTIONS
+.TP
+.I \-b modes
+Selects operating modes.
+.I modes
+is a concatenation of characters that indicate which mode(s) of operation
+are desired.  Valid modes are
+.I s
+(signer) and
+.I v
+(verifier).  The default is
+.I sv.
 .TP
 .I \-c configfile
 Read the named configuration file.  See the

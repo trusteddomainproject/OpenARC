@@ -88,8 +88,12 @@
 #include "util.h"
 
 /* macros */
-#define CMDLINEOPTS	"Ac:fhlnp:P:r:t:u:vV"
+#define CMDLINEOPTS	"Ab:c:fhlnp:P:r:t:u:vV"
 #define AR_HEADER_NAME	"Authentication-Results"
+
+#define ARCF_MODE_SIGNER	0x01
+#define ARCF_MODE_VERIFIER	0x02
+#define ARCF_MODE_DEFAULT	(ARCF_MODE_SIGNER|ARCF_MODE_VERIFIER)
 
 /*
 **  CONFIGVALUE -- a list of configuration values
@@ -117,6 +121,7 @@ struct arcf_config
 	_Bool		conf_safekeys;		/* require safe keys */
 	_Bool		conf_keeptmpfiles;	/* keep temp files */
 	u_int		conf_refcnt;		/* reference count */
+	unsigned int	conf_mode;		/* operating mode */
 	arc_canon_t	conf_canonhdr;		/* canonicalization for header */
 	arc_canon_t	conf_canonbody;		/* canonicalization for body */
 	arc_alg_t	conf_signalg;		/* signing algorithm */
@@ -127,7 +132,7 @@ struct arcf_config
 	char *		conf_authservid;	/* ID for A-R fields */
 	char *		conf_peerfile;		/* peer hosts table */
 	char *		conf_domain;		/* domain */
-	char *		conf_mode;		/* mode: s(ign) and/or v(erify) */
+	char *		conf_modestr;		/* mode string */
 	char *		conf_signhdrs_raw;	/* headers to sign (raw) */
 	const char **	conf_signhdrs;		/* headers to sign (array) */
 	char *		conf_oversignhdrs_raw;	/* fields to over-sign (raw) */
@@ -1436,13 +1441,11 @@ arcf_config_load(struct config *data, struct arcf_config *conf,
 		                  &conf->conf_maxhdrsz,
 		                  sizeof conf->conf_maxhdrsz);
 
-		str = NULL;
-		(void) config_get(data, "Mode",
-		                  &str, sizeof str);
-		if (str == NULL)
-			conf->conf_mode = "sv";
-		else
-			conf->conf_mode = strdup(str);
+		if (conf->conf_modestr == NULL)
+		{
+			(void) config_get(data, "Mode", &conf->conf_modestr,
+			                  sizeof conf->conf_modestr);
+		}
 
 		(void) config_get(data, "SignHeaders",
 		                  &conf->conf_signhdrs_raw,
@@ -1520,6 +1523,36 @@ arcf_config_load(struct config *data, struct arcf_config *conf,
 			snprintf(err, errlen, "%s: arcf_loadlist(): %s",
 			         str, dberr);
 			return -1;
+		}
+	}
+
+	if (conf->conf_modestr == NULL)
+	{
+		conf->conf_mode = ARCF_MODE_DEFAULT;
+	}
+	else
+	{
+		char *p;
+
+		conf->conf_mode = 0;
+
+		for (p = conf->conf_modestr; *p != '\0'; p++)
+		{
+			switch (*p)
+			{
+			  case 's':
+				conf->conf_mode |= ARCF_MODE_SIGNER;
+				break;
+
+			  case 'v':
+				conf->conf_mode |= ARCF_MODE_VERIFIER;
+				break;
+
+			  default:
+				snprintf(err, errlen, "unknown mode \"%c\"",
+					 *p);
+				return -1;
+			}
 		}
 	}
 
@@ -3386,7 +3419,7 @@ mlfi_eom(SMFICTX *ctx)
 		return SMFIS_TEMPFAIL;
 	}
 
-	if (strstr(conf->conf_mode, "s"))
+	if (conf->conf_mode & ARCF_MODE_SIGNER)
 	{
 		for (sealhdr = seal; sealhdr != NULL; sealhdr = arc_hdr_next(sealhdr))
 		{
@@ -3418,7 +3451,7 @@ mlfi_eom(SMFICTX *ctx)
  	**  Authentication-Results
 	*/
 
-	if (strstr(conf->conf_mode, "v"))
+	if (conf->conf_mode & ARCF_MODE_VERIFIER)
 	{
 		arcf_dstring_blank(afc->mctx_tmpstr);
 		arcf_dstring_printf(afc->mctx_tmpstr, "%s%s; arc=%s header.d=%s",
@@ -3578,6 +3611,7 @@ usage(void)
 {
 	fprintf(stderr, "%s: usage: %s -p socketfile [options]\n"
 	                "\t-A          \tauto-restart\n"
+			"\t-b modes    \tselect operating modes\n"
 	                "\t-c conffile \tread configuration from conffile\n"
 	                "\t-f          \tdon't fork-and-exit\n"
 	                "\t-h          \tprint this help message and exit\n"
@@ -3677,6 +3711,12 @@ main(int argc, char **argv)
 		{
 		  case 'A':
 			autorestart = TRUE;
+			break;
+
+		  case 'b':
+			if (optarg == NULL || *optarg == '\0')
+				return usage();
+			curconf->conf_modestr = optarg;
 			break;
 
 		  case 'c':
