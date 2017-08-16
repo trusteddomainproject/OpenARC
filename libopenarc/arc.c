@@ -2538,8 +2538,8 @@ arc_eoh(ARC_MESSAGE *msg)
 				return status;
 			}
 		} else {
-			hdr_canon = ARC_CANON_SIMPLE
-			body_canon = ARC_CANON_SIMPLE
+			hdr_canon = ARC_CANON_SIMPLE;
+			body_canon = ARC_CANON_SIMPLE;
 		}
 
 		status = arc_add_canon(msg, ARC_CANONTYPE_HEADER, hdr_canon,
