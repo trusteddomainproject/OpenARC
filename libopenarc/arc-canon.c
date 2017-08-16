@@ -2123,6 +2123,10 @@ arc_parse_canon_t(unsigned char *tag, arc_canon_t *hdr_canon, arc_canon_t *body_
 	int code = 0;
 	char *last = NULL;
 
+	assert(tag != NULL)
+	assert(hdr_canon != NULL)
+	assert(body_canon != NULL)
+
 	token = strtok_r(tag, "/", &last);
 	code = arc_name_to_code(canonicalizations, token);
 
