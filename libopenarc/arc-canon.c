@@ -1393,7 +1393,6 @@ arc_canon_runheaders(ARC_MESSAGE *msg)
 				}
 			}
 
-
 			memset(hdrset, '\0', n);
 
 			/* do header selection */
@@ -2057,8 +2056,8 @@ arc_canon_gethashes(ARC_MESSAGE *msg, void **hh, size_t *hhlen,
 	size_t hdlen;
 	size_t bdlen;
 
-	hdc = msg->arc_hdrcanon;
-	bdc = msg->arc_bodycanon;
+	hdc = msg->arc_valid_hdrcanon;
+	bdc = msg->arc_valid_bodycanon;
 
 	status = arc_canon_getfinal(hdc, &hd, &hdlen);
 	if (status != ARC_STAT_OK)
