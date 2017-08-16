@@ -2386,7 +2386,8 @@ arc_eoh(ARC_MESSAGE *msg)
 	ARC_KVSET *set;
 	u_char *inst;
 	u_char *htag;
-	arc_canon_t hdr_canon, body_canon;
+	arc_canon_t hdr_canon;
+	arc_canon_t body_canon;
 
 	if (msg->arc_state >= ARC_STATE_EOH)
 		return ARC_STAT_INVALID;
@@ -2523,14 +2524,22 @@ arc_eoh(ARC_MESSAGE *msg)
 		else
 			hashtype = ARC_HASHTYPE_SHA256;
 
-		status = arc_parse_canon_t(arc_param_get(h->hdr_data, "c"),
-		                           &hdr_canon, &body_canon);
-
-		if (status != ARC_STAT_OK)
+		u_char *c = arc_param_get(h->hdr_data, "c");
+		if (c != NULL)
 		{
-			arc_error(msg,
-			          "failed to parse header c= tag");
-			return status;
+			status = arc_parse_canon_t(arc_param_get(h->hdr_data, "c"),
+						   &hdr_canon, &body_canon);
+
+			if (status != ARC_STAT_OK)
+			{
+				arc_error(msg,
+					  "failed to parse header c= tag with value %s",
+					  c);
+				return status;
+			}
+		} else {
+			hdr_canon = ARC_CANON_SIMPLE
+			body_canon = ARC_CANON_SIMPLE
 		}
 
 		status = arc_add_canon(msg, ARC_CANONTYPE_HEADER, hdr_canon,
