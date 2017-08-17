@@ -23,7 +23,7 @@ extern "C" {
 
 /*
 **  version -- 0xrrMMmmpp
-**  
+**
 **  	rr == release number
 **  	MM == major revision number
 **  	mm == minor revision number
@@ -52,6 +52,8 @@ extern "C" {
 #define	ARC_MSGSIG_HDRNAMELEN	sizeof(ARC_MSGSIG_HDRNAME) - 1
 #define	ARC_SEAL_HDRNAME	"ARC-Seal"
 #define	ARC_SEAL_HDRNAMELEN	sizeof(ARC_SEAL_HDRNAME) - 1
+
+#define	ARC_EXT_AR_HDRNAME	"Authentication-Results"
 
 /* special DNS tokens */
 #define	ARC_DNSKEYNAME		"_domainkey"
@@ -219,6 +221,8 @@ typedef int arc_opts_t;
 #define	ARC_OPTS_FLAGS		0
 #define	ARC_OPTS_TMPDIR		1
 #define	ARC_OPTS_FIXEDTIME	2
+#define	ARC_OPTS_SIGNHDRS	3
+#define	ARC_OPTS_OVERSIGNHDRS	4
 
 /* flags */
 #define	ARC_LIBFLAGS_NONE		0x00000000
@@ -328,7 +332,7 @@ extern void arc_close __P((ARC_LIB *));
 extern const char *arc_geterror __P((ARC_MESSAGE *));
 
 /*
-** 
+**
 **  ARC_OPTIONS -- get/set library options
 **
 **  Parameters:

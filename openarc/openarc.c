@@ -127,6 +127,10 @@ struct arcf_config
 	char *		conf_authservid;	/* ID for A-R fields */
 	char *		conf_peerfile;		/* peer hosts table */
 	char *		conf_domain;		/* domain */
+	char *		conf_signhdrs_raw;	/* headers to sign (raw) */
+	const char **	conf_signhdrs;		/* headers to sign (array) */
+	char *		conf_oversignhdrs_raw;	/* fields to over-sign (raw) */
+	const char **	conf_oversignhdrs;	/* fields to over-sign (array) */
 	u_char *	conf_keydata;		/* binary key data */
 	size_t		conf_keylen;		/* key length */
 	ssize_t		conf_maxhdrsz;		/* max. header size */
@@ -1294,6 +1298,12 @@ arcf_config_free(struct arcf_config *conf)
 	if (conf->conf_data != NULL)
 		config_free(conf->conf_data);
 
+	if (conf->conf_signhdrs != NULL)
+		free(conf->conf_signhdrs);
+
+	if (conf->conf_oversignhdrs != NULL)
+		free(conf->conf_oversignhdrs);
+
 	free(conf);
 }
 
@@ -1424,6 +1434,14 @@ arcf_config_load(struct config *data, struct arcf_config *conf,
 		(void) config_get(data, "MaximumHeaders",
 		                  &conf->conf_maxhdrsz,
 		                  sizeof conf->conf_maxhdrsz);
+
+		(void) config_get(data, "SignHeaders",
+		                  &conf->conf_signhdrs_raw,
+		                  sizeof conf->conf_signhdrs_raw);
+
+		(void) config_get(data, "OverSignHeaders",
+		                  &conf->conf_oversignhdrs_raw,
+		                  sizeof conf->conf_oversignhdrs_raw);
 
 		str = NULL;
 		(void) config_get(data, "FixedTimestamp", &str, sizeof str);
@@ -1750,6 +1768,37 @@ arcf_config_setlib(struct arcf_config *conf, char **err)
 		if (err != NULL)
 			*err = "failed to set ARC library options";
 		return FALSE;
+	}
+
+	if (conf->conf_signhdrs_raw != NULL)
+	{
+		conf->conf_signhdrs = arcf_mkarray(conf->conf_signhdrs_raw);
+		status = arc_options(conf->conf_libopenarc, ARC_OP_SETOPT,
+		                     ARC_OPTS_SIGNHDRS, conf->conf_signhdrs,
+		                     sizeof conf->conf_signhdrs);
+
+		if (status != ARC_STAT_OK)
+		{
+			if (err != NULL)
+				*err = "failed to set ARC library options";
+			return FALSE;
+		}
+	}
+
+	if (conf->conf_oversignhdrs_raw != NULL)
+	{
+		conf->conf_oversignhdrs = arcf_mkarray(conf->conf_oversignhdrs_raw);
+		status = arc_options(conf->conf_libopenarc, ARC_OP_SETOPT,
+		                     ARC_OPTS_OVERSIGNHDRS,
+		                     conf->conf_oversignhdrs,
+		                     sizeof conf->conf_oversignhdrs);
+
+		if (status != ARC_STAT_OK)
+		{
+			if (err != NULL)
+				*err = "failed to set ARC library options";
+			return FALSE;
+		}
 	}
 
 	return TRUE;

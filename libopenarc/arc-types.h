@@ -141,15 +141,6 @@ struct arc_canon
 struct arc_msghandle
 {
 	_Bool			arc_partial;
-	u_char *		arc_key;
-	u_char *		arc_error;
-	u_char *		arc_hdrlist;
-	u_char *		arc_domain;
-	u_char *		arc_selector;
-	u_char *		arc_authservid;
-	u_char *		arc_b64sig;
-	u_char *		arc_b64key;
-	void *			arc_signature;
 	int			arc_dnssec_key;
 	int			arc_signalg;
 	u_int			arc_nsets;
@@ -173,6 +164,15 @@ struct arc_msghandle
 	arc_canon_t		arc_canonbody;
 	ARC_CHAIN		arc_cstate;
 	ARC_SIGERROR		arc_sigerror;
+	u_char *		arc_key;
+	u_char *		arc_error;
+	u_char *		arc_hdrlist;
+	u_char *		arc_domain;
+	u_char *		arc_selector;
+	u_char *		arc_authservid;
+	u_char *		arc_b64sig;
+	u_char *		arc_b64key;
+	void *			arc_signature;
 	struct arc_qmethod *	arc_querymethods;
 	struct arc_xtag *	arc_xtags;
 	struct arc_dstring *	arc_canonbuf;
@@ -197,13 +197,15 @@ struct arc_msghandle
 /* struct arc_lib -- a ARC library context */
 struct arc_lib
 {
+	_Bool			arcl_signre;
 	_Bool			arcl_dnsinit_done;
 	u_int			arcl_flsize;
 	uint32_t		arcl_flags;
 	time_t			arcl_fixedtime;
+	u_int			arcl_callback_int;
 	u_int *			arcl_flist;
 	struct arc_dstring *	arcl_sslerrbuf;
-	u_int			arcl_callback_int;
+	u_char **		arcl_oversignhdrs;
 	void			(*arcl_dns_callback) (const void *context);
 	void			*arcl_dns_service;
 	int			(*arcl_dns_init) (void **srv);
@@ -220,6 +222,7 @@ struct arc_lib
 				                       size_t *bytes,
 				                       int *error,
 				                       int *dnssec);
+	regex_t			arcl_hdrre;
 	u_char			arcl_tmpdir[MAXPATHLEN + 1];
 	u_char			arcl_queryinfo[MAXPATHLEN + 1];
 };

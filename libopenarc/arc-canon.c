@@ -1272,6 +1272,8 @@ arc_canon_runheaders(ARC_MESSAGE *msg)
 
 	for (cur = msg->arc_canonhead; cur != NULL; cur = cur->canon_next)
 	{
+		arc_dstring_blank(msg->arc_hdrbuf);
+
 		/* skip done hashes and those which are of the wrong type */
 		if (cur->canon_done || cur->canon_type != ARC_CANONTYPE_HEADER)
 			continue;
@@ -1318,6 +1320,8 @@ arc_canon_runheaders(ARC_MESSAGE *msg)
 			regex_t *hdrtest;
 
 			lib = msg->arc_library;
+			hdrtest = &lib->arcl_hdrre;
+
 			memset(hdrset, '\0', sizeof *hdrset);
 			nhdrs = 0;
 
@@ -1326,10 +1330,12 @@ arc_canon_runheaders(ARC_MESSAGE *msg)
 			     hdr != NULL;
 			     hdr = hdr->hdr_next)
 			{
-				if (strncasecmp(ARC_AR_HDRNAME,
-				                hdr->hdr_text,
-				                hdr->hdr_namelen) == 0 ||
-				    strncasecmp(ARC_MSGSIG_HDRNAME,
+				/*
+				**  MUST NOT sign ARC-Seal; SHOULD NOT sign
+				**  Authentication-Results
+				*/
+
+				if (strncasecmp(ARC_EXT_AR_HDRNAME,
 				                hdr->hdr_text,
 				                hdr->hdr_namelen) == 0 ||
 				    strncasecmp(ARC_SEAL_HDRNAME,
@@ -1337,15 +1343,56 @@ arc_canon_runheaders(ARC_MESSAGE *msg)
 				                hdr->hdr_namelen) == 0)
 					continue;
 
-				tmp = arc_dstring_get(msg->arc_hdrbuf);
+				if (!lib->arcl_signre)
+				{
+					/*
+					**  No header list configured, so
+					**  sign everything.
+					*/
 
-				if (tmp[0] != '\0')
-					arc_dstring_cat1(msg->arc_hdrbuf, ':');
+					if (arc_dstring_len(msg->arc_hdrbuf) > 0)
+						arc_dstring_cat1(msg->arc_hdrbuf,
+						                 ':');
 
-				arc_dstring_catn(msg->arc_hdrbuf,
-				                 hdr->hdr_text,
-				                 hdr->hdr_namelen);
+					arc_dstring_catn(msg->arc_hdrbuf,
+					                  hdr->hdr_text,
+					                  hdr->hdr_namelen);
+					continue;
+				}
+
+				/*
+				**  A list of header field names to sign was
+				**  given, so just do those.
+				*/
+
+				/* could be space, could be colon ... */
+				savechar = hdr->hdr_text[hdr->hdr_namelen];
+
+				/* terminate the header field name and test */
+				hdr->hdr_text[hdr->hdr_namelen] = '\0';
+				status = regexec(hdrtest,
+				                 (char *) hdr->hdr_text,
+				                 0, NULL, 0);
+
+				/* restore the character */
+				hdr->hdr_text[hdr->hdr_namelen] = savechar;
+
+				if (status == 0)
+				{
+					if (arc_dstring_len(msg->arc_hdrbuf) > 0)
+						arc_dstring_cat1(msg->arc_hdrbuf,
+						                 ':');
+
+					arc_dstring_catn(msg->arc_hdrbuf,
+					                 hdr->hdr_text,
+					                 hdr->hdr_namelen);
+				}
+				else
+				{
+					assert(status == REG_NOMATCH);
+				}
 			}
+
 
 			memset(hdrset, '\0', n);
 

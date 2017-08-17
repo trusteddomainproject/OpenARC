@@ -432,7 +432,7 @@ arc_genamshdr(ARC_MESSAGE *msg, struct arc_dstring *dstr, char *delim,
 		if (msg->arc_partial)
 		{
 			arc_dstring_printf(dstr, ";%sl=%lu", delim,
-		                   	(u_long) msg->arc_bodycanon->canon_wrote);
+		                   	   (u_long) msg->arc_bodycanon->canon_wrote);
 		}
 
 		/* h= */
@@ -457,6 +457,38 @@ arc_genamshdr(ARC_MESSAGE *msg, struct arc_dstring *dstr, char *delim,
 			firsthdr = FALSE;
 
 			arc_dstring_catn(dstr, hdr->hdr_text, hdr->hdr_namelen);
+		}
+
+		if (msg->arc_library->arcl_oversignhdrs != NULL &&
+		    msg->arc_library->arcl_oversignhdrs[0] != NULL)
+		{
+			_Bool wrote = FALSE;
+
+			if (firsthdr)
+			{
+				arc_dstring_cat1(dstr, ';');
+				arc_dstring_catn(dstr, delim, delimlen);
+				arc_dstring_catn(dstr, "h=", 2);
+			}
+			else
+			{
+				arc_dstring_cat1(dstr, ':');
+			}
+
+			for (n = 0;
+			     msg->arc_library->arcl_oversignhdrs[n] != NULL;
+			     n++)
+			{
+				if (msg->arc_library->arcl_oversignhdrs[n][0] == '\0')
+					continue;
+
+				if (wrote)
+					arc_dstring_cat1(dstr, ':');
+
+				arc_dstring_cat(dstr, msg->arc_library->arcl_oversignhdrs[n]);
+
+				wrote = TRUE;
+			}
 		}
 	}
 
@@ -889,6 +921,79 @@ arc_options(ARC_LIB *lib, int op, int arg, void *val, size_t valsz)
 
 		return ARC_STAT_OK;
 
+	  case ARC_OPTS_SIGNHDRS:
+		if (valsz != sizeof(char **) || op == ARC_OP_GETOPT)
+		{
+			return ARC_STAT_INVALID;
+		}
+		else if (val == NULL)
+		{
+			if (lib->arcl_signre)
+			{
+				(void) regfree(&lib->arcl_hdrre);
+				lib->arcl_signre = FALSE;
+			}
+		}
+		else
+		{
+			int status;
+			u_char **hdrs;
+			char buf[BUFRSZ + 1];
+
+			if (lib->arcl_signre)
+			{
+				(void) regfree(&lib->arcl_hdrre);
+				lib->arcl_signre = FALSE;
+			}
+			memset(buf, '\0', sizeof buf);
+
+			hdrs = (u_char **) val;
+			(void) strlcpy(buf, "^(", sizeof buf);
+			if (!arc_hdrlist((u_char *) buf, sizeof buf,
+			                  hdrs, TRUE))
+				return ARC_STAT_INVALID;
+
+			if (strlcat(buf, ")$", sizeof buf) >= sizeof buf)
+				return ARC_STAT_INVALID;
+
+			status = regcomp(&lib->arcl_hdrre, buf,
+			                 (REG_EXTENDED|REG_ICASE));
+			if (status != 0)
+				return ARC_STAT_INTERNAL;
+
+			lib->arcl_signre = TRUE;
+		}
+		return ARC_STAT_OK;
+
+	  case ARC_OPTS_OVERSIGNHDRS:
+		if (valsz != sizeof lib->arcl_oversignhdrs)
+			return ARC_STAT_INVALID;
+
+		if (op == ARC_OP_GETOPT)
+		{
+			memcpy(val, &lib->arcl_oversignhdrs, valsz);
+		}
+		else if (val == NULL)
+		{
+			if (lib->arcl_oversignhdrs != NULL)
+				arc_clobber_array((char **) lib->arcl_oversignhdrs);
+			lib->arcl_oversignhdrs = NULL;
+		}
+		else
+		{
+			const char **tmp;
+
+			tmp = arc_copy_array(val);
+			if (tmp == NULL)
+				return ARC_STAT_NORESOURCE;
+
+			if (lib->arcl_oversignhdrs != NULL)
+				arc_clobber_array((char **) lib->arcl_oversignhdrs);
+
+			lib->arcl_oversignhdrs = (u_char **) tmp;
+		}
+		return ARC_STAT_OK;
+
 	  default:
 		assert(0);
 	}
@@ -1212,6 +1317,8 @@ arc_process_set(ARC_MESSAGE *msg, arc_kvsettype_t type, u_char *str,
 	char *ctx;
 	ARC_KVSET *set;
 	const char *settype;
+	struct arc_plist *par;
+	struct arc_plist *dup;
 
 	assert(msg != NULL);
 	assert(str != NULL);
@@ -1455,6 +1562,7 @@ arc_process_set(ARC_MESSAGE *msg, arc_kvsettype_t type, u_char *str,
 			set->set_bad = TRUE;
 			return ARC_STAT_INTERNAL;
 		}
+
 		for (p = strtok_r(hcopy, ":", &ctx);
 		     p != NULL;
 		     p = strtok_r(NULL, ":", &ctx))
@@ -1469,7 +1577,6 @@ arc_process_set(ARC_MESSAGE *msg, arc_kvsettype_t type, u_char *str,
 		}
 
 		/* test validity of "t", "x", and "i" */
-
 		p = arc_param_get(set, (u_char *) "t");
 		if (p != NULL && !arc_check_uint(p))
 		{
@@ -2412,7 +2519,7 @@ arc_eoh(ARC_MESSAGE *msg)
 		htag = arc_param_get(h->hdr_data, "h");
 	}
 
-	if (strcmp(arc_param_get(h->hdr_data, "a"), "rsa-sha1") == 0)
+	if (msg->arc_signalg == ARC_SIGN_RSASHA1)
 		hashtype = ARC_HASHTYPE_SHA1;
 	else
 		hashtype = ARC_HASHTYPE_SHA256;

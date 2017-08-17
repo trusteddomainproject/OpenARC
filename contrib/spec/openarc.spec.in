@@ -1,12 +1,9 @@
-%global commit0 0.1.0
-%global gittag0 GIT-TAG
-%global shortcommit0 %(c=%{commit0}; echo ${c:0:7})
 %global systemd (0%{?fedora} >= 18) || (0%{?rhel} >= 7)
 %global tmpfiles (0%{?fedora} >= 15) || (0%{?rhel} >= 7)
 
 Summary: An open source library and milter for providing ARC service
 Name: openarc
-Version: 0.1.0
+Version: @VERSION@
 Release: 1%{?dist}
 License: BSD and Sendmail
 Group: System Environment/Daemons
@@ -37,7 +34,7 @@ Requires(preun): chkconfig, initscripts
 Requires(postun): initscripts
 %endif
 
-Source0:  https://github.com/mskucherawy/OpenARC/archive/%{commit0}.tar.gz#/%{name}-%{shortcommit0}.tar.gz
+Source0: openarc-%{version}.tar.gz
 BuildRoot: %{_tmppath}/%{name}-%{version}-root
 Prefix: %{_prefix}
 

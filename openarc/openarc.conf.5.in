@@ -116,6 +116,21 @@ Sets the debug level to be requested from the milter library.  The
 default is 0.
 
 .TP
+.I OversignHeaders (string)
+Specifies a comma-separated list of header field names that should be
+included in all signature header lists (the "h=" tag) once more than the
+number of times they were actually present in the signed message.  The set
+is empty by default.  The purpose of this, and especially of listing an
+absent header field, is to prevent the addition of important fields between
+the signer and the verifier.  Since the verifier would include that header
+field when performing verification if it had been added by an intermediary,
+the signed message and the verified message were different and the
+verification would fail.  Note that listing a field name here and not listing
+it in the
+.I SignHeaders
+list is likely to generate invalid signatures.
+
+.TP
 .I PeerList (dataset)
 Identifies a set of "peers" that identifies clients whose connections
 should be accepted without processing by this filter.  The set
@@ -143,6 +158,15 @@ Selects the signing algorithm to use when generating signatures.
 Use 'openarc \-V' to see the list of supported algorithms.
 The default is
 .I rsa-sha1.
+
+.TP
+.I SignHeaders (string)
+Specifies the set of header fields that should be included when generating
+signatures.  This is expected to be a comma-separated list of header
+field names, and matching is case-insensitive.  If the list omits any header
+field that is mandated by the ARC specification, those fields are implicitly
+added.  By default, those fields listed in the DKIM specification as
+"SHOULD" be signed (RFC6376, Section 5.4) will be signed by the filter.
 
 .TP
 .I Socket (string)

@@ -21,6 +21,7 @@
 struct arcf_dstring;
 
 /* PROTOTYPES */
+extern const char **arcf_mkarray __P((char *));
 extern size_t arcf_inet_ntoa __P((struct in_addr, char *, size_t));
 extern void arcf_lowercase __P((u_char *));
 extern void arcf_optlist __P((FILE *));
