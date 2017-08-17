@@ -30,6 +30,7 @@
 #include "arc-types.h"
 #include "arc-canon.h"
 #include "arc-util.h"
+#include "arc-tables.h"
 
 /* libbsd if found */
 #ifdef USE_BSD_H
@@ -1453,7 +1454,6 @@ arc_canon_runheaders(ARC_MESSAGE *msg)
 		tmphdr.hdr_flags = 0;
 		tmphdr.hdr_next = NULL;
 
-		arc_lowerhdr(tmphdr.hdr_text);
 		(void) arc_canon_header(msg, cur, &tmphdr, FALSE);
 		arc_canon_buffer(cur, NULL, 0);
 
@@ -2057,8 +2057,8 @@ arc_canon_gethashes(ARC_MESSAGE *msg, void **hh, size_t *hhlen,
 	size_t hdlen;
 	size_t bdlen;
 
-	hdc = msg->arc_hdrcanon;
-	bdc = msg->arc_bodycanon;
+	hdc = msg->arc_valid_hdrcanon;
+	bdc = msg->arc_valid_bodycanon;
 
 	status = arc_canon_getfinal(hdc, &hd, &hdlen);
 	if (status != ARC_STAT_OK)
@@ -2100,6 +2100,48 @@ arc_canon_add_to_seal(ARC_MESSAGE *msg)
 		if (status != ARC_STAT_OK)
 			return status;
 	}
+
+	return ARC_STAT_OK;
+}
+
+/*
+**  ARC_PARSE_CANON_T -- parse a c= tag
+**
+**  Parameters:
+**    tag        -- c=
+**    hdr_canon  -- the header canon output
+**    body_canon -- the body canon output
+**
+**  Return value:
+**    ARC_STAT_OK -- successful completion
+*/
+
+ARC_STAT
+arc_parse_canon_t(unsigned char *tag, arc_canon_t *hdr_canon, arc_canon_t *body_canon)
+{
+	char *token = NULL;
+	int code = 0;
+	char *last = NULL;
+
+	assert(tag != NULL);
+	assert(hdr_canon != NULL);
+	assert(body_canon != NULL);
+
+	token = strtok_r(tag, "/", &last);
+	code = arc_name_to_code(canonicalizations, token);
+
+	if (code == -1)
+		return ARC_STAT_INVALID;
+
+	*hdr_canon = (arc_canon_t) code;
+
+	token = strtok_r(NULL, "/", &last);
+	code = arc_name_to_code(canonicalizations, token);
+
+	if (code == -1)
+		return ARC_STAT_INVALID;
+
+	*body_canon = (arc_canon_t) code;
 
 	return ARC_STAT_OK;
 }

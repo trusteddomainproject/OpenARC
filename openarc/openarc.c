@@ -1412,6 +1412,10 @@ arcf_config_load(struct config *data, struct arcf_config *conf,
 			conf->conf_signalg = arcf_lookup_strtoint(str,
 			                                          arcf_signalgorithms);
 		}
+		else
+		{
+			conf->conf_signalg = ARC_SIGN_RSASHA256;
+		}
 
 		(void) config_get(data, "Domain",
 		                  &conf->conf_domain,

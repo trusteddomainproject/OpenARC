@@ -31,6 +31,11 @@
 #include "arc-types.h"
 #include "arc-util.h"
 
+/* libbsd if found */
+#ifdef USE_BSD_H
+# include <bsd/string.h>
+#endif /* USE_BSD_H */
+
 #if defined(__RES) && (__RES >= 19940415)
 # define RES_UNC_T		char *
 #else /* __RES && __RES >= 19940415 */
@@ -912,7 +917,7 @@ arc_copy_array(char **in)
 	out = malloc(sizeof(char *) * (n + 1));
 	if (out == NULL)
 		return NULL;
-	
+
 	for (c = 0; c < n; c++)
 	{
 		out[c] = strdup(in[c]);
