@@ -1247,6 +1247,35 @@ arcf_list_load(struct conflist *list, char *path, char **err)
 }
 
 /*
+**  ARCF_ADDLIST -- add an entry to a list
+**
+**  Parameters:
+**  	list -- list to update
+**      str -- string to add
+**  	err -- error string (returned)
+**
+**  Return value:
+**  	TRUE if the operation succeeded.
+*/
+
+_Bool
+arcf_addlist(struct conflist *list, char *str, char **err)
+{
+	struct configvalue *v;
+
+	v = (struct configvalue *) malloc(sizeof(struct configvalue));
+	if (v == NULL)
+	{
+		*err = strerror(errno);
+		return FALSE;
+	}
+	v->value = str;
+
+	LIST_INSERT_HEAD(list, v, entries);
+	return TRUE;
+}
+
+/*
 **  ARCF_LIST_DESTROY -- destroy a list
 **
 **  Parameters:
@@ -1513,6 +1542,19 @@ arcf_config_load(struct config *data, struct arcf_config *conf,
 		if (status != TRUE)
 		{
 			snprintf(err, errlen, "%s: arcf_loadlist(): %s",
+			         str, dberr);
+			return -1;
+		}
+	}
+	else if (!testmode)
+	{
+		_Bool status;
+		char *dberr = NULL;
+
+		status = arcf_addlist(&conf->conf_peers, "127.0.0.1", &dberr);
+		if (status != TRUE)
+		{
+			snprintf(err, errlen, "%s: arcf_addlist(): %s",
 			         str, dberr);
 			return -1;
 		}
