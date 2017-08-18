@@ -1204,7 +1204,7 @@ arcf_config_new(void)
 **  	err -- error string (returned)
 **
 **  Return value:
-**  	TRUE iff the operation succeeded.
+**  	TRUE if the operation succeeded.
 */
 
 _Bool
@@ -1223,7 +1223,7 @@ arcf_list_load(struct conflist *list, char *path, char **err)
 	}
 
 	memset(buf, '\0', sizeof buf);
-	while (fgets(buf, sizeof buf - 1, f) != (char *) EOF)
+	while (fgets(buf, sizeof buf - 1, f) != NULL)
 	{
 		for (p = buf; *p != '\0'; p++)
 		{
@@ -1534,11 +1534,11 @@ arcf_config_load(struct config *data, struct arcf_config *conf,
 		(void) config_get(data, "PeerHosts", &str, sizeof str);
 	if (str != NULL)
 	{
-		int status;
+		_Bool status;
 		char *dberr = NULL;
 
 		status = arcf_list_load(&conf->conf_peers, str, &dberr);
-		if (status != 0)
+		if (status != TRUE)
 		{
 			snprintf(err, errlen, "%s: arcf_list_load(): %s",
 			         str, dberr);
