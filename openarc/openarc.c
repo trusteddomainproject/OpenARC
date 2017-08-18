@@ -2717,6 +2717,18 @@ mlfi_connect(SMFICTX *ctx, char *host, _SOCK_ADDR *ip)
 		conf = cc->cctx_config;
 	}
 
+	arcf_lowercase((u_char *) host);
+
+	/* if the client is on an ignored list, then ignore it */
+	if (((host != NULL && host[0] != '[') &&
+	    arcf_checkhost(&curconf->conf_peers, host)) ||
+	    (ip != NULL && arcf_checkip(&curconf->conf_peers, ip)))
+	{
+		if (curconf->conf_dolog)
+			syslog(LOG_INFO, "ignoring connection from %s", host);
+		return SMFIS_ACCEPT;
+	}
+
 	if (host != NULL)
 		strlcpy(cc->cctx_host, host, sizeof cc->cctx_host);
 
