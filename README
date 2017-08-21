@@ -211,7 +211,7 @@ with successful use of the DKIM service.  The two features are MASQUERADE_AS
 and FEATURE(genericstable).  See cf/README in the open source sendmail
 source code distribution for more information.
 
-Due to the way the milter protocol is incorporated into the MTA, opnarc
+Due to the way the milter protocol is incorporated into the MTA, openarc
 sees the headers before they are modified as required by those two features.
 This means any signature is generated based on the headers originally
 injected by the mail client and not on the headers which are actually sent
