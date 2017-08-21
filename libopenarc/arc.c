@@ -2709,7 +2709,7 @@ ARC_STAT
 arc_eom(ARC_MESSAGE *msg)
 {
 	/*
-	**  Verify the exisitng chain, if any.
+	**  Verify the existing chain, if any.
 	*/
 
 	if (msg->arc_nsets == 0)
