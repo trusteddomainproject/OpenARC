@@ -168,6 +168,7 @@ struct arc_msghandle
 	u_char *		arc_error;
 	u_char *		arc_hdrlist;
 	u_char *		arc_domain;
+	u_char **		arc_domain_whitelist;
 	u_char *		arc_selector;
 	u_char *		arc_authservid;
 	u_char *		arc_b64sig;

@@ -131,6 +131,9 @@ struct arcf_config
 	const char **	conf_signhdrs;		/* headers to sign (array) */
 	char *		conf_oversignhdrs_raw;	/* fields to over-sign (raw) */
 	const char **	conf_oversignhdrs;	/* fields to over-sign (array) */
+	char **		conf_domain_whitelist;	/* whitelisted domains */
+	char *		conf_domain_whitelist_file; /* domain whitelist file */
+	u_int 		conf_whitelist_size;	/* whitelist size */
 	u_char *	conf_keydata;		/* binary key data */
 	size_t		conf_keylen;		/* key length */
 	ssize_t		conf_maxhdrsz;		/* max. header size */
@@ -1304,6 +1307,9 @@ arcf_config_free(struct arcf_config *conf)
 	if (conf->conf_oversignhdrs != NULL)
 		free(conf->conf_oversignhdrs);
 
+	if (conf->conf_domain_whitelist != NULL)
+		free(conf->conf_domain_whitelist);
+
 	free(conf);
 }
 
@@ -1338,6 +1344,8 @@ arcf_config_load(struct config *data, struct arcf_config *conf,
 	char *str;
 	char confstr[BUFRSZ + 1];
 	char basedir[MAXPATHLEN + 1];
+	char *inline_whitelist_domains = NULL;
+	u_char *whitelist_domains = NULL;
 
 	assert(conf != NULL);
 	assert(err != NULL);
@@ -1447,6 +1455,14 @@ arcf_config_load(struct config *data, struct arcf_config *conf,
 		                  &conf->conf_oversignhdrs_raw,
 		                  sizeof conf->conf_oversignhdrs_raw);
 
+		(void) config_get(data, "DomainWhitelistFile",
+		                  &conf->conf_domain_whitelist_file,
+		                  sizeof conf->conf_domain_whitelist_file);
+
+		(void) config_get(data, "DomainWhitelist",
+		                  &inline_whitelist_domains,
+				  sizeof inline_whitelist_domains);
+
 		str = NULL;
 		(void) config_get(data, "FixedTimestamp", &str, sizeof str);
 		if (str != NULL)
@@ -1517,6 +1533,200 @@ arcf_config_load(struct config *data, struct arcf_config *conf,
 			return -1;
 		}
 	}
+
+	conf->conf_whitelist_size = 0;
+	if (inline_whitelist_domains != NULL)
+	{
+		char *s = inline_whitelist_domains;
+		int i;
+
+		for (i = 0; s[i] != '\0'; s[i] == ',' ? i++ : *s++)
+			continue;
+
+		conf->conf_whitelist_size += i + 1;
+	}
+
+	/* load the whitelist if a file was specified */
+	if (conf->conf_domain_whitelist_file != NULL)
+	{
+		int status;
+		int fd;
+		uid_t asuser = (uid_t) -1;
+		ssize_t rlen;
+		struct stat s;
+
+		fd = open(conf->conf_domain_whitelist_file, O_RDONLY, 0);
+		if (fd < 0)
+		{
+			if (conf->conf_dolog)
+			{
+				int saveerrno;
+
+				saveerrno = errno;
+
+				syslog(LOG_ERR, "%s: open(): %s",
+				       conf->conf_keyfile,
+				       strerror(errno));
+
+				errno = saveerrno;
+			}
+
+			snprintf(err, errlen, "%s: open(): %s",
+			         conf->conf_domain_whitelist_file, strerror(errno));
+			return -1;
+		}
+
+		status = fstat(fd, &s);
+		if (status != 0)
+		{
+			if (conf->conf_dolog)
+			{
+				int saveerrno;
+
+				saveerrno = errno;
+
+				syslog(LOG_ERR, "%s: stat(): %s",
+				       conf->conf_domain_whitelist_file,
+				       strerror(errno));
+
+				errno = saveerrno;
+			}
+
+			snprintf(err, errlen, "%s: stat(): %s",
+			         conf->conf_domain_whitelist_file, strerror(errno));
+			close(fd);
+			return -1;
+		}
+		else if (!S_ISREG(s.st_mode))
+		{
+			snprintf(err, errlen, "%s: open(): Not a regular file",
+			         conf->conf_domain_whitelist_file);
+			close(fd);
+			return -1;
+		}
+
+		if (become != NULL)
+		{
+			struct passwd *pw;
+			char *p;
+			char tmp[BUFRSZ + 1];
+
+			strlcpy(tmp, become, sizeof tmp);
+
+			p = strchr(tmp, ':');
+			if (p != NULL)
+				*p = '\0';
+
+			pw = getpwnam(tmp);
+			if (pw == NULL)
+			{
+				snprintf(err, errlen, "%s: no such user", tmp);
+				close(fd);
+				return -1;
+			}
+
+			asuser = pw->pw_uid;
+		}
+
+		whitelist_domains = malloc(s.st_size + 1);
+		if (whitelist_domains == NULL)
+		{
+			if (conf->conf_dolog)
+			{
+				int saveerrno;
+
+				saveerrno = errno;
+
+				syslog(LOG_ERR, "malloc(): %s",
+				       strerror(errno));
+
+				errno = saveerrno;
+			}
+
+			snprintf(err, errlen, "malloc(): %s", strerror(errno));
+			return -1;
+		}
+
+		rlen = read(fd, whitelist_domains, s.st_size + 1);
+		if (rlen == (ssize_t) -1)
+		{
+			if (conf->conf_dolog)
+			{
+				int saveerrno;
+
+				saveerrno = errno;
+
+				syslog(LOG_ERR, "%s: read(): %s",
+				       conf->conf_domain_whitelist_file,
+				       strerror(errno));
+
+				errno = saveerrno;
+			}
+
+			snprintf(err, errlen, "%s: read(): %s",
+			         conf->conf_domain_whitelist_file, strerror(errno));
+			close(fd);
+			free(whitelist_domains);
+			return -1;
+		}
+		else if (rlen != s.st_size)
+		{
+			if (conf->conf_dolog)
+			{
+				syslog(LOG_ERR, "%s: read() wrong size (%lu)",
+				       conf->conf_domain_whitelist_file, (u_long) rlen);
+			}
+
+			snprintf(err, errlen, "%s: read() wrong size (%lu)",
+			         conf->conf_domain_whitelist_file, (u_long) rlen);
+			close(fd);
+			free(whitelist_domains);
+			return -1;
+		}
+
+		close(fd);
+		whitelist_domains[s.st_size] = '\0';
+	}
+
+	if (whitelist_domains != NULL)
+	{
+		char *s = whitelist_domains;
+		int i;
+
+		for (i = 0; s[i] != '\0'; s[i] == '\n' ? i++ : *s++)
+			continue;
+		conf->conf_whitelist_size += i;
+	}
+
+	if (conf->conf_whitelist_size != 0)
+		conf->conf_domain_whitelist = (char **) malloc(conf->conf_whitelist_size * sizeof(char*));
+
+	int cnt = 0;
+	if (inline_whitelist_domains != NULL)
+	{
+		char *pt;
+		pt = strtok(inline_whitelist_domains, ",");
+		while (pt != NULL) {
+			conf->conf_domain_whitelist[cnt++] = pt;
+			pt = strtok(NULL, ",");
+		}
+	}
+
+	if (whitelist_domains != NULL)
+	{
+		char *pt;
+		pt = strtok(whitelist_domains, "\n");
+		while (pt != NULL) {
+			conf->conf_domain_whitelist[cnt++] = pt;
+			pt = strtok(NULL, "\n");
+		}
+	}
+
+	/* alphabetize whitelist, so we can do binary search on it */
+	qsort(conf->conf_domain_whitelist,
+	      conf->conf_whitelist_size,
+	      sizeof conf->conf_domain_whitelist[0],
+	      arcf_qstrcmp);
 
 	/* load the secret key, if one was specified */
 	if (conf->conf_keyfile != NULL)
@@ -3148,6 +3358,13 @@ mlfi_eoh(SMFICTX *ctx)
 		}
 
 		return SMFIS_TEMPFAIL;
+	}
+
+	if (conf->conf_domain_whitelist != NULL)
+	{
+		status = arc_check_whitelist(afc->mctx_arcmsg, conf->conf_domain_whitelist, conf->conf_whitelist_size);
+		if (status != ARC_STAT_OK)
+			return SMFIS_REJECT;
 	}
 
 	return SMFIS_CONTINUE;

@@ -898,3 +898,22 @@ arcf_mkarray(char *in)
 
 	return (const char **) out;
 }
+
+/*
+**  ARCF_QSTRCMP - comparison function for alphabetizing lists via qsort
+**
+**  Parameters:
+**  	a -- pointer to first str
+**  	b -- pointer to second str
+**
+**  Return value:
+**  	comparison value as required by qsort(3)
+*/
+
+int
+arcf_qstrcmp(const void* a, const void* b)
+{
+	char **ia = (char **)a;
+	char **ib = (char **)b;
+	return strncmp(*ia, *ib, 2);
+}

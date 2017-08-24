@@ -30,6 +30,8 @@ struct configdef arcf_config[] =
 	{ "Canonicalization",		CONFIG_TYPE_STRING,	FALSE },
 	{ "ChangeRootDirectory",	CONFIG_TYPE_STRING,	FALSE },
 	{ "Domain",			CONFIG_TYPE_STRING,	TRUE },
+	{ "DomainWhitelist",		CONFIG_TYPE_STRING,	FALSE },
+	{ "DomainWhitelistFile",	CONFIG_TYPE_STRING,	FALSE },
 	{ "EnableCoredumps",		CONFIG_TYPE_BOOLEAN,	FALSE },
 	{ "FixedTimestamp",		CONFIG_TYPE_STRING,	FALSE },
 	{ "Include",			CONFIG_TYPE_INCLUDE,	FALSE },
