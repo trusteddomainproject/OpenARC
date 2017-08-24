@@ -116,6 +116,12 @@ Sets the debug level to be requested from the milter library.  The
 default is 0.
 
 .TP
+.I Mode (string)
+Selects  operating modes. The string is a concatenation of characters that
+indicate which mode(s) of operation are desired. Valid modes are s (signer)
+and v (verifier). The default is sv.
+
+.TP
 .I OversignHeaders (string)
 Specifies a comma-separated list of header field names that should be
 included in all signature header lists (the "h=" tag) once more than the
