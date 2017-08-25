@@ -2781,7 +2781,7 @@ arc_eom(ARC_MESSAGE *msg)
 		return ARC_STAT_OK;
 
 	/*
-	**  Verify the exisitng chain, if any.
+	**  Verify the existing chain, if any.
 	*/
 
 	if (msg->arc_nsets == 0)

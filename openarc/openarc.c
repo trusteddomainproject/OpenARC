@@ -1318,7 +1318,7 @@ arcf_config_free(struct arcf_config *conf)
 /*
 **  ARCF_CONFIG_LOAD -- load a configuration handle based on file content
 **
-**  Paramters:
+**  Parameters:
 **  	data -- configuration data loaded from config file
 **  	conf -- configuration structure to load
 **  	err -- where to write errors
