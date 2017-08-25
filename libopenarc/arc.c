@@ -2114,9 +2114,16 @@ arc_validate_seal(ARC_MESSAGE *msg, u_int setnum)
 
 ARC_MESSAGE *
 arc_message(ARC_LIB *lib, arc_canon_t canonhdr, arc_canon_t canonbody,
-            arc_alg_t signalg, const u_char **err)
+            arc_alg_t signalg, arc_mode_t mode, const u_char **err)
 {
 	ARC_MESSAGE *msg;
+
+	if (mode == 0)
+	{
+		if (err != NULL)
+			*err = "no mode(s) selected";
+		return NULL;
+	}
 
 	msg = (ARC_MESSAGE *) malloc(sizeof *msg);
 	if (msg == NULL)
@@ -2138,6 +2145,7 @@ arc_message(ARC_LIB *lib, arc_canon_t canonhdr, arc_canon_t canonbody,
 	msg->arc_canonbody = canonbody;
 	msg->arc_signalg = signalg;
 	msg->arc_margin = ARC_HDRMARGIN;
+	msg->arc_mode = mode;
 
 	return msg;
 }
@@ -2363,6 +2371,183 @@ arc_header_field(ARC_MESSAGE *msg, u_char *hdr, size_t hlen)
 }
 
 /*
+**  ARC_EOH_VERIFY -- verifying side of the end-of-header handler
+**
+**  Parameters:
+**  	msg -- message handle
+**
+**  Return value:
+**  	An ARC_STAT_* constant.
+*/
+
+ARC_STAT
+arc_eoh_verify(ARC_MESSAGE *msg)
+{
+	u_int c;
+	u_int n;
+	u_int hashtype;
+	ARC_STAT status;
+	struct arc_hdrfield *h;
+	u_char *htag;
+	arc_canon_t hdr_canon;
+	arc_canon_t body_canon;
+
+	/*
+	**  Request specific canonicalizations we want to run.
+	*/
+
+	h = NULL;
+	htag = NULL;
+	if (msg->arc_nsets > 0)
+	{
+		/* headers, validation */
+		h = msg->arc_sets[msg->arc_nsets - 1].arcset_ams;
+		htag = arc_param_get(h->hdr_data, "h");
+		if (strcmp(arc_param_get(h->hdr_data, "a"), "rsa-sha1") == 0)
+			hashtype = ARC_HASHTYPE_SHA1;
+		else
+			hashtype = ARC_HASHTYPE_SHA256;
+
+		u_char *c = arc_param_get(h->hdr_data, "c");
+		if (c != NULL)
+		{
+			status = arc_parse_canon_t(arc_param_get(h->hdr_data, "c"),
+						   &hdr_canon, &body_canon);
+
+			if (status != ARC_STAT_OK)
+			{
+				arc_error(msg,
+					  "failed to parse header c= tag with value %s",
+					  c);
+				return status;
+			}
+		} else {
+			hdr_canon = ARC_CANON_SIMPLE;
+			body_canon = ARC_CANON_SIMPLE;
+		}
+
+		status = arc_add_canon(msg, ARC_CANONTYPE_HEADER, hdr_canon,
+		                       hashtype, htag, h, (ssize_t) -1,
+		                       &msg->arc_valid_hdrcanon);
+
+		if (status != ARC_STAT_OK)
+		{
+			arc_error(msg,
+			          "failed to initialize header canonicalization object");
+			return status;
+		}
+
+		/* body, validation */
+		status = arc_add_canon(msg, ARC_CANONTYPE_BODY, body_canon,
+		                       hashtype, NULL, NULL, (ssize_t) -1,
+		                       &msg->arc_valid_bodycanon);
+
+		if (status != ARC_STAT_OK)
+		{
+			arc_error(msg,
+			          "failed to initialize body canonicalization object");
+			return status;
+		}
+	}
+
+	/* sets already in the chain, validation */
+	if (msg->arc_nsets > 0)
+	{
+		msg->arc_sealcanons = malloc(msg->arc_nsets * sizeof(ARC_CANON *));
+		if (msg->arc_sealcanons == NULL)
+		{
+			arc_error(msg,
+		          	"failed to allocate memory for canonicalizations");
+			return status;
+		}
+
+		for (n = 0; n < msg->arc_nsets; n++)
+		{
+			h = msg->arc_sets[n].arcset_as;
+
+			int hashtype;
+			if (strcmp(arc_param_get(h->hdr_data, "a"), "rsa-sha1") == 0)
+				hashtype = ARC_HASHTYPE_SHA1;
+			else
+				hashtype = ARC_HASHTYPE_SHA256;
+
+			status = arc_add_canon(msg,
+			                       ARC_CANONTYPE_SEAL,
+			                       ARC_CANON_RELAXED,
+			                       hashtype,
+			                       NULL,
+			                       h,
+			                       (ssize_t) -1,
+			                       &msg->arc_sealcanons[n]);
+			if (status != ARC_STAT_OK)
+			{
+				arc_error(msg,
+					"failed to initialize seal canonicalization object");
+				return status;
+			}
+		}
+	}
+
+	return ARC_STAT_OK;
+}
+
+/*
+**  ARC_EOH_SIGN -- signing side of the end-of-header handler
+**
+**  Parameters:
+**  	msg -- message handle
+**
+**  Return value:
+**  	An ARC_STAT_* constant.
+*/
+
+ARC_STAT
+arc_eoh_sign(ARC_MESSAGE *msg)
+{
+	ARC_STAT status;
+
+	/* headers, signing */
+	status = arc_add_canon(msg, ARC_CANONTYPE_HEADER, msg->arc_canonhdr,
+	                       msg->arc_signalg, NULL, NULL, (ssize_t) -1,
+	                       &msg->arc_sign_hdrcanon);
+	if (status != ARC_STAT_OK)
+	{
+		arc_error(msg,
+		          "failed to initialize header canonicalization object");
+		return status;
+	}
+
+	/* all sets, for the next chain, signing */
+	status = arc_add_canon(msg,
+	                       ARC_CANONTYPE_SEAL,
+	                       ARC_CANON_RELAXED,
+	                       msg->arc_signalg,
+	                       NULL,
+	                       NULL,
+	                       (ssize_t) -1,
+	                       &msg->arc_sealcanon);
+	if (status != ARC_STAT_OK)
+	{
+		arc_error(msg,
+			"failed to initialize seal canonicalization object");
+		return status;
+	}
+
+	/* body, signing */
+	status = arc_add_canon(msg, ARC_CANONTYPE_BODY, msg->arc_canonbody,
+	                       msg->arc_signalg, NULL, NULL, (ssize_t) -1,
+	                       &msg->arc_sign_bodycanon);
+	if (status != ARC_STAT_OK)
+	{
+		arc_error(msg,
+		          "failed to initialize body canonicalization object");
+		return status;
+	}
+
+	return ARC_STAT_OK;
+}
+
+/*
 **  ARC_EOH -- declare no more header fields are coming
 **
 **  Parameters:
@@ -2379,19 +2564,13 @@ arc_eoh(ARC_MESSAGE *msg)
 	u_int c;
 	u_int n;
 	u_int nsets = 0;
-	u_int hashtype;
 	arc_kvsettype_t type;
 	ARC_STAT status;
+	u_char *inst;
 	struct arc_hdrfield *h;
 	ARC_KVSET *set;
-	u_char *inst;
-	u_char *htag;
-	arc_canon_t hdr_canon;
-	arc_canon_t body_canon;
 
-	if (msg->arc_state >= ARC_STATE_EOH)
-		return ARC_STAT_INVALID;
-	msg->arc_state = ARC_STATE_EOH;
+	assert(msg != NULL);
 
 	/*
 	**  Process all the header fields that make up ARC sets.
@@ -2508,141 +2687,25 @@ arc_eoh(ARC_MESSAGE *msg)
 		}
 	}
 
-	/*
-	** Request specific canonicalizations we want to run.
-	*/
+	if (msg->arc_state >= ARC_STATE_EOH)
+		return ARC_STAT_INVALID;
+	msg->arc_state = ARC_STATE_EOH;
 
-	h = NULL;
-	htag = NULL;
-	if (nsets > 0)
+	if ((msg->arc_mode & ARC_MODE_SIGN) != 0)
 	{
-		/* headers, validation */
-		h = msg->arc_sets[nsets - 1].arcset_ams;
-		htag = arc_param_get(h->hdr_data, "h");
-		if (strcmp(arc_param_get(h->hdr_data, "a"), "rsa-sha1") == 0)
-			hashtype = ARC_HASHTYPE_SHA1;
-		else
-			hashtype = ARC_HASHTYPE_SHA256;
-
-		u_char *c = arc_param_get(h->hdr_data, "c");
-		if (c != NULL)
-		{
-			status = arc_parse_canon_t(arc_param_get(h->hdr_data, "c"),
-						   &hdr_canon, &body_canon);
-
-			if (status != ARC_STAT_OK)
-			{
-				arc_error(msg,
-					  "failed to parse header c= tag with value %s",
-					  c);
-				return status;
-			}
-		} else {
-			hdr_canon = ARC_CANON_SIMPLE;
-			body_canon = ARC_CANON_SIMPLE;
-		}
-
-		status = arc_add_canon(msg, ARC_CANONTYPE_HEADER, hdr_canon,
-		                       hashtype, htag, h, (ssize_t) -1,
-		                       &msg->arc_valid_hdrcanon);
-
+		status = arc_eoh_sign(msg);
 		if (status != ARC_STAT_OK)
-		{
-			arc_error(msg,
-			          "failed to initialize header canonicalization object");
 			return status;
-		}
+	}
 
-		/* body, validation */
-		status = arc_add_canon(msg, ARC_CANONTYPE_BODY, body_canon,
-		                       hashtype, NULL, NULL, (ssize_t) -1,
-		                       &msg->arc_valid_bodycanon);
-
+	if ((msg->arc_mode & ARC_MODE_VERIFY) != 0)
+	{
+		status = arc_eoh_verify(msg);
 		if (status != ARC_STAT_OK)
-		{
-			arc_error(msg,
-			          "failed to initialize body canonicalization object");
 			return status;
-		}
 	}
 
-	/* sets already in the chain, validation */
-	if (nsets > 0)
-	{
-		msg->arc_sealcanons = malloc(nsets * sizeof(ARC_CANON *));
-		if (msg->arc_sealcanons == NULL)
-		{
-			arc_error(msg,
-		          	"failed to allocate memory for canonicalizations");
-			return status;
-		}
-
-		for (n = 0; n < nsets; n++)
-		{
-			h = msg->arc_sets[n].arcset_as;
-
-			int hashtype;
-			if (strcmp(arc_param_get(h->hdr_data, "a"), "rsa-sha1") == 0)
-				hashtype = ARC_HASHTYPE_SHA1;
-			else
-				hashtype = ARC_HASHTYPE_SHA256;
-
-			status = arc_add_canon(msg,
-			                       ARC_CANONTYPE_SEAL,
-			                       ARC_CANON_RELAXED,
-			                       hashtype,
-			                       NULL,
-			                       h,
-			                       (ssize_t) -1,
-			                       &msg->arc_sealcanons[n]);
-			if (status != ARC_STAT_OK)
-			{
-				arc_error(msg,
-					"failed to initialize seal canonicalization object");
-				return status;
-			}
-		}
-	}
-
-	/* headers, signing */
-	status = arc_add_canon(msg, ARC_CANONTYPE_HEADER, msg->arc_canonhdr,
-	                       msg->arc_signalg, NULL, NULL, (ssize_t) -1,
-	                       &msg->arc_sign_hdrcanon);
-	if (status != ARC_STAT_OK)
-	{
-		arc_error(msg,
-		          "failed to initialize header canonicalization object");
-		return status;
-	}
-
-	/* all sets, for the next chain, signing */
-	status = arc_add_canon(msg,
-	                       ARC_CANONTYPE_SEAL,
-	                       ARC_CANON_RELAXED,
-	                       msg->arc_signalg,
-	                       NULL,
-	                       NULL,
-	                       (ssize_t) -1,
-	                       &msg->arc_sealcanon);
-	if (status != ARC_STAT_OK)
-	{
-		arc_error(msg,
-			"failed to initialize seal canonicalization object");
-		return status;
-	}
-
-	/* body, signing */
-	status = arc_add_canon(msg, ARC_CANONTYPE_BODY, msg->arc_canonbody,
-	                       msg->arc_signalg, NULL, NULL, (ssize_t) -1,
-	                       &msg->arc_sign_bodycanon);
-	if (status != ARC_STAT_OK)
-	{
-		arc_error(msg,
-		          "failed to initialize body canonicalization object");
-		return status;
-	}
-
-	/* initialize them */
+	/* initialize the canonicalizations */
 	keep = ((msg->arc_library->arcl_flags & ARC_LIBFLAGS_KEEPFILES) != 0);
 	status = arc_canon_init(msg, keep, keep);
 	if (status != ARC_STAT_OK)
@@ -2659,11 +2722,14 @@ arc_eoh(ARC_MESSAGE *msg)
 		return ARC_STAT_SYNTAX;
 	}
 
-	status = arc_canon_runheaders_seal(msg);
-	if (status != ARC_STAT_OK)
+	if ((msg->arc_mode & ARC_MODE_VERIFY) != 0)
 	{
-		arc_error(msg, "arc_canon_runheaders_seal() failed");
-		return ARC_STAT_SYNTAX;
+		status = arc_canon_runheaders_seal(msg);
+		if (status != ARC_STAT_OK)
+		{
+			arc_error(msg, "arc_canon_runheaders_seal() failed");
+			return ARC_STAT_SYNTAX;
+		}
 	}
 
 	return ARC_STAT_OK;
@@ -2708,6 +2774,9 @@ arc_body(ARC_MESSAGE *msg, u_char *buf, size_t len)
 ARC_STAT
 arc_eom(ARC_MESSAGE *msg)
 {
+	if ((msg->arc_mode & ARC_MODE_VERIFY) == 0)
+		return ARC_STAT_OK;
+
 	/*
 	**  Verify the exisitng chain, if any.
 	*/
@@ -2760,6 +2829,26 @@ arc_eom(ARC_MESSAGE *msg)
 	}
 
 	return ARC_STAT_OK;
+}
+
+/*
+**  ARC_SET_CV -- force the chain state
+**
+**  Parameters:
+**  	msg -- ARC_MESSAGE object
+**  	cv -- chain state
+*/
+
+void
+arc_set_cv(ARC_MESSAGE *msg, ARC_CHAIN cv)
+{
+	assert(msg != NULL);
+	assert(cv == ARC_CHAIN_UNKNOWN ||
+	       cv == ARC_CHAIN_NONE ||
+	       cv == ARC_CHAIN_FAIL ||
+	       cv == ARC_CHAIN_PASS);
+
+	msg->arc_cstate = cv;
 }
 
 /*

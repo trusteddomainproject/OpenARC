@@ -1185,7 +1185,7 @@ arc_canon_runheaders_seal(ARC_MESSAGE *msg)
 
 		cur = msg->arc_sealcanon;
 
-		if (cur->canon_done)
+		if (cur == NULL || cur->canon_done)
 			continue;
 
 		/* write all the ARC sets once more for re-sealing */
