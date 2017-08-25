@@ -13,7 +13,7 @@ latest updates.
 +--------------+
 
 The Trusted Domain Project (TDP) is a non-profit corporation dedicated to
-research and development of techologies that promote trust in the use of
+research and development of technologies that promote trust in the use of
 domain names in on the Internet.  OpenARC is an initiative of TDP, and is
 primarily community effort to develop and maintain an open source library
 for producing ARC-aware applications, and a "milter"-based filter for
@@ -211,7 +211,7 @@ with successful use of the DKIM service.  The two features are MASQUERADE_AS
 and FEATURE(genericstable).  See cf/README in the open source sendmail
 source code distribution for more information.
 
-Due to the way the milter protocol is incorporated into the MTA, opnarc
+Due to the way the milter protocol is incorporated into the MTA, openarc
 sees the headers before they are modified as required by those two features.
 This means any signature is generated based on the headers originally
 injected by the mail client and not on the headers which are actually sent

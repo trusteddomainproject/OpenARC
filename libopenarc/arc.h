@@ -249,6 +249,15 @@ typedef int arc_opts_t;
 #define ARC_KEYFLAG_NOSUBDOMAIN	0x02
 
 /*
+**  ARC_MODE -- operating modes
+*/
+
+typedef u_int arc_mode_t;
+
+#define	ARC_MODE_SIGN		0x01
+#define	ARC_MODE_VERIFY		0x02
+
+/*
 **  ARC_LIB -- library handle
 */
 
@@ -369,6 +378,7 @@ extern const char *arc_getsslbuf __P((ARC_LIB *));
 **  	canonhdr -- canonicalization to use for the header
 **  	canonbody -- canonicalization to use for the body
 **  	signalg -- signing algorithm
+**  	mode -- mask of mode bits
 **  	err -- error string (returned)
 **
 **  Return value:
@@ -376,7 +386,7 @@ extern const char *arc_getsslbuf __P((ARC_LIB *));
 */
 
 extern ARC_MESSAGE *arc_message __P((ARC_LIB *, arc_canon_t, arc_canon_t,
-				     arc_alg_t, const u_char **));
+				     arc_alg_t, arc_mode_t, const u_char **));
 
 /*
 **  ARC_FREE -- deallocate a message object
@@ -444,6 +454,16 @@ extern ARC_STAT arc_body __P((ARC_MESSAGE *msg, u_char *buf, size_t len));
 */
 
 extern ARC_STAT arc_eom __P((ARC_MESSAGE *));
+
+/*
+**  ARC_SET_CV -- force the chain state
+**
+**  Parameters:
+**      msg -- ARC_MESSAGE object
+**      cv -- chain state
+*/
+
+extern void arc_set_cv(ARC_MESSAGE *, ARC_CHAIN);
 
 /*
 **  ARC_GETSEAL -- get the "seal" to apply to this message

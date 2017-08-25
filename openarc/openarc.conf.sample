@@ -127,17 +127,16 @@ KeyFile			/var/db/dkim/example.private
 
 # MilterDebug		0
 
-##  Minimum n[% | +]
-##  	default 0
+##  Mode modes
+##  	default (none)
 ##
-##  Sets a minimum signing volume; one of the following formats:
-##	n	at least n bytes (or the whole message, whichever is less)
-##		must be signed
-##  	n%	at least n% of the message must be signed
-##	n+	if a length limit was presented in the signature, no more than
-##  		n bytes may have been added
+##  Selects the operating mode(s) for this filter.  If the string contains
+##  the character "s", the filter will sign and seal messages passing through
+##  the filter.  If the string contains the character "v", the filter
+##  will do signature and seal validation of arriving messages.  The two
+##  can be combined.  There is no default; this must be specified.
 
-# Minimum		n
+# Mode			sv
 
 ##  OversignHeaders (string)
 ##  	default (none)

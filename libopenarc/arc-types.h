@@ -143,6 +143,7 @@ struct arc_msghandle
 	_Bool			arc_partial;
 	int			arc_dnssec_key;
 	int			arc_signalg;
+	u_int			arc_mode;
 	u_int			arc_nsets;
 	u_int			arc_margin;
 	u_int			arc_state;

@@ -63,7 +63,7 @@ static void config_attach __P((struct config *, struct config **));
 static int conf_error;			/* configuration error number */
 
 /*
-**  CONFIG_GETLINE -- read a line of arbitary length from a stream
+**  CONFIG_GETLINE -- read a line of arbitrary length from a stream
 **
 **  Parameters:
 **  	in -- input stream

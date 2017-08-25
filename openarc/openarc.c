@@ -117,6 +117,7 @@ struct arcf_config
 	_Bool		conf_safekeys;		/* require safe keys */
 	_Bool		conf_keeptmpfiles;	/* keep temp files */
 	u_int		conf_refcnt;		/* reference count */
+	u_int		conf_mode;		/* mode flags */
 	arc_canon_t	conf_canonhdr;		/* canonicalization for header */
 	arc_canon_t	conf_canonbody;		/* canonicalization for body */
 	arc_alg_t	conf_signalg;		/* signing algorithm */
@@ -214,6 +215,13 @@ struct lookup arcf_canonicalizations[] = {
 struct lookup arcf_signalgorithms[] = {
 	{ "rsa-sha1",		ARC_SIGN_RSASHA1 },
 	{ "rsa-sha256",		ARC_SIGN_RSASHA256 },
+	{ NULL,			-1 }
+};
+
+struct lookup arcf_chainstates[] = {
+	{ "none",		ARC_CHAIN_NONE },
+	{ "pass",		ARC_CHAIN_PASS },
+	{ "fail",		ARC_CHAIN_FAIL },
 	{ NULL,			-1 }
 };
 
@@ -1339,7 +1347,7 @@ arcf_config_free(struct arcf_config *conf)
 /*
 **  ARCF_CONFIG_LOAD -- load a configuration handle based on file content
 **
-**  Paramters:
+**  Parameters:
 **  	data -- configuration data loaded from config file
 **  	conf -- configuration structure to load
 **  	err -- where to write errors
@@ -1385,6 +1393,20 @@ arcf_config_load(struct config *data, struct arcf_config *conf,
 	if (data != NULL)
 	{
 		int tmpint;
+
+		(void) config_get(data, "Mode", &str, sizeof str);
+		if (str != NULL)
+		{
+			if (strchr(str, 's') != NULL)
+				conf->conf_mode |= ARC_MODE_SIGN;
+			if (strchr(str, 'v') != NULL)
+				conf->conf_mode |= ARC_MODE_VERIFY;
+		}
+		if (conf->conf_mode == 0)
+		{
+			strlcpy(err, "no mode selected", errlen);
+			return -1;
+		}
 
 		str = NULL;
 		(void) config_get(data, "BaseDirectory", &str, sizeof str);
@@ -2948,8 +2970,8 @@ mlfi_header(SMFICTX *ctx, char *headerf, char *headerv)
 		**  verification of the signature will fail because what got
 		**  signed isn't the same as what actually goes out.  This
 		**  chunk of code attempts to compensate by arranging to
-		**  feed to the canonicalization algorithms the headers
-		**  exactly as the MTA will modify them, so verification
+		**  feed to the canonicalization algorithms the header
+		**  fields exactly as the MTA will modify them, so verification
 		**  should still work.
 		**
 		**  This is based on experimentation and on reading
@@ -3028,7 +3050,6 @@ mlfi_eoh(SMFICTX *ctx)
 	_Bool didfrom = FALSE;
 	int c;
 	ARC_STAT status;
-	sfsistat ms = SMFIS_CONTINUE;
 	connctx cc;
 	msgctx afc;
 	char *p;
@@ -3121,6 +3142,7 @@ mlfi_eoh(SMFICTX *ctx)
 	                               conf->conf_canonhdr,
 	                               conf->conf_canonbody,
 	                               conf->conf_signalg,
+	                               conf->conf_mode,
 	                               &err);
 	if (afc->mctx_arcmsg == NULL)
 	{
@@ -3331,7 +3353,7 @@ mlfi_eom(SMFICTX *ctx)
 		hostname = HOSTUNKNOWN;
 
 	/*
-	**  Signal end-of-message to ARC
+	**  Signal end-of-message to ARC.
 	*/
 
 	status = arc_eom(afc->mctx_arcmsg);
@@ -3347,139 +3369,177 @@ mlfi_eom(SMFICTX *ctx)
 		return SMFIS_TEMPFAIL;
 	}
 
-	/* assemble authentication results */
-	arcf_dstring_blank(afc->mctx_tmpstr);
-	for (c = 0; ; c++)
+	if ((conf->conf_mode & ARC_MODE_SIGN) != 0)
 	{
-		hdr = arcf_findheader(afc, AR_HEADER_NAME, c);
-		if (hdr == NULL)
-			break;
-		status = ares_parse(hdr->hdr_val, &ar);
-		if (status != 0)
+		/* assemble authentication results */
+		arcf_dstring_blank(afc->mctx_tmpstr);
+		for (c = 0; ; c++)
+		{
+			hdr = arcf_findheader(afc, AR_HEADER_NAME, c);
+			if (hdr == NULL)
+				break;
+			status = ares_parse(hdr->hdr_val, &ar);
+			if (status != 0)
+			{
+				if (conf->conf_dolog)
+				{
+					syslog(LOG_WARNING,
+					       "%s: can't parse %s; ignoring",
+					       afc->mctx_jobid, AR_HEADER_NAME);
+				}
+
+				continue;
+			}
+
+			if (strcasecmp(conf->conf_authservid,
+			               ar.ares_host) == 0)
+			{
+				int m;
+				int n;
+
+				for (n = 0; n < ar.ares_count; n++)
+				{
+					if (ar.ares_result[n].result_method == ARES_METHOD_ARC)
+					{
+						int cv;
+
+						switch (ar.ares_result[n].result_result)
+						{
+						    case ARES_RESULT_PASS:
+							cv = ARC_CHAIN_PASS;
+							break;
+
+						    case ARES_RESULT_FAIL:
+							cv = ARC_CHAIN_FAIL;
+							break;
+
+						    case ARES_RESULT_NONE:
+							cv = ARC_CHAIN_NONE;
+							break;
+
+						    default:
+							cv = ARC_CHAIN_UNKNOWN;
+							break;
+						}
+
+						arc_set_cv(afc->mctx_arcmsg,
+						           cv);
+					}
+
+					arcf_dstring_printf(afc->mctx_tmpstr,
+					                    "%s=%s",
+					                    ares_getmethod(ar.ares_result[n].result_method),
+					                    ares_getresult(ar.ares_result[n].result_result));
+
+					if (ar.ares_result[n].result_comment[0] != '\0')
+					{
+						arcf_dstring_printf(afc->mctx_tmpstr,
+						                    " %s",
+						                    ar.ares_result[n].result_comment);
+					}
+
+					for (m = 0;
+					     m < ar.ares_result[n].result_props;
+					     m++)
+					{
+						arcf_dstring_printf(afc->mctx_tmpstr,
+						                    " %s.%s=%s",
+						                    ares_getptype(ar.ares_result[n].result_ptype[m]),
+						                    ar.ares_result[n].result_property[m],
+						                    ar.ares_result[n].result_value[m]);
+					}
+
+					if (ar.ares_result[0].result_reason[0] != '\0')
+					{
+						arcf_dstring_printf(afc->mctx_tmpstr,
+						                    " reason=\"%s\"",
+						                    ar.ares_result[0].result_reason);
+					}
+
+					if (n != ar.ares_count - 1)
+						arcf_dstring_cat(afc->mctx_tmpstr, "; ");
+				}
+			}
+		}
+
+		/*
+		**  Get the seal fields to apply.
+		*/
+
+		status = arc_getseal(afc->mctx_arcmsg, &seal,
+		                     conf->conf_authservid,
+		                     conf->conf_selector,
+		                     conf->conf_domain,
+		                     conf->conf_keydata,
+		                     conf->conf_keylen,
+		                     arcf_dstring_len(afc->mctx_tmpstr) > 0
+		                     ? arcf_dstring_get(afc->mctx_tmpstr)
+		                     : NULL);
+		if (status != ARC_STAT_OK)
 		{
 			if (conf->conf_dolog)
 			{
 				syslog(LOG_WARNING,
-				       "%s: can't parse %s; ignoring",
-				       afc->mctx_jobid, AR_HEADER_NAME);
-			}
-
-			continue;
-		}
-
-		if (strcasecmp(conf->conf_authservid, ar.ares_host) == 0)
-		{
-			int m;
-			int n;
-
-			for (n = 0; n < ar.ares_count; n++)
-			{
-				arcf_dstring_printf(afc->mctx_tmpstr,
-				                    "%s=%s",
-				                    ares_getmethod(ar.ares_result[n].result_method),
-				                    ares_getresult(ar.ares_result[n].result_result));
-
-				if (ar.ares_result[n].result_comment[0] != '\0')
-				{
-					arcf_dstring_printf(afc->mctx_tmpstr,
-					                    " %s",
-					                    ar.ares_result[n].result_comment);
-				}
-
-				for (m = 0;
-				     m < ar.ares_result[n].result_props;
-				     m++)
-				{
-					arcf_dstring_printf(afc->mctx_tmpstr,
-					                    " %s.%s=%s",
-					                    ares_getptype(ar.ares_result[n].result_ptype[m]),
-					                    ar.ares_result[n].result_property[m],
-					                    ar.ares_result[n].result_value[m]);
-				}
-
-				if (ar.ares_result[0].result_reason[0] != '\0')
-				{
-					arcf_dstring_printf(afc->mctx_tmpstr,
-					                    " reason=\"%s\"",
-					                    ar.ares_result[0].result_reason);
-				}
-
-				if (n != ar.ares_count - 1)
-					arcf_dstring_cat(afc->mctx_tmpstr, "; ");
-			}
-		}
-	}
-
-	/*
-	**  Get the seal fields to apply.
-	*/
-
-	status = arc_getseal(afc->mctx_arcmsg, &seal,
-                             conf->conf_authservid,
-	                     conf->conf_selector,
-	                     conf->conf_domain,
-	                     conf->conf_keydata,
-	                     conf->conf_keylen,
-	                     arcf_dstring_len(afc->mctx_tmpstr) > 0
-                                 ? arcf_dstring_get(afc->mctx_tmpstr)
-                                 : NULL);
-	if (status != ARC_STAT_OK)
-	{
-		if (conf->conf_dolog)
-		{
-			syslog(LOG_WARNING,
-			       "%s: failed to compute seal",
-			       afc->mctx_jobid);
-		}
-
-		return SMFIS_TEMPFAIL;
-	}
-
-	for (sealhdr = seal; sealhdr != NULL; sealhdr = arc_hdr_next(sealhdr))
-	{
-		size_t len;
-		u_char *hfptr;
-		u_char hfname[BUFRSZ + 1];
-
-		hfptr = arc_hdr_name(sealhdr, &len);
-		memset(hfname, '\0', sizeof hfname);
-		strncpy(hfname, hfptr, len);
-
-		status = arcf_insheader(ctx, 1, hfname,
-		                        arc_hdr_value(sealhdr));
-		if (status == MI_FAILURE)
-		{
-			if (conf->conf_dolog)
-			{
-				syslog(LOG_WARNING,
-				       "%s: error inserting header field \"%s\"",
-				       afc->mctx_jobid, hfname);
+				       "%s: failed to compute seal",
+				       afc->mctx_jobid);
 			}
 
 			return SMFIS_TEMPFAIL;
 		}
+
+		for (sealhdr = seal;
+		     sealhdr != NULL;
+		     sealhdr = arc_hdr_next(sealhdr))
+		{
+			size_t len;
+			u_char *hfptr;
+			u_char hfname[BUFRSZ + 1];
+
+			hfptr = arc_hdr_name(sealhdr, &len);
+			memset(hfname, '\0', sizeof hfname);
+			strncpy(hfname, hfptr, len);
+
+			status = arcf_insheader(ctx, 1, hfname,
+			                        arc_hdr_value(sealhdr));
+			if (status == MI_FAILURE)
+			{
+				if (conf->conf_dolog)
+				{
+					syslog(LOG_WARNING,
+					       "%s: error inserting header field \"%s\"",
+					       afc->mctx_jobid, hfname);
+				}
+
+				return SMFIS_TEMPFAIL;
+			}
+		}
 	}
 
-	/*
- 	**  Authentication-Results
-	*/
-
-	arcf_dstring_blank(afc->mctx_tmpstr);
-	arcf_dstring_printf(afc->mctx_tmpstr, "%s%s; arc=%s header.d=%s",
-	                    cc->cctx_noleadspc ? " " : "",
-	                    conf->conf_authservid,
-	                    arc_chain_str(afc->mctx_arcmsg),
-	                    arc_get_domain(afc->mctx_arcmsg));
-	if (arcf_insheader(ctx, 1, AUTHRESULTSHDR,
-	                   arcf_dstring_get(afc->mctx_tmpstr)) != MI_SUCCESS)
+	if ((conf->conf_mode & ARC_MODE_VERIFY) != 0 &&
+	    arc_get_domain(afc->mctx_arcmsg) != NULL)
 	{
-		if (conf->conf_dolog)
-		{
-			syslog(LOG_ERR, "%s: %s header add failed",
-			       afc->mctx_jobid, AUTHRESULTSHDR);
-		}
+		/*
+ 		**  Authentication-Results
+		*/
 
-		return SMFIS_TEMPFAIL;
+		arcf_dstring_blank(afc->mctx_tmpstr);
+		arcf_dstring_printf(afc->mctx_tmpstr,
+		                    "%s%s; arc=%s header.d=%s",
+		                    cc->cctx_noleadspc ? " " : "",
+		                    conf->conf_authservid,
+		                    arc_chain_str(afc->mctx_arcmsg),
+		                    arc_get_domain(afc->mctx_arcmsg));
+		if (arcf_insheader(ctx, 1, AUTHRESULTSHDR,
+		                   arcf_dstring_get(afc->mctx_tmpstr)) != MI_SUCCESS)
+		{
+			if (conf->conf_dolog)
+			{
+				syslog(LOG_ERR, "%s: %s header add failed",
+				       afc->mctx_jobid, AUTHRESULTSHDR);
+			}
+
+			return SMFIS_TEMPFAIL;
+		}
 	}
 
 	/*

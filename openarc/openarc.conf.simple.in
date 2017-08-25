@@ -1,5 +1,7 @@
 # This is a simple config file for OpenARC
 
+Mode			sv
+
 Syslog                  yes
 
 Socket                  inet:8891@localhost

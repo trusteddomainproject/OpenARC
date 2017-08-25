@@ -116,6 +116,14 @@ Sets the debug level to be requested from the milter library.  The
 default is 0.
 
 .TP
+.I Mode (string)
+Selects the operating mode(s) for this filter.  If the string contains
+the character "s", the filter will sign and seal messages passing through
+the filter.  If the string contains the character "v", the filter
+will do signature and seal validation of arriving messages.  The two
+can be combined.  There is no default; this must be specified.
+
+.TP
 .I OversignHeaders (string)
 Specifies a comma-separated list of header field names that should be
 included in all signature header lists (the "h=" tag) once more than the
