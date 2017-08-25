@@ -1257,7 +1257,10 @@ arc_add_plist(ARC_MESSAGE *msg, ARC_KVSET *set, u_char *param, u_char *value,
 	{
 		if (strcasecmp((char *) plist->plist_param,
 		               (char *) param) == 0)
-			break;
+		{
+			arc_error(msg, "duplicate parameter '%s'", param);
+			return -1;
+		}
 	}
 
 	/* nope; make one and connect it */

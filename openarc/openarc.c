@@ -2916,8 +2916,8 @@ mlfi_header(SMFICTX *ctx, char *headerf, char *headerv)
 		**  verification of the signature will fail because what got
 		**  signed isn't the same as what actually goes out.  This
 		**  chunk of code attempts to compensate by arranging to
-		**  feed to the canonicalization algorithms the headers
-		**  exactly as the MTA will modify them, so verification
+		**  feed to the canonicalization algorithms the header
+		**  fields exactly as the MTA will modify them, so verification
 		**  should still work.
 		**
 		**  This is based on experimentation and on reading
@@ -2996,7 +2996,6 @@ mlfi_eoh(SMFICTX *ctx)
 	_Bool didfrom = FALSE;
 	int c;
 	ARC_STAT status;
-	sfsistat ms = SMFIS_CONTINUE;
 	connctx cc;
 	msgctx afc;
 	char *p;
