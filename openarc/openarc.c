@@ -261,6 +261,7 @@ char myhostname[MAXHOSTNAMELEN + 1];		/* local host's name */
 #define	SUPERUSER	"root"			/* superuser name */
 
 /* MACROS */
+#define	BITSET(b, s)	(((x) & (b)) == (b))
 #define	JOBID(x)	((x) == NULL ? JOBIDUNKNOWN : (char *) (x))
 #define	TRYFREE(x)	do { \
 				if ((x) != NULL) \
@@ -3315,7 +3316,7 @@ mlfi_eom(SMFICTX *ctx)
 		return SMFIS_TEMPFAIL;
 	}
 
-	if ((conf->conf_mode & ARC_MODE_SIGN) != 0)
+	if (BITSET(ARC_MODE_SIGN, conf->conf_mode))
 	{
 		/* assemble authentication results */
 		arcf_dstring_blank(afc->mctx_tmpstr);
@@ -3345,8 +3346,16 @@ mlfi_eom(SMFICTX *ctx)
 
 				for (n = 0; n < ar.ares_count; n++)
 				{
-					if (ar.ares_result[n].result_method == ARES_METHOD_ARC)
+					if (ar.ares_result[n].result_method == ARES_METHOD_ARC &&
+					    !BITSET(ARC_MODE_VERIFY, conf->conf_mode))
 					{
+						/*
+						**  If it's an ARC result under
+						**  our authserv-id and we're
+						**  not verifying, use that
+						**  value as the chain state.
+						*/
+
 						int cv;
 
 						switch (ar.ares_result[n].result_result)
@@ -3461,7 +3470,7 @@ mlfi_eom(SMFICTX *ctx)
 		}
 	}
 
-	if ((conf->conf_mode & ARC_MODE_VERIFY) != 0 &&
+	if (BITSET(ARC_MODE_VERIFY, conf->conf_mode) &&
 	    arc_get_domain(afc->mctx_arcmsg) != NULL)
 	{
 		/*
