@@ -261,7 +261,7 @@ char myhostname[MAXHOSTNAMELEN + 1];		/* local host's name */
 #define	SUPERUSER	"root"			/* superuser name */
 
 /* MACROS */
-#define	BITSET(b, s)	(((x) & (b)) == (b))
+#define	BITSET(b, s)	(((b) & (s)) == (b))
 #define	JOBID(x)	((x) == NULL ? JOBIDUNKNOWN : (char *) (x))
 #define	TRYFREE(x)	do { \
 				if ((x) != NULL) \
@@ -3170,7 +3170,8 @@ mlfi_eoh(SMFICTX *ctx)
 			       afc->mctx_jobid);
 		}
 
-		return SMFIS_TEMPFAIL;
+		/* record a bad chain here, and short-circuit crypto */
+		arc_set_cv(afc->mctx_arcmsg, ARC_CHAIN_FAIL);
 	}
 
 	return SMFIS_CONTINUE;

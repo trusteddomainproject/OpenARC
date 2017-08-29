@@ -2761,6 +2761,9 @@ arc_body(ARC_MESSAGE *msg, u_char *buf, size_t len)
 		return ARC_STAT_INVALID;
 	msg->arc_state = ARC_STATE_BODY;
 
+	if (msg->arc_state == ARC_CHAIN_FAIL)
+		return ARC_STAT_OK;
+
 	return arc_canon_bodychunk(msg, buf, len);
 }
 
@@ -2777,7 +2780,12 @@ arc_body(ARC_MESSAGE *msg, u_char *buf, size_t len)
 ARC_STAT
 arc_eom(ARC_MESSAGE *msg)
 {
+	/* nothing to do outside of verify mode */
 	if ((msg->arc_mode & ARC_MODE_VERIFY) == 0)
+		return ARC_STAT_OK;
+
+	/* nothing to do if the chain has been expressly failed */
+	if (msg->arc_state == ARC_CHAIN_FAIL)
 		return ARC_STAT_OK;
 
 	/*
