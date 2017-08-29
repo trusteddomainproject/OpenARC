@@ -138,6 +138,7 @@ struct arcf_config
 	struct config *	conf_data;		/* configuration data */
 	ARC_LIB *	conf_libopenarc;	/* shared library instance */
 	struct conflist conf_peers;		/* peers hosts */
+	struct conflist conf_internal;		/* internal hosts */
 };
 
 /*
@@ -1189,6 +1190,7 @@ arcf_config_new(void)
 	new->conf_safekeys = TRUE;
 
 	LIST_INIT(&new->conf_peers);
+	LIST_INIT(&new->conf_internal);
 
 	return new;
 }
@@ -1303,6 +1305,9 @@ arcf_config_free(struct arcf_config *conf)
 
 	if (!LIST_EMPTY(&conf->conf_peers))
 		arcf_list_destroy(&conf->conf_peers);
+
+	if (!LIST_EMPTY(&conf->conf_internal))
+		arcf_list_destroy(&conf->conf_internal);
 
 	if (conf->conf_data != NULL)
 		config_free(conf->conf_data);
@@ -1526,7 +1531,7 @@ arcf_config_load(struct config *data, struct arcf_config *conf,
 
 	str = NULL;
 	if (data != NULL)
-		(void) config_get(data, "PeerList", &str, sizeof str);
+		(void) config_get(data, "PeerHosts", &str, sizeof str);
 	if (str != NULL)
 	{
 		int status;
@@ -1535,7 +1540,24 @@ arcf_config_load(struct config *data, struct arcf_config *conf,
 		status = arcf_list_load(&conf->conf_peers, str, &dberr);
 		if (status != 0)
 		{
-			snprintf(err, errlen, "%s: arcf_loadlist(): %s",
+			snprintf(err, errlen, "%s: arcf_list_load(): %s",
+			         str, dberr);
+			return -1;
+		}
+	}
+
+	str = NULL;
+	if (data != NULL)
+		(void) config_get(data, "InternalHosts", &str, sizeof str);
+	if (str != NULL)
+	{
+		int status;
+		char *dberr = NULL;
+
+		status = arcf_list_load(&conf->conf_internal, str, &dberr);
+		if (status != 0)
+		{
+			snprintf(err, errlen, "%s: arcf_list_load(): %s",
 			         str, dberr);
 			return -1;
 		}
@@ -2721,6 +2743,23 @@ mlfi_connect(SMFICTX *ctx, char *host, _SOCK_ADDR *ip)
 		memcpy(&cc->cctx_ip, ip, sizeof(struct sockaddr_in6));
 	}
 #endif /* AF_INET6 */
+
+	/* peers are just ignored */
+	if (arcf_checkhost(&curconf->conf_peers, cc->cctx_host) ||
+	    arcf_checkip(&curconf->conf_peers,
+	                 (struct sockaddr *) &cc->cctx_ip))
+		return SMFIS_ACCEPT;
+
+	/* infer operating mode if not explicitly set */
+	if (curconf->conf_mode == 0)
+	{
+		if (arcf_checkhost(&curconf->conf_internal, cc->cctx_host) ||
+		    arcf_checkip(&curconf->conf_internal,
+		                 (struct sockaddr *) &cc->cctx_ip))
+			curconf->conf_mode = ARC_MODE_VERIFY;
+		else
+			curconf->conf_mode = ARC_MODE_SIGN;
+	}
 
 	cc->cctx_msg = NULL;
 

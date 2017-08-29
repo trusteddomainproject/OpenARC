@@ -33,6 +33,7 @@ struct configdef arcf_config[] =
 	{ "EnableCoredumps",		CONFIG_TYPE_BOOLEAN,	FALSE },
 	{ "FixedTimestamp",		CONFIG_TYPE_STRING,	FALSE },
 	{ "Include",			CONFIG_TYPE_INCLUDE,	FALSE },
+	{ "InternalHosts",		CONFIG_TYPE_STRING,	FALSE },
 	{ "KeepTemporaryFiles",		CONFIG_TYPE_BOOLEAN,	FALSE },
 	{ "KeyFile",			CONFIG_TYPE_STRING,	TRUE },
 	{ "MaximumHeaders",		CONFIG_TYPE_INTEGER,	FALSE },
