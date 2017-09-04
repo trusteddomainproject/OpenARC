@@ -1262,7 +1262,7 @@ arcf_list_load(struct conflist *list, char *path, char **err)
 **
 **  Parameters:
 **  	list -- list to update
-**      str -- string to add
+**  	str -- string to add
 **  	err -- error string (returned)
 **
 **  Return value:
@@ -1560,7 +1560,7 @@ arcf_config_load(struct config *data, struct arcf_config *conf,
 
 	str = NULL;
 	if (data != NULL)
-		(void) config_get(data, "PeerHosts", &str, sizeof str);
+		(void) config_get(data, "PeerList", &str, sizeof str);
 	if (str != NULL)
 	{
 		_Bool status;
