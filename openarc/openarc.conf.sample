@@ -95,6 +95,16 @@ Domain			example.com
 
 # FixedTimestamp	1234567890
 
+##  InternalHosts file
+##  	default (none)
+##
+##  Names a file that contains a list of IP addresses, CIDR blocks, hostnames
+##  or domain names whose mail should be considered to have come from an
+##  internal trusted source, and thus authentication details found in the
+##  message will be used as-is.  See man page for file format.
+
+# InternalHosts		filename
+
 ##  KeepTemporaryFiles { yes | no }
 ##  	default "no"
 ##

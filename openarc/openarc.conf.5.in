@@ -111,6 +111,16 @@ Names a file to be opened and read as an additional configuration file.
 Nesting is allowed to a maximum of five levels.
 
 .TP
+.I InternalHosts (dataset)
+Identifies a set of hosts that identifies clients whose connections
+should be treated as "internal" by this filter.  Messages received from
+such sources will not be verified and are instead trusted as-is; in
+particular, their Authentication-Results fields are trusted to be
+correct and authentic, meaning they will be assumed to contain the correct
+chain status when generating an outgoing seal.  See the description of
+"PeerList" for a description of the supported format.
+
+.TP
 .I MilterDebug (integer)
 Sets the debug level to be requested from the milter library.  The
 default is 0.
