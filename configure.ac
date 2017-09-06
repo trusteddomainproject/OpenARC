@@ -1,7 +1,7 @@
 #                                               -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
 #
-# Copyright (c) 2009-2016, The Trusted Domain Project.  All rights reserved.
+# Copyright (c) 2009-2017, The Trusted Domain Project.  All rights reserved.
 # 
 
 #

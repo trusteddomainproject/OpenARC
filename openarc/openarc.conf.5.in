@@ -261,7 +261,7 @@ This man page covers version @VERSION@ of
 Copyright (c) 2007, 2008, Sendmail, Inc. and its suppliers.  All rights
 reserved.
 
-Copyright (c) 2009-2016, The Trusted Domain Project.  All rights reserved.
+Copyright (c) 2009-2017, The Trusted Domain Project.  All rights reserved.
 .SH SEE ALSO
 .I openarc(8), sendmail(8)
 .P

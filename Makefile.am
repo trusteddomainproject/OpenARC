@@ -1,4 +1,4 @@
-# Copyright (c) 2010-2014, 2016, The Trusted Domain Project.
+# Copyright (c) 2010-2014, 2016, 2017, The Trusted Domain Project.
 # All rights reserved.
 
 AUTOMAKE_OPTIONS = foreign

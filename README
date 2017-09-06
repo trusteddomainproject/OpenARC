@@ -246,5 +246,5 @@ re-generate your configuration and restart the filter:
 	FEATURE(`nocanonify')
 
 --
-Copyright (c) 2010-2012, 2014, 2016, The Trusted Domain Project.
+Copyright (c) 2010-2012, 2014, 2016, 2017, The Trusted Domain Project.
   All rights reserved.
