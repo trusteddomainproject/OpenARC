@@ -2420,7 +2420,8 @@ arc_eoh_verify(ARC_MESSAGE *msg)
 		u_char *c = arc_param_get(h->hdr_data, "c");
 		if (c != NULL)
 		{
-			status = arc_parse_canon_t(arc_param_get(h->hdr_data, "c"),
+			status = arc_parse_canon_t(arc_param_get(h->hdr_data,
+			                                         "c"),
 						   &hdr_canon, &body_canon);
 
 			if (status != ARC_STAT_OK)
@@ -2700,16 +2701,16 @@ arc_eoh(ARC_MESSAGE *msg)
 		return ARC_STAT_INVALID;
 	msg->arc_state = ARC_STATE_EOH;
 
-	if ((msg->arc_mode & ARC_MODE_SIGN) != 0)
+	if ((msg->arc_mode & ARC_MODE_VERIFY) != 0)
 	{
-		status = arc_eoh_sign(msg);
+		status = arc_eoh_verify(msg);
 		if (status != ARC_STAT_OK)
 			return status;
 	}
 
-	if ((msg->arc_mode & ARC_MODE_VERIFY) != 0)
+	if ((msg->arc_mode & ARC_MODE_SIGN) != 0)
 	{
-		status = arc_eoh_verify(msg);
+		status = arc_eoh_sign(msg);
 		if (status != ARC_STAT_OK)
 			return status;
 	}
