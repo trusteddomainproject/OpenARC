@@ -166,6 +166,7 @@ struct connctx
 {
 	_Bool		cctx_milterv2;		/* milter v2 available */
 	_Bool		cctx_noleadspc;		/* no leading spaces */
+	unsigned int	cctx_mode;		/* operating mode */
 	char		cctx_host[ARC_MAXHOSTNAMELEN + 1];
 						/* hostname */
 	struct sockaddr_storage	cctx_ip;	/* IP info */
@@ -1400,6 +1401,7 @@ arcf_config_load(struct config *data, struct arcf_config *conf,
 	{
 		int tmpint;
 
+		str = NULL;
 		(void) config_get(data, "Mode", &str, sizeof str);
 		if (str != NULL)
 		{
@@ -1407,11 +1409,6 @@ arcf_config_load(struct config *data, struct arcf_config *conf,
 				conf->conf_mode |= ARC_MODE_SIGN;
 			if (strchr(str, 'v') != NULL)
 				conf->conf_mode |= ARC_MODE_VERIFY;
-		}
-		if (conf->conf_mode == 0)
-		{
-			strlcpy(err, "no mode selected", errlen);
-			return -1;
 		}
 
 		str = NULL;
@@ -1596,7 +1593,8 @@ arcf_config_load(struct config *data, struct arcf_config *conf,
 		_Bool status;
 		char *dberr = NULL;
 
-		status = arcf_addlist(&conf->conf_peers, "127.0.0.1", &dberr);
+		status = arcf_addlist(&conf->conf_internal, "127.0.0.1",
+		                      &dberr);
 		if (!status)
 		{
 			snprintf(err, errlen, "%s: arcf_addlist(): %s",
@@ -2764,16 +2762,6 @@ mlfi_connect(SMFICTX *ctx, char *host, _SOCK_ADDR *ip)
 
 	arcf_lowercase((u_char *) host);
 
-	/* if the client is on an ignored list, then ignore it */
-	if (((host != NULL && host[0] != '[') &&
-	    arcf_checkhost(&curconf->conf_peers, host)) ||
-	    (ip != NULL && arcf_checkip(&curconf->conf_peers, ip)))
-	{
-		if (curconf->conf_dolog)
-			syslog(LOG_INFO, "ignoring connection from %s", host);
-		return SMFIS_ACCEPT;
-	}
-
 	if (host != NULL)
 		strlcpy(cc->cctx_host, host, sizeof cc->cctx_host);
 
@@ -2798,21 +2786,41 @@ mlfi_connect(SMFICTX *ctx, char *host, _SOCK_ADDR *ip)
 	}
 #endif /* AF_INET6 */
 
-	/* peers are just ignored */
-	if (arcf_checkhost(&curconf->conf_peers, cc->cctx_host) ||
-	    arcf_checkip(&curconf->conf_peers,
-	                 (struct sockaddr *) &cc->cctx_ip))
+	/* if the client is on the peer list, then ignore it */
+	if (((host != NULL && host[0] != '[') &&
+	     arcf_checkhost(&curconf->conf_peers, host)) ||
+	    (ip != NULL && arcf_checkip(&curconf->conf_peers, ip)))
+	{
+		if (curconf->conf_dolog)
+			syslog(LOG_INFO, "ignoring connection from %s", host);
 		return SMFIS_ACCEPT;
+	}
 
 	/* infer operating mode if not explicitly set */
 	if (curconf->conf_mode == 0)
 	{
-		if (arcf_checkhost(&curconf->conf_internal, cc->cctx_host) ||
-		    arcf_checkip(&curconf->conf_internal,
-		                 (struct sockaddr *) &cc->cctx_ip))
-			curconf->conf_mode = ARC_MODE_VERIFY;
+		char *modestr;
+
+		if (((host != NULL && host[0] != '[') &&
+	    	     arcf_checkhost(&curconf->conf_internal, host)) ||
+	            (ip != NULL && arcf_checkip(&curconf->conf_internal, ip)))
+		{
+			/* internal host; assume outbound, so sign */
+			cc->cctx_mode = ARC_MODE_SIGN;
+			modestr = "sign";
+		}
 		else
-			curconf->conf_mode = ARC_MODE_SIGN;
+		{
+			/* non-internal host; assume inbound, so verify */
+			cc->cctx_mode = ARC_MODE_VERIFY;
+			modestr = "verify";
+		}
+
+		if (curconf->conf_dolog)
+		{
+			syslog(LOG_INFO, "assuming %s mode for host %s",
+			       modestr, cc->cctx_host);
+		}
 	}
 
 	cc->cctx_msg = NULL;
@@ -3089,6 +3097,7 @@ mlfi_eoh(SMFICTX *ctx)
 	_Bool originok;
 	_Bool didfrom = FALSE;
 	int c;
+	u_int mode;
 	ARC_STAT status;
 	connctx cc;
 	msgctx afc;
@@ -3178,11 +3187,14 @@ mlfi_eoh(SMFICTX *ctx)
 	}
 
 	/* run the header fields */
+	mode = conf->conf_mode;
+	if (mode == 0)
+		mode = cc->cctx_mode;
 	afc->mctx_arcmsg = arc_message(conf->conf_libopenarc,
 	                               conf->conf_canonhdr,
 	                               conf->conf_canonbody,
 	                               conf->conf_signalg,
-	                               conf->conf_mode,
+	                               mode,
 	                               &err);
 	if (afc->mctx_arcmsg == NULL)
 	{
@@ -3410,7 +3422,7 @@ mlfi_eom(SMFICTX *ctx)
 		return SMFIS_TEMPFAIL;
 	}
 
-	if (BITSET(ARC_MODE_SIGN, conf->conf_mode))
+	if (BITSET(ARC_MODE_SIGN, cc->cctx_mode))
 	{
 		/* assemble authentication results */
 		arcf_dstring_blank(afc->mctx_tmpstr);
@@ -3441,7 +3453,7 @@ mlfi_eom(SMFICTX *ctx)
 				for (n = 0; n < ar.ares_count; n++)
 				{
 					if (ar.ares_result[n].result_method == ARES_METHOD_ARC &&
-					    !BITSET(ARC_MODE_VERIFY, conf->conf_mode))
+					    !BITSET(ARC_MODE_VERIFY, cc->cctx_mode))
 					{
 						/*
 						**  If it's an ARC result under
@@ -3564,7 +3576,7 @@ mlfi_eom(SMFICTX *ctx)
 		}
 	}
 
-	if (BITSET(ARC_MODE_VERIFY, conf->conf_mode) &&
+	if (BITSET(ARC_MODE_VERIFY, cc->cctx_mode) &&
 	    arc_get_domain(afc->mctx_arcmsg) != NULL)
 	{
 		/*

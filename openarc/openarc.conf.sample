@@ -144,7 +144,10 @@ KeyFile			/var/db/dkim/example.private
 ##  the character "s", the filter will sign and seal messages passing through
 ##  the filter.  If the string contains the character "v", the filter
 ##  will do signature and seal validation of arriving messages.  The two
-##  can be combined.  There is no default; this must be specified.
+##  can be combined.  If neither is specified, the operating mode will
+##  be inferred on a per-connection basis based on the entries in the
+##  InternalHosts list; connections from internal hosts will be assigned to
+##  signing mode, and all others will be assigned to verify mode.
 
 # Mode			sv
 
