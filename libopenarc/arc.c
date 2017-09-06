@@ -2763,13 +2763,13 @@ arc_body(ARC_MESSAGE *msg, u_char *buf, size_t len)
 	assert(msg != NULL);
 	assert(buf != NULL);
 
+	if (msg->arc_state == ARC_CHAIN_FAIL)
+		return ARC_STAT_OK;
+
 	if (msg->arc_state > ARC_STATE_BODY ||
 	    msg->arc_state < ARC_STATE_EOH)
 		return ARC_STAT_INVALID;
 	msg->arc_state = ARC_STATE_BODY;
-
-	if (msg->arc_state == ARC_CHAIN_FAIL)
-		return ARC_STAT_OK;
 
 	return arc_canon_bodychunk(msg, buf, len);
 }
