@@ -2797,7 +2797,11 @@ mlfi_connect(SMFICTX *ctx, char *host, _SOCK_ADDR *ip)
 	}
 
 	/* infer operating mode if not explicitly set */
-	if (curconf->conf_mode == 0)
+	if (curconf->conf_mode != 0)
+	{
+		cc->cctx_mode = curconf->conf_mode;
+	}
+	else
 	{
 		char *modestr;
 
