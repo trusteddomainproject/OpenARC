@@ -206,6 +206,7 @@ struct arc_lib
 	uint32_t		arcl_flags;
 	time_t			arcl_fixedtime;
 	u_int			arcl_callback_int;
+	u_int			arcl_minkeysize;
 	u_int *			arcl_flist;
 	struct arc_dstring *	arcl_sslerrbuf;
 	u_char **		arcl_oversignhdrs;

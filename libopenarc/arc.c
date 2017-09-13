@@ -785,6 +785,7 @@ arc_init(void)
 		return lib;
 
 	memset(lib, '\0', sizeof *lib);
+	lib->arcl_minkeysize = ARC_DEFAULT_MINKEYSIZE;
 	lib->arcl_flags = ARC_LIBFLAGS_DEFAULT;
 
 #define FEATURE_INDEX(x)	((x) / (8 * sizeof(u_int)))
@@ -918,6 +919,20 @@ arc_options(ARC_LIB *lib, int op, int arg, void *val, size_t valsz)
 			memcpy(val, &lib->arcl_fixedtime, valsz);
 		else
 			memcpy(&lib->arcl_fixedtime, val, valsz);
+
+		return ARC_STAT_OK;
+
+	  case ARC_OPTS_MINKEYSIZE:
+		if (val == NULL)
+			return ARC_STAT_INVALID;
+
+		if (valsz != sizeof lib->arcl_minkeysize)
+			return ARC_STAT_INVALID;
+
+		if (op == ARC_OP_GETOPT)
+			memcpy(val, &lib->arcl_minkeysize, valsz);
+		else
+			memcpy(&lib->arcl_minkeysize, val, valsz);
 
 		return ARC_STAT_OK;
 
@@ -2975,6 +2990,16 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 	}
 
 	keysize = RSA_size(rsa);
+	if (keysize * 8 < msg->arc_library->arcl_minkeysize)
+	{
+		arc_error(msg, "key size (%u) below minimum (%u)",
+		          keysize, msg->arc_library->arcl_minkeysize);
+		EVP_PKEY_free(pkey);
+		RSA_free(rsa);
+		BIO_free(keydata);
+		return ARC_STAT_CANTVRFY;
+	}
+
 	sigout = malloc(keysize);
 	if (sigout == NULL)
 	{

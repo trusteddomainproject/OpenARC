@@ -48,6 +48,7 @@ extern "C" {
 #define	ARC_MAXHOSTNAMELEN	256	/* max. FQDN we support */
 
 #define	ARC_AR_HDRNAME		"ARC-Authentication-Results"
+#define	ARC_DEFAULT_MINKEYSIZE	1024
 #define	ARC_MSGSIG_HDRNAME	"ARC-Message-Signature"
 #define	ARC_MSGSIG_HDRNAMELEN	sizeof(ARC_MSGSIG_HDRNAME) - 1
 #define	ARC_SEAL_HDRNAME	"ARC-Seal"
@@ -223,6 +224,7 @@ typedef int arc_opts_t;
 #define	ARC_OPTS_FIXEDTIME	2
 #define	ARC_OPTS_SIGNHDRS	3
 #define	ARC_OPTS_OVERSIGNHDRS	4
+#define	ARC_OPTS_MINKEYSIZE	5
 
 /* flags */
 #define	ARC_LIBFLAGS_NONE		0x00000000
