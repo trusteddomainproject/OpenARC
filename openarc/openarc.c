@@ -3428,6 +3428,8 @@ mlfi_eom(SMFICTX *ctx)
 
 	if (BITSET(ARC_MODE_SIGN, cc->cctx_mode))
 	{
+		int arfound = 0;
+
 		/* assemble authentication results */
 		arcf_dstring_blank(afc->mctx_tmpstr);
 		for (c = 0; ; c++)
@@ -3457,7 +3459,7 @@ mlfi_eom(SMFICTX *ctx)
 				for (n = 0; n < ar.ares_count; n++)
 				{
 					if (ar.ares_result[n].result_method == ARES_METHOD_ARC &&
-					    !BITSET(ARC_MODE_VERIFY, cc->cctx_mode))
+					    BITSET(ARC_MODE_SIGN, cc->cctx_mode))
 					{
 						/*
 						**  If it's an ARC result under
@@ -3467,6 +3469,22 @@ mlfi_eom(SMFICTX *ctx)
 						*/
 
 						int cv;
+
+						arfound += 1;
+						if (arfound > 1)
+						{
+							arc_set_cv(afc->mctx_arcmsg,
+							           ARC_CHAIN_FAIL);
+
+							if (conf->conf_dolog)
+							{
+								syslog(LOG_INFO,
+								       "%s: chain state forced to \"fail\" due to multiple results present",
+								       afc->mctx_jobid);
+							}
+
+							continue;
+						}
 
 						switch (ar.ares_result[n].result_result)
 						{
@@ -3485,6 +3503,14 @@ mlfi_eom(SMFICTX *ctx)
 						    default:
 							cv = ARC_CHAIN_UNKNOWN;
 							break;
+						}
+
+						if (conf->conf_dolog)
+						{
+							syslog(LOG_INFO,
+							       "%s: chain state forced to %d due to prior result found",
+							       afc->mctx_jobid,
+							       cv);
 						}
 
 						arc_set_cv(afc->mctx_arcmsg,
