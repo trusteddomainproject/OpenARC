@@ -6,7 +6,6 @@ Name: openarc
 Version: @VERSION@
 Release: 1%{?dist}
 License: BSD and Sendmail
-Group: System Environment/Daemons
 URL: https://github.com/mskucherawy/OpenARC
 
 BuildRequires: libtool
@@ -35,7 +34,6 @@ Requires(postun): initscripts
 %endif
 
 Source0: openarc-%{version}.tar.gz
-BuildRoot: %{_tmppath}/%{name}-%{version}-root
 Prefix: %{_prefix}
 
 %description
@@ -45,7 +43,6 @@ providing ARC service through milter-enabled MTAs.
 
 %package -n libopenarc
 Summary: An open source ARC library
-Group: System Environment/Libraries
 
 %description -n libopenarc
 This package contains the library files required for running services built
@@ -53,7 +50,6 @@ using libopenarc.
 
 %package -n libopenarc-devel
 Summary: Development files for libopenarc
-Group: Development/Libraries
 Requires: lib%{name}%{?_isa} = %{version}-%{release}
 
 %description -n libopenarc-devel
