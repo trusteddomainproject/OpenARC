@@ -1912,6 +1912,7 @@ arc_validate_msg(ARC_MESSAGE *msg, u_int setnum)
 	size_t b64siglen;
 	size_t b64bhlen;
 	size_t siglen;
+	size_t keysize;
 	ARC_STAT status;
 	u_char *alg;
 	u_char *b64sig;
@@ -2009,6 +2010,17 @@ arc_validate_msg(ARC_MESSAGE *msg, u_int setnum)
 	{
 		arc_error(msg, "EVP_PKEY_get1_RSA() failed");
 		return ARC_STAT_INTERNAL;
+	}
+
+	keysize = RSA_size(rsa);
+	if (keysize * 8 < msg->arc_library->arcl_minkeysize)
+	{
+		arc_error(msg, "key size (%u) below minimum (%u)",
+		          keysize, msg->arc_library->arcl_minkeysize);
+		EVP_PKEY_free(pkey);
+		RSA_free(rsa);
+		BIO_free(keydata);
+		return ARC_STAT_CANTVRFY;
 	}
 
 	alg = arc_param_get(kvset, "a");
