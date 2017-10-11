@@ -3430,8 +3430,26 @@ mlfi_eom(SMFICTX *ctx)
 	{
 		int arfound = 0;
 
+		if (afc->mctx_tmpstr == NULL)
+		{
+			afc->mctx_tmpstr = arcf_dstring_new(BUFRSZ, 0);
+			if (afc->mctx_tmpstr == NULL)
+			{
+				if (conf->conf_dolog)
+				{
+					syslog(LOG_ERR,
+					       "arcf_dstring_new() failed");
+				}
+
+				return SMFIS_TEMPFAIL;
+			}
+		}
+		else
+		{
+			arcf_dstring_blank(afc->mctx_tmpstr);
+		}
+
 		/* assemble authentication results */
-		arcf_dstring_blank(afc->mctx_tmpstr);
 		for (c = 0; ; c++)
 		{
 			hdr = arcf_findheader(afc, AR_HEADER_NAME, c);

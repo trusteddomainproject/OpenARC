@@ -2496,7 +2496,9 @@ arc_eoh_verify(ARC_MESSAGE *msg)
 				arc_error(msg,
 					  "failed to parse header c= tag with value %s",
 					  c);
-				return status;
+				hdr_canon = ARC_CANON_SIMPLE;
+				body_canon = ARC_CANON_SIMPLE;
+				msg->arc_cstate = ARC_CHAIN_FAIL;
 			}
 		} else {
 			hdr_canon = ARC_CANON_SIMPLE;
@@ -2692,8 +2694,11 @@ arc_eoh(ARC_MESSAGE *msg)
              set = arc_set_next(set, ARC_KVSETTYPE_ANY))
 	{
 		inst = arc_param_get(set, "i");
-		n = strtoul(inst, NULL, 10);
-		nsets = MAX(n, nsets);
+		if (inst != NULL)
+		{
+			n = strtoul(inst, NULL, 10);
+			nsets = MAX(n, nsets);
+		}
 	}
 
 	msg->arc_nsets = nsets;

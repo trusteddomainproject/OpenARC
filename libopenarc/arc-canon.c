@@ -1252,6 +1252,9 @@ arc_canon_runheaders(ARC_MESSAGE *msg)
 	tmp = tmpbuf;
 	end = tmpbuf + sizeof tmpbuf - 1;
 
+	if (msg->arc_hdrcnt == 0)
+		return ARC_STAT_OK;
+
 	n = msg->arc_hdrcnt * sizeof(struct arc_hdrfield *);
 	hdrset = malloc(n);
 	if (hdrset == NULL)
@@ -2117,7 +2120,8 @@ arc_canon_add_to_seal(ARC_MESSAGE *msg)
 */
 
 ARC_STAT
-arc_parse_canon_t(unsigned char *tag, arc_canon_t *hdr_canon, arc_canon_t *body_canon)
+arc_parse_canon_t(unsigned char *tag, arc_canon_t *hdr_canon,
+                  arc_canon_t *body_canon)
 {
 	char *token = NULL;
 	int code = 0;
@@ -2126,6 +2130,9 @@ arc_parse_canon_t(unsigned char *tag, arc_canon_t *hdr_canon, arc_canon_t *body_
 	assert(tag != NULL);
 	assert(hdr_canon != NULL);
 	assert(body_canon != NULL);
+
+	if (tag[0] == '\0')
+		return ARC_STAT_INVALID;
 
 	token = strtok_r(tag, "/", &last);
 	code = arc_name_to_code(canonicalizations, token);
