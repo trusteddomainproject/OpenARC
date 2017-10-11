@@ -2717,7 +2717,7 @@ arc_eoh(ARC_MESSAGE *msg)
 		inst = arc_param_get(set, "i");
 		if (inst == NULL)
 			continue;
-		n = strtoul(inst, NULL, &p);
+		n = strtoul(inst, &p, 10);
 		if (*p != '\0')
 			continue;
 
