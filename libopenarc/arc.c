@@ -1035,9 +1035,11 @@ arc_getsslbuf(ARC_LIB *lib)
 **
 **  Parameters:
 **  	value -- value to check
+**  	allow_zero -- if true, allow zero
 **
 **  Return value:
-**  	TRUE iff the input value looks like a properly formed unsigned integer.
+**  	TRUE iff the input value looks like a properly formed unsigned integer
+** 	that is not zero.
 */
 
 static _Bool
@@ -1065,7 +1067,7 @@ arc_check_uint(u_char *value)
 		tmp = strtoll((char *) value, &end, 10);
 	}
 
-	return !(tmp < 0 || errno != 0 || *end != '\0');
+	return !(tmp <= 0 || errno != 0 || *end != '\0');
 }
 
 /*
