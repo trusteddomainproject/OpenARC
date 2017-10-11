@@ -1566,6 +1566,7 @@ arc_process_set(ARC_MESSAGE *msg, arc_kvsettype_t type, u_char *str,
 		    arc_param_get(set, (u_char *) "h") == NULL ||
 		    arc_param_get(set, (u_char *) "d") == NULL ||
 		    arc_param_get(set, (u_char *) "b") == NULL ||
+		    arc_param_get(set, (u_char *) "bh") == NULL ||
 		    arc_param_get(set, (u_char *) "i") == NULL ||
 		    arc_param_get(set, (u_char *) "a") == NULL)
 		{
@@ -1934,8 +1935,8 @@ arc_validate_msg(ARC_MESSAGE *msg, u_int setnum)
 
 	/* extract the signature and body hash from the message */
 	b64sig = arc_param_get(kvset, "b");
-	b64siglen = strlen(b64sig);
 	b64bhtag = arc_param_get(kvset, "bh");
+	b64siglen = strlen(b64sig);
 
 	sig = malloc(b64siglen);
 	if (sig == NULL)
@@ -2628,7 +2629,7 @@ arc_eoh(ARC_MESSAGE *msg)
 			                         h,
 			                         &set);
 			if (status != ARC_STAT_OK)
-				return status;
+				msg->arc_cstate = ARC_CHAIN_FAIL;
 			h->hdr_data = set;
 		}
 	}
