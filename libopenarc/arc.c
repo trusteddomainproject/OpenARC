@@ -1568,6 +1568,7 @@ arc_process_set(ARC_MESSAGE *msg, arc_kvsettype_t type, u_char *str,
 		    arc_param_get(set, (u_char *) "b") == NULL ||
 		    arc_param_get(set, (u_char *) "bh") == NULL ||
 		    arc_param_get(set, (u_char *) "i") == NULL ||
+		    arc_param_get(set, (u_char *) "c") == NULL ||
 		    arc_param_get(set, (u_char *) "a") == NULL)
 		{
 			arc_error(msg, "missing parameter(s) in %s data",
@@ -1657,6 +1658,11 @@ arc_process_set(ARC_MESSAGE *msg, arc_kvsettype_t type, u_char *str,
 	  case ARC_KVSETTYPE_SEAL:
 		/* make sure required stuff is here */
 		if (arc_param_get(set, (u_char *) "cv") == NULL ||
+		    arc_param_get(set, (u_char *) "i") == NULL ||
+		    arc_param_get(set, (u_char *) "b") == NULL ||
+		    arc_param_get(set, (u_char *) "s") == NULL ||
+		    arc_param_get(set, (u_char *) "d") == NULL ||
+		    arc_param_get(set, (u_char *) "a") == NULL ||
 		    arc_param_get(set, (u_char *) "t") == NULL)
 		{
 			arc_error(msg, "missing parameter(s) in %s data",
@@ -1665,9 +1671,39 @@ arc_process_set(ARC_MESSAGE *msg, arc_kvsettype_t type, u_char *str,
 			return ARC_STAT_SYNTAX;
 		}
 
+		/* test validity of "i" */
+		p = arc_param_get(set, (u_char *) "i");
+		if (p != NULL && !arc_check_uint(p))
+		{
+			arc_error(msg,
+			          "invalid \"i\" value in %s data",
+			          settype);
+			set->set_bad = TRUE;
+			return ARC_STAT_SYNTAX;
+		}
+
 		break;
 
 	  case ARC_KVSETTYPE_AR:
+		if (arc_param_get(set, (u_char *) "i") == NULL)
+		{
+			arc_error(msg, "missing parameter(s) in %s data",
+			          settype);
+			set->set_bad = TRUE;
+			return ARC_STAT_SYNTAX;
+		}
+
+		/* test validity of "i" */
+		p = arc_param_get(set, (u_char *) "i");
+		if (p != NULL && !arc_check_uint(p))
+		{
+			arc_error(msg,
+			          "invalid \"i\" value in %s data",
+			          settype);
+			set->set_bad = TRUE;
+			return ARC_STAT_SYNTAX;
+		}
+
 		break;
 	}
 
@@ -2048,6 +2084,17 @@ arc_validate_seal(ARC_MESSAGE *msg, u_int setnum)
 	kvset = set->arcset_as->hdr_data;
 	msg->arc_selector = arc_param_get(kvset, "s");
 	msg->arc_domain = arc_param_get(kvset, "d");
+
+	if (msg->arc_selector == NULL)
+	{
+		arc_error(msg, "seal at i=%u has no selector", setnum);
+		return ARC_STAT_SYNTAX;
+	}
+	if (msg->arc_domain == NULL)
+	{
+		arc_error(msg, "seal at i=%u has no domain", setnum);
+		return ARC_STAT_SYNTAX;
+	}
 
 	/* get the key from DNS (or wherever) */
 	status = arc_get_key(msg, FALSE);
@@ -2597,6 +2644,7 @@ arc_eoh(ARC_MESSAGE *msg)
 	arc_kvsettype_t type;
 	ARC_STAT status;
 	u_char *inst;
+	char *p;
 	struct arc_hdrfield *h;
 	ARC_KVSET *set;
 
@@ -2663,9 +2711,15 @@ arc_eoh(ARC_MESSAGE *msg)
              set != NULL;
              set = arc_set_next(set, ARC_KVSETTYPE_ANY))
 	{
-		inst = arc_param_get(set, "i");
 		type = arc_set_type(set);
-		n = strtoul(inst, NULL, 10);
+
+		/* if i= is missing or bogus, just skip it */
+		inst = arc_param_get(set, "i");
+		if (inst == NULL)
+			continue;
+		n = strtoul(inst, NULL, &p);
+		if (*p != '\0')
+			continue;
 
 		switch (type)
 		{
