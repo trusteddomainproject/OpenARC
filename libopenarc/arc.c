@@ -1053,19 +1053,19 @@ arc_check_uint(u_char *value)
 	if (value[0] == '-')
 	{
 		errno = ERANGE;
-		tmp = (uint64_t) -1;
+		tmp = -1;
 	}
 	else if (value[0] == '\0')
 	{
 		errno = EINVAL;
-		tmp = (uint64_t) -1;
+		tmp = -1;
 	}
 	else
 	{
-		tmp = strtoull((char *) value, &end, 10);
+		tmp = strtoll((char *) value, &end, 10);
 	}
 
-	return !(tmp == (uint64_t) -1 || errno != 0 || *end != '\0');
+	return !(tmp < 0 || errno != 0 || *end != '\0');
 }
 
 /*
@@ -2720,11 +2720,9 @@ arc_eoh(ARC_MESSAGE *msg)
 
 		/* if i= is missing or bogus, just skip it */
 		inst = arc_param_get(set, "i");
-		if (inst == NULL)
+		if (inst == NULL || !arc_check_uint(inst))
 			continue;
 		n = strtoul(inst, &p, 10);
-		if (*p != '\0')
-			continue;
 
 		switch (type)
 		{
