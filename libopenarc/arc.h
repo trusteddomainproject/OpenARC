@@ -565,4 +565,8 @@ extern char *arc_get_domain __P((ARC_MESSAGE *msg));
 
 extern const char *arc_chain_str __P((ARC_MESSAGE *msg));
 
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
+
 #endif /* _ARC_H_ */
