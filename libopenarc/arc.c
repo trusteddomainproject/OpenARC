@@ -831,6 +831,7 @@ arc_init(void)
 void
 arc_close(ARC_LIB *lib)
 {
+	ARC_free(lib->arcl_flist);
 	ARC_free(lib);
 }
 
@@ -2260,6 +2261,25 @@ arc_free(ARC_MESSAGE *msg)
 		ARC_free(h);
 		h = tmp;
 	}
+
+	h = msg->arc_sealhead;
+	while (h != NULL)
+	{
+		tmp = h->hdr_next;
+		ARC_free(h->hdr_text);
+		ARC_free(h);
+		h = tmp;
+	}
+
+if (msg->arc_hdrlist != NULL)
+{
+	ARC_free(msg->arc_hdrlist);
+}
+
+if (msg->arc_hdrbuf != NULL)
+{
+	arc_dstring_free(msg->arc_hdrbuf);
+}
 
 	arc_canon_cleanup(msg);
 
