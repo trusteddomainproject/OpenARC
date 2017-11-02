@@ -101,7 +101,7 @@ arc_dstring_resize(struct arc_dstring *dstr, int len)
 		}
 	}
 
-	new = malloc(newsz);
+	new = ARC_malloc(newsz);
 	if (new == NULL)
 	{
 		arc_error(dstr->ds_msg, "unable to allocate %d byte(s)",
@@ -110,7 +110,7 @@ arc_dstring_resize(struct arc_dstring *dstr, int len)
 	}
 
 	memcpy(new, dstr->ds_buf, dstr->ds_alloc);
-	free(dstr->ds_buf);
+	ARC_free(dstr->ds_buf);
 	dstr->ds_alloc = newsz;
 	dstr->ds_buf = new;
 
@@ -144,7 +144,7 @@ arc_dstring_new(ARC_MESSAGE *msg, int len, int maxlen)
 	if (len < BUFRSZ)
 		len = BUFRSZ;
 
-	new = (struct arc_dstring *) malloc(sizeof *new);
+	new = (struct arc_dstring *) ARC_malloc(sizeof *new);
 	if (new == NULL)
 	{
 		arc_error(msg, "unable to allocate %d byte(s)",
@@ -153,12 +153,12 @@ arc_dstring_new(ARC_MESSAGE *msg, int len, int maxlen)
 	}
 
 	new->ds_msg = msg;
-	new->ds_buf = malloc(len);
+	new->ds_buf = ARC_malloc(len);
 	if (new->ds_buf == NULL)
 	{
 		arc_error(msg, "unable to allocate %d byte(s)",
 		          sizeof(struct arc_dstring));
-		free(new);
+		ARC_free(new);
 		return NULL;
 	}
 
@@ -186,8 +186,8 @@ arc_dstring_free(struct arc_dstring *dstr)
 {
 	assert(dstr != NULL);
 
-	free(dstr->ds_buf);
-	free(dstr);
+	ARC_free(dstr->ds_buf);
+	ARC_free(dstr);
 }
 
 /*
@@ -485,7 +485,7 @@ arc_strndup(u_char *src, size_t len)
 {
 	u_char *ret;
 
-	ret = malloc(len + 1);
+	ret = ARC_malloc(len + 1);
 	if (ret != NULL)
 	{
 		memset(ret, '\0', len + 1);
@@ -914,18 +914,18 @@ arc_copy_array(char **in)
 	for (n = 0; in[n] != NULL; n++)
 		continue;
 
-	out = malloc(sizeof(char *) * (n + 1));
+	out = ARC_malloc(sizeof(char *) * (n + 1));
 	if (out == NULL)
 		return NULL;
 
 	for (c = 0; c < n; c++)
 	{
-		out[c] = strdup(in[c]);
+		out[c] = ARC_strdup(in[c]);
 		if (out[c] == NULL)
 		{
 			for (n = 0; n < c; n++)
-				free(out[n]);
-			free(out);
+				ARC_free(out[n]);
+			ARC_free(out);
 			return NULL;
 		}
 	}
@@ -953,7 +953,7 @@ arc_clobber_array(char **in)
 	assert(in != NULL);
 
 	for (n = 0; in[n] != NULL; n++)
-		free(in[n]);
+		ARC_free(in[n]);
 
-	free(in);
+	ARC_free(in);
 }

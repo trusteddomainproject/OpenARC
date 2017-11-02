@@ -115,16 +115,16 @@ arc_canon_free(ARC_MESSAGE *msg, ARC_CANON *canon)
 			/* NOTREACHED */
 		}
 
-		free(canon->canon_hash);
+		ARC_free(canon->canon_hash);
 	}
 
 	if (canon->canon_hashbuf != NULL)
-		free(canon->canon_hashbuf);
+		ARC_free(canon->canon_hashbuf);
 
 	if (canon->canon_buf != NULL)
 		arc_dstring_free(canon->canon_buf);
 
-	free(canon);
+	ARC_free(canon);
 }
 
 /*
@@ -568,7 +568,7 @@ arc_canon_init(ARC_MESSAGE *msg, _Bool tmp, _Bool keep)
 
 	for (cur = msg->arc_canonhead; cur != NULL; cur = cur->canon_next)
 	{
-		cur->canon_hashbuf = malloc(ARC_HASHBUFSIZE);
+		cur->canon_hashbuf = ARC_malloc(ARC_HASHBUFSIZE);
 		if (cur->canon_hashbuf == NULL)
 		{
 			arc_error(msg, "unable to allocate %d byte(s)",
@@ -587,7 +587,7 @@ arc_canon_init(ARC_MESSAGE *msg, _Bool tmp, _Bool keep)
 		  {
 			struct arc_sha1 *sha1;
 
-			sha1 = (struct arc_sha1 *) malloc(sizeof(struct arc_sha1));
+			sha1 = (struct arc_sha1 *) ARC_malloc(sizeof(struct arc_sha1));
 			if (sha1 == NULL)
 			{
 				arc_error(msg,
@@ -604,7 +604,7 @@ arc_canon_init(ARC_MESSAGE *msg, _Bool tmp, _Bool keep)
 				status = arc_tmpfile(msg, &fd, keep);
 				if (status != ARC_STAT_OK)
 				{
-					free(sha1);
+					ARC_free(sha1);
 					return status;
 				}
 
@@ -622,7 +622,7 @@ arc_canon_init(ARC_MESSAGE *msg, _Bool tmp, _Bool keep)
 		  {
 			struct arc_sha256 *sha256;
 
-			sha256 = (struct arc_sha256 *) malloc(sizeof(struct arc_sha256));
+			sha256 = (struct arc_sha256 *) ARC_malloc(sizeof(struct arc_sha256));
 			if (sha256 == NULL)
 			{
 				arc_error(msg,
@@ -639,7 +639,7 @@ arc_canon_init(ARC_MESSAGE *msg, _Bool tmp, _Bool keep)
 				status = arc_tmpfile(msg, &fd, keep);
 				if (status != ARC_STAT_OK)
 				{
-					free(sha256);
+					ARC_free(sha256);
 					return status;
 				}
 
@@ -750,7 +750,7 @@ arc_add_canon(ARC_MESSAGE *msg, int type, arc_canon_t canon, int hashtype,
 		}
 	}
 
-	new = (ARC_CANON *) malloc(sizeof *new);
+	new = (ARC_CANON *) ARC_malloc(sizeof *new);
 	if (new == NULL)
 	{
 		arc_error(msg, "unable to allocate %d byte(s)", sizeof *new);
@@ -867,7 +867,7 @@ arc_canon_selecthdrs(ARC_MESSAGE *msg, u_char *hdrlist,
 
 	if (msg->arc_hdrlist == NULL)
 	{
-		msg->arc_hdrlist = malloc(ARC_MAXHEADER);
+		msg->arc_hdrlist = ARC_malloc(ARC_MAXHEADER);
 		if (msg->arc_hdrlist == NULL)
 		{
 			arc_error(msg, "unable to allocate %d bytes(s)",
@@ -883,7 +883,7 @@ arc_canon_selecthdrs(ARC_MESSAGE *msg, u_char *hdrlist,
 		hdr->hdr_flags &= ~ARC_HDR_SIGNED;
 
 	n = msg->arc_hdrcnt * sizeof(struct arc_hdrfield *);
-	lhdrs = malloc(n);
+	lhdrs = ARC_malloc(n);
 	if (lhdrs == NULL)
 		return -1;
 	memset(lhdrs, '\0', n);
@@ -895,10 +895,10 @@ arc_canon_selecthdrs(ARC_MESSAGE *msg, u_char *hdrlist,
 			shcnt++;
 	}
 	n = sizeof(u_char *) * shcnt;
-	hdrs = malloc(n);
+	hdrs = ARC_malloc(n);
 	if (hdrs == NULL)
 	{
-		free(lhdrs);
+		ARC_free(lhdrs);
 		return -1;
 	}
 	memset(hdrs, '\0', n);
@@ -949,8 +949,8 @@ arc_canon_selecthdrs(ARC_MESSAGE *msg, u_char *hdrlist,
 		arc_error(msg, "too many headers (found %d, max %d)", shcnt,
 		          nptrs);
 
-		free(lhdrs);
-		free(hdrs);
+		ARC_free(lhdrs);
+		ARC_free(hdrs);
 
 		return -1;
 	}
@@ -966,8 +966,8 @@ arc_canon_selecthdrs(ARC_MESSAGE *msg, u_char *hdrlist,
 		}
 	}
 
-	free(lhdrs);
-	free(hdrs);
+	ARC_free(lhdrs);
+	ARC_free(hdrs);
 
 	return m;
 }
@@ -1256,7 +1256,7 @@ arc_canon_runheaders(ARC_MESSAGE *msg)
 		return ARC_STAT_OK;
 
 	n = msg->arc_hdrcnt * sizeof(struct arc_hdrfield *);
-	hdrset = malloc(n);
+	hdrset = ARC_malloc(n);
 	if (hdrset == NULL)
 		return ARC_STAT_NORESOURCE;
 
@@ -1265,7 +1265,7 @@ arc_canon_runheaders(ARC_MESSAGE *msg)
 		msg->arc_hdrbuf = arc_dstring_new(msg, BUFRSZ, MAXBUFRSZ);
 		if (msg->arc_hdrbuf == NULL)
 		{
-			free(hdrset);
+			ARC_free(hdrset);
 			return ARC_STAT_NORESOURCE;
 		}
 	}
@@ -1313,7 +1313,7 @@ arc_canon_runheaders(ARC_MESSAGE *msg)
 				{
 					arc_error(msg,
 					          "arc_canon_selecthdrs() failed during canonicalization");
-					free(hdrset);
+					ARC_free(hdrset);
 					return ARC_STAT_INTERNAL;
 				}
 			}
@@ -1410,7 +1410,7 @@ arc_canon_runheaders(ARC_MESSAGE *msg)
 			{
 				arc_error(msg,
 				          "arc_canon_selecthdrs() failed during canonicalization");
-				free(hdrset);
+				ARC_free(hdrset);
 				return ARC_STAT_INTERNAL;
 			}
 		}
@@ -1425,7 +1425,7 @@ arc_canon_runheaders(ARC_MESSAGE *msg)
 				                          hdrset[c], TRUE);
 				if (status != ARC_STAT_OK)
 				{
-					free(hdrset);
+					ARC_free(hdrset);
 					return status;
 				}
 			}
@@ -1445,7 +1445,7 @@ arc_canon_runheaders(ARC_MESSAGE *msg)
 		status = arc_canon_strip_b(msg, cur->canon_sigheader->hdr_text);
 		if (status != ARC_STAT_OK)
 		{
-			free(hdrset);
+			ARC_free(hdrset);
 			return status;
 		}
 
@@ -1466,7 +1466,7 @@ arc_canon_runheaders(ARC_MESSAGE *msg)
 		cur->canon_done = TRUE;
 	}
 
-	free(hdrset);
+	ARC_free(hdrset);
 
 	return ARC_STAT_OK;
 }
