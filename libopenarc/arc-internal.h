@@ -122,4 +122,13 @@ typedef struct arc_plist ARC_PLIST;
 struct arc_canon;
 typedef struct arc_canon ARC_CANON;
 
+/*
+**  memory allocation wrappers
+*/
+
+#define ARC_malloc  malloc
+#define ARC_strdup  strdup
+#define ARC_realloc realloc
+#define ARC_free    free
+
 #endif /* ! _ARC_INTERNAL_H_ */
