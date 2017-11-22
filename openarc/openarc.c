@@ -3565,10 +3565,20 @@ mlfi_eom(SMFICTX *ctx)
 						                    ar.ares_result[0].result_reason);
 					}
 
-					if (n != ar.ares_count - 1)
+					/* append semicolon unless this is the last result in this AR header */
+					if (n < ar.ares_count - 1)
+					{
 						arcf_dstring_cat(afc->mctx_tmpstr, "; ");
+					}
 				}
 			}
+
+			/* append semicolon unless this is the last AR header */
+			if (arcf_findheader(afc, AR_HEADER_NAME, c + 1) != NULL)
+			{
+				arcf_dstring_cat(afc->mctx_tmpstr, "; ");
+			}
+
 		}
 
 		/*
