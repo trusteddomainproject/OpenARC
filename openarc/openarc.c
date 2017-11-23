@@ -3571,6 +3571,15 @@ mlfi_eom(SMFICTX *ctx)
 			}
 		}
 
+		/* append our chain status if verifying */
+		if (BITSET(ARC_MODE_VERIFY, cc->cctx_mode))
+		{
+			if (arcf_dstring_len(afc->mctx_tmpstr) > 0)
+				arcf_dstring_cat(afc->mctx_tmpstr, "; ");
+			arcf_dstring_printf(afc->mctx_tmpstr, "arc=%s",
+			                    arc_chain_str(afc->mctx_arcmsg));
+		}
+
 		/*
 		**  Get the seal fields to apply.
 		*/
