@@ -1,17 +1,40 @@
-# Copyright (c) 2010, 2011, 2016, The Trusted Domain Project.
-# All rights reserved.
+%global systemd (0%{?fedora} >= 18) || (0%{?rhel} >= 7)
+%global tmpfiles (0%{?fedora} >= 15) || (0%{?rhel} >= 7)
 
 Summary: An open source library and milter for providing ARC service
 Name: openarc
 Version: @VERSION@
-Release: 1
-License: BSD
+Release: 1%{?dist}
+License: BSD and Sendmail
 Group: System Environment/Daemons
+URL: https://github.com/mskucherawy/OpenARC
+
+BuildRequires: libtool
+BuildRequires: pkgconfig(openssl)
+BuildRequires: pkgconfig(libbsd)
+
+# sendmail-devel renamed for F25+
+%if 0%{?fedora} > 25
+BuildRequires: sendmail-milter-devel
+%else
+BuildRequires: sendmail-devel
+%endif
+
+Requires: lib%{name}%{?_isa} = %{version}-%{release}
 Requires: libopenarc = %{version}-%{release}
-BuildRequires: sendmail-devel, openssl-devel
-@SPECREQUIRES@
-@SPECBUILDREQUIRES@
-Source: openarc-%{version}.tar.gz
+Requires(pre): shadow-utils
+%if %systemd
+# Required for systemd
+%{?systemd_requires}
+BuildRequires: systemd
+%else
+# Required for SysV
+Requires(post): chkconfig
+Requires(preun): chkconfig, initscripts
+Requires(postun): initscripts
+%endif
+
+Source0: openarc-%{version}.tar.gz
 BuildRoot: %{_tmppath}/%{name}-%{version}-root
 Prefix: %{_prefix}
 
@@ -31,111 +54,149 @@ using libopenarc.
 %package -n libopenarc-devel
 Summary: Development files for libopenarc
 Group: Development/Libraries
-Requires: libopenarc
+Requires: lib%{name}%{?_isa} = %{version}-%{release}
 
 %description -n libopenarc-devel
 This package contains the static libraries, headers, and other support files
 required for developing applications against libopenarc.
 
 %prep
-%setup
+%autosetup -p1
 
 %build
-# Required for proper OpenSSL support on some versions of RedHat
-if [ -d /usr/include/kerberos ]; then
-	INCLUDES="$INCLUDES -I/usr/include/kerberos"
-fi
-./configure --prefix=%{_prefix} --sysconfdir=%{_sysconfdir} --libdir=%{_libdir} --mandir=%{_mandir} @SPECCONFIGURE@ CPPFLAGS="$INCLUDES"
+%configure --disable-static
 
-make
-
+make %{?_smp_mflags}
 %install
-make install DESTDIR="$RPM_BUILD_ROOT"
-mkdir -p "$RPM_BUILD_ROOT"%{_sysconfdir}
-mkdir -p "$RPM_BUILD_ROOT"%{_initrddir}
-install -m 0755 contrib/init/generic/openarc "$RPM_BUILD_ROOT"%{_initrddir}/%{name}
-echo '## Basic OpenARC config file for verification only
+make install DESTDIR=%{buildroot}
+mkdir -p %{buildroot}%{_sysconfdir}
+mkdir -p -m 0700 %{buildroot}%{_localstatedir}/run/%{name}
+rm -r %{buildroot}%{_prefix}/share/doc/openarc
+rm %{buildroot}/%{_libdir}/*.la
+
+
+cat > %{buildroot}%{_sysconfdir}/openarc.conf <<EOF
 ## See openarc.conf(5) or %{_docdir}/%{name}-%{version}/openarc.conf.sample for more
 PidFile %{_localstatedir}/run/openarc/openarc.pid
-Mode	v
-Syslog	yes
+Syslog  yes
 #Umask   002
-#UserID  openarc:mail
-#Socket	local:%{_localstatedir}/run/openarc/openarc.socket
-Socket  inet:8891@localhost
+UserID  openarc:openarc
+Socket  inet:8894@localhost
 
 ## After setting Mode to "sv", running
-## openarc-genkey -D %{_sysconfdir}/openarc -s key -d `hostname --domain`
+## opendkim-genkey -D %{_sysconfdir}/openarc -s key -d `hostname --domain`
 ## and putting %{_sysconfdir}/openarc
 #Canonicalization        relaxed/simple
 #Domain                  example.com # change to domain
 #Selector                key
 #KeyFile                 %{_sysconfdir}/openarc/key.private
-' > "$RPM_BUILD_ROOT"%{_sysconfdir}/openarc.conf
-rm -r "$RPM_BUILD_ROOT"%{_prefix}/share/doc/openarc
+#SignatureAlgorithm rsa-sha256
+EOF
+
+
+%if %systemd
+install -d -m 0755 %{buildroot}%{_unitdir}
+cat > %{buildroot}%{_unitdir}/%{name}.service << 'EOF'
+[Unit]
+Description=Authenticated Receive Chain (ARC) Milter
+Documentation=man:%{name}(8) man:%{name}.conf(5) http://www.trusteddomain.org/%{name}/
+After=network.target nss-lookup.target syslog.target
+
+[Service]
+Type=forking
+PIDFile=%{_localstatedir}/run/%{name}/%{name}.pid
+EnvironmentFile=-%{_sysconfdir}/sysconfig/%{name}
+ExecStart=/usr/sbin/%{name} $OPTIONS
+ExecReload=/bin/kill -USR1 $MAINPID
+User=%{name}
+Group=%{name}
+
+[Install]
+WantedBy=multi-user.target
+EOF
+%else
+mkdir -p %{buildroot}%{_initrddir}
+install -m 0755 contrib/init/redhat/%{name} %{buildroot}%{_initrddir}/%{name}
+%endif
+
+%if %{tmpfiles}
+install -p -d %{buildroot}%{_tmpfilesdir}
+cat > %{buildroot}%{_tmpfilesdir}/%{name}.conf <<EOF
+D %{_localstatedir}/run/%{name} 0700 %{name} %{name} -
+EOF
+%endif
+
+%pre
+if ! getent passwd openarc >/dev/null 2>&1; then
+    %{_sbindir}/useradd -M -d %{_localstatedir}/lib -r -s /bin/false openarc
+    if ! getent group openarc >/dev/null; then
+        %{_sbindir}/groupadd openarc
+        %{_sbindir}/usermod -g openarc openarc
+    fi
+    if getent group mail >/dev/null; then
+        %{_sbindir}/usermod -G mail openarc
+    fi
+fi
+exit 0
+
 
 %post
-if ! getent passwd openarc >/dev/null 2>&1; then
-	%{_sbindir}/useradd -M -d %{_localstatedir}/lib -r -s /bin/false openarc
-	if ! getent group openarc >/dev/null; then
-		%{_sbindir}/groupadd openarc
-		%{_sbindir}/usermod -g openarc openarc
-	fi
-	if getent group mail >/dev/null; then
-		%{_sbindir}/usermod -G mail openarc
-	fi
-fi
-test -d %{_localstatedir}/run/openarc || mkdir %{_localstatedir}/run/openarc
-chown openarc:openarc %{_localstatedir}/run/openarc
-if [ ! -d %{_sysconfdir}/openarc ]; then
-	mkdir %{_sysconfdir}/openarc
-	chmod o-rx %{_sysconfdir}/openarc
-	openarc-genkey -D %{_sysconfdir}/openarc -s key -d `hostname --domain`
-	chown -R openarc:openarc %{_sysconfdir}/openarc
-fi
-if [ -x /sbin/chkconfig ]; then
-	/sbin/chkconfig --add openarc
-elif [ -x /usr/lib/lsb/install_initd ]; then
-	/usr/lib/lsb/install_initd openarc
-fi
+
+%if %systemd
+%systemd_post %{name}.service
+%else
+/sbin/chkconfig --add %{name} || :
+%endif
+
 
 %preun
-if [ $1 = 0 ]; then
-	service openarc stop && rm -f %{_localstatedir}/run/openarc/openarc.sock && rmdir %{_localstatedir}/run/openarc 2>/dev/null
-	if [ -x /sbin/chkconfig ]; then
-		/sbin/chkconfig --del openarc
-	elif [ -x /usr/lib/lsb/remove_initd ]; then
-		/usr/lib/lsb/remove_initd openarc
-	fi
-	userdel openarc
-	if getent group openarc >/dev/null; then
-		groupdel openarc
-	fi
+%if %systemd
+%systemd_preun %{name}.service
+%else
+if [ $1 -eq 0 ]; then
+    service %{name} stop >/dev/null || :
+    /sbin/chkconfig --del %{name} || :
 fi
+exit 0
+%endif
 
-%clean
-if [ "$RPM_BUILD_ROOT" != "/" ]; then
-	rm -rf "$RPM_BUILD_ROOT"
-fi
+%post -n libopenarc -p /sbin/ldconfig
+
+%postun -n libopenarc -p /sbin/ldconfig
+
 
 %files
 %defattr(-,root,root)
 %doc LICENSE LICENSE.Sendmail README RELEASE_NOTES
 %config(noreplace) %{_sysconfdir}/openarc.conf
-%config %{_initrddir}/%{name}
+
+%if %{tmpfiles}
+%{_tmpfilesdir}/%{name}.conf
+%else
+%dir %attr(-,%{name},%{name}) %{_localstatedir}/run/%{name}
+%endif
+
+%if %{systemd}
+%{_unitdir}/%{name}.service
+%else
+%{_initrddir}/%{name}
+%endif
 %{_mandir}/*/*
 %{_sbindir}/*
-@SPECBINDIR@
+
 
 %files -n libopenarc
+%doc LICENSE LICENSE.Sendmail
 %defattr(-,root,root)
 %{_libdir}/*.so.*
 
 %files -n libopenarc-devel
 %defattr(-,root,root)
-%doc libopenarc/docs/*.html
+%doc LICENSE LICENSE.Sendmail
 %{_includedir}/*
-%{_libdir}/*.a
-%{_libdir}/*.la
 %{_libdir}/*.so
 %{_libdir}/pkgconfig/*.pc
+
+%changelog
+* Sun Jul 23 2017  Matt Domsch <matt@domsch.com> 0.1.0-1
+- update to Fedora Packaging Guidelines
