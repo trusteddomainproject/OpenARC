@@ -3,5 +3,10 @@
 This listing shows the versions of the OpenARC package, the date of
 release, and a summary of the changes in that release.
 
+0.1.1		2017/12/11
+	Fix issue #47: Fix syntax of ARC-Authentication-Results with respect
+		to semicolons.  Problem noted by Matt Domsch; based on a
+		patch from Ben Arblaster.
+
 0.1.0		2017/12/06
 	Initial pre-release.
