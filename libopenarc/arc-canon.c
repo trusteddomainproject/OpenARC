@@ -691,11 +691,11 @@ arc_canon_cleanup(ARC_MESSAGE *msg)
 
 	msg->arc_canonhead = NULL;
 
-if (msg->arc_canonbuf != NULL)
-{
-	arc_dstring_free(msg->arc_canonbuf);
-	msg->arc_canonbuf = NULL;
-}
+	if (msg->arc_canonbuf != NULL)
+	{
+		arc_dstring_free(msg->arc_canonbuf);
+		msg->arc_canonbuf = NULL;
+	}
 }
 
 /*
