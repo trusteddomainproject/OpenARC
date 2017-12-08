@@ -2271,15 +2271,15 @@ arc_free(ARC_MESSAGE *msg)
 		h = tmp;
 	}
 
-if (msg->arc_hdrlist != NULL)
-{
-	ARC_free(msg->arc_hdrlist);
-}
+	if (msg->arc_hdrlist != NULL)
+	{
+		ARC_free(msg->arc_hdrlist);
+	}
 
-if (msg->arc_hdrbuf != NULL)
-{
-	arc_dstring_free(msg->arc_hdrbuf);
-}
+	if (msg->arc_hdrbuf != NULL)
+	{
+		arc_dstring_free(msg->arc_hdrbuf);
+	}
 
 	arc_canon_cleanup(msg);
 
