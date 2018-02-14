@@ -89,7 +89,6 @@
 
 /* macros */
 #define CMDLINEOPTS	"Ac:fhlnp:P:r:t:u:vV"
-#define AR_HEADER_NAME	"Authentication-Results"
 
 /*
 **  CONFIGVALUE -- a list of configuration values
@@ -3457,7 +3456,7 @@ mlfi_eom(SMFICTX *ctx)
 		/* assemble authentication results */
 		for (c = 0; ; c++)
 		{
-			hdr = arcf_findheader(afc, AR_HEADER_NAME, c);
+			hdr = arcf_findheader(afc, AUTHRESULTSHDR, c);
 			if (hdr == NULL)
 				break;
 			status = ares_parse(hdr->hdr_val, &ar);
@@ -3467,7 +3466,7 @@ mlfi_eom(SMFICTX *ctx)
 				{
 					syslog(LOG_WARNING,
 					       "%s: can't parse %s; ignoring",
-					       afc->mctx_jobid, AR_HEADER_NAME);
+					       afc->mctx_jobid, AUTHRESULTSHDR);
 				}
 
 				continue;
