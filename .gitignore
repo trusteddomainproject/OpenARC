@@ -52,6 +52,7 @@ stamp-h1
 *~
 *.cache
 *#*
+.vscode
 
 # compilation artifacts
 libopenarc/symbols.map
