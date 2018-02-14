@@ -116,6 +116,7 @@ struct arcf_config
 	_Bool		conf_addswhdr;		/* add software header field */
 	_Bool		conf_safekeys;		/* require safe keys */
 	_Bool		conf_keeptmpfiles;	/* keep temp files */
+	_Bool		conf_finalreceiver; /* act as final receiver */
 	u_int		conf_refcnt;		/* reference count */
 	u_int		conf_mode;		/* mode flags */
 	arc_canon_t	conf_canonhdr;		/* canonicalization for header */
@@ -1480,6 +1481,10 @@ arcf_config_load(struct config *data, struct arcf_config *conf,
 		(void) config_get(data, "EnableCoredumps",
 		                  &conf->conf_enablecores,
 		                  sizeof conf->conf_enablecores);
+
+		(void) config_get(data, "FinalReceiver",
+		                  &conf->conf_finalreceiver,
+						  sizeof conf->conf_finalreceiver);
 
 		(void) config_get(data, "TemporaryDirectory",
 		                  &conf->conf_tmpdir,
