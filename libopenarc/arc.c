@@ -3550,7 +3550,7 @@ arc_get_domain(ARC_MESSAGE *msg)
 }
 
 /*
-**  ARC_CHAIN_STR -- retrieve chain status, as a string
+**  ARC_CHAIN_STATUS_STR -- retrieve chain status, as a string
 **
 **  Parameters:
 **      msg -- ARC_MESSAGE object
@@ -3560,7 +3560,57 @@ arc_get_domain(ARC_MESSAGE *msg)
 */
 
 const char *
-arc_chain_str(ARC_MESSAGE *msg)
+arc_chain_status_str(ARC_MESSAGE *msg)
 {
 	return arc_code_to_name(chainstatus, msg->arc_cstate);
+}
+
+/*
+**	ARC_CHAIN_CUSTODY_STR -- retrieve domain chain, as a string
+**
+**	Parameters:
+**      msg -- ARC_MESSAGE object
+**      buf -- where to write
+**      buflen -- bytes at "buf"
+**
+**	Return value:
+**	    Number of bytes written
+*/
+int
+arc_chain_custody_str(ARC_MESSAGE *msg, u_char *buf, size_t buflen)
+{
+	u_int set;
+	u_char *inst;
+	ARC_KVSET *kvset;
+	char *str = NULL;
+	char *delim = "";
+	size_t bytecount = 0;
+	size_t appendlen = 0;
+
+	assert(buf != NULL);
+	assert(buflen > 0);
+
+	memset(buf, '\0', buflen);
+
+	for (set = msg->arc_nsets; set > 0; set--)
+	{
+		for (kvset = arc_set_first(msg, ARC_KVSETTYPE_SEAL);
+				kvset != NULL;
+				kvset = arc_set_next(kvset, ARC_KVSETTYPE_SEAL))
+		{
+			inst = arc_param_get(kvset, "i");
+			if (atoi(inst) == set)
+				break;
+		}
+
+		str = arc_param_get(kvset, "d");
+		if (str == NULL) continue;
+		if (set < msg->arc_nsets) delim = ":";
+		appendlen = strlen(str) + strlen(delim);
+		snprintf(buf + bytecount,
+		         buflen - bytecount - appendlen, "%s%s", delim, str);
+		bytecount += appendlen;
+	}
+
+	return bytecount;
 }

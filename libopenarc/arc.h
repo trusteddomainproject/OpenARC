@@ -554,7 +554,7 @@ extern uint64_t arc_ssl_version __P((void));
 extern char *arc_get_domain __P((ARC_MESSAGE *msg));
 
 /*
-**  ARC_CHAIN_STR -- retrieve chain status, as a string
+**  ARC_CHAIN_STATUS_STR -- retrieve chain status, as a string
 **
 **  Parameters:
 **      msg -- ARC_MESSAGE object
@@ -563,7 +563,20 @@ extern char *arc_get_domain __P((ARC_MESSAGE *msg));
 **      Pointer to string containing the current chain status.
 */
 
-extern const char *arc_chain_str __P((ARC_MESSAGE *msg));
+extern const char *arc_chain_status_str __P((ARC_MESSAGE *msg));
+
+/*
+**	ARC_CHAIN_CUSTODY_STR -- retrieve domain chain, as a string
+**
+**	Parameters:
+**      msg -- ARC_MESSAGE object
+**      buf -- where to write
+**      buflen -- bytes at "buf"
+**
+**	Return value:
+**	    Number of bytes written
+*/
+extern int arc_chain_custody_str __P((ARC_MESSAGE *msg, u_char *buf, size_t buflen));
 
 #ifdef __cplusplus
 }

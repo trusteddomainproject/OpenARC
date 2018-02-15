@@ -3589,7 +3589,7 @@ mlfi_eom(SMFICTX *ctx)
 			if (arcf_dstring_len(afc->mctx_tmpstr) > 0)
 				arcf_dstring_cat(afc->mctx_tmpstr, "; ");
 			arcf_dstring_printf(afc->mctx_tmpstr, "arc=%s",
-			                    arc_chain_str(afc->mctx_arcmsg));
+			                    arc_chain_status_str(afc->mctx_arcmsg));
 		}
 
 		/*
@@ -3650,13 +3650,19 @@ mlfi_eom(SMFICTX *ctx)
 		/*
  		**  Authentication-Results
 		*/
+		u_char arcchainbuf[ARC_MAXHEADER + 1];
+		int arcchainlen = arc_chain_custody_str(afc->mctx_arcmsg, arcchainbuf, sizeof(arcchainbuf));
 
 		arcf_dstring_blank(afc->mctx_tmpstr);
 		arcf_dstring_printf(afc->mctx_tmpstr,
 		                    "%s%s; arc=%s",
 		                    cc->cctx_noleadspc ? " " : "",
 		                    conf->conf_authservid,
-		                    arc_chain_str(afc->mctx_arcmsg));
+		                    arc_chain_status_str(afc->mctx_arcmsg));
+		if (conf->conf_finalreceiver && arcchainlen > 0)
+		{
+			arcf_dstring_printf(afc->mctx_tmpstr, " arc.chain=%s", arcchainbuf);
+		}
 		if (arcf_insheader(ctx, 1, AUTHRESULTSHDR,
 		                   arcf_dstring_get(afc->mctx_tmpstr)) != MI_SUCCESS)
 		{
