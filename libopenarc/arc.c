@@ -3604,8 +3604,8 @@ arc_chain_custody_str(ARC_MESSAGE *msg, u_char *buf, size_t buflen)
 	for (set = msg->arc_nsets; set > 0; set--)
 	{
 		for (kvset = arc_set_first(msg, ARC_KVSETTYPE_SEAL);
-				kvset != NULL;
-				kvset = arc_set_next(kvset, ARC_KVSETTYPE_SEAL))
+		     kvset != NULL;
+		     kvset = arc_set_next(kvset, ARC_KVSETTYPE_SEAL))
 		{
 			instance = arc_param_get(kvset, "i");
 			if (atoi(instance) == set)
@@ -3613,7 +3613,10 @@ arc_chain_custody_str(ARC_MESSAGE *msg, u_char *buf, size_t buflen)
 		}
 
 		str = arc_param_get(kvset, "d");
-		if (str == NULL) continue;
+		if (str == NULL)
+		{
+			continue;
+		}
 
 		if (set < msg->arc_nsets)
 		{
