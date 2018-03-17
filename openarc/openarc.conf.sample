@@ -123,6 +123,14 @@ Domain			example.com
 
 KeyFile			/var/db/dkim/example.private
 
+## FinalReceiver { yes | no }
+##      default "no"
+##
+## If set, causes this filter to pass chain signatory information downstream for
+## local policy evaluation in the event of an authentication failure.
+
+FinalReceiver { yes | no }
+
 ##  MaximumHeaders n
 ##
 ##  Disallow messages whose header blocks are bigger than "n" bytes.

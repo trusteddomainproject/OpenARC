@@ -89,7 +89,6 @@
 
 /* macros */
 #define CMDLINEOPTS	"Ac:fhlnp:P:r:t:u:vV"
-#define AR_HEADER_NAME	"Authentication-Results"
 
 /*
 **  CONFIGVALUE -- a list of configuration values
@@ -116,6 +115,7 @@ struct arcf_config
 	_Bool		conf_addswhdr;		/* add software header field */
 	_Bool		conf_safekeys;		/* require safe keys */
 	_Bool		conf_keeptmpfiles;	/* keep temp files */
+	_Bool		conf_finalreceiver;	/* act as final receiver */
 	u_int		conf_refcnt;		/* reference count */
 	u_int		conf_mode;		/* mode flags */
 	arc_canon_t	conf_canonhdr;		/* canonicalization for header */
@@ -1480,6 +1480,10 @@ arcf_config_load(struct config *data, struct arcf_config *conf,
 		(void) config_get(data, "EnableCoredumps",
 		                  &conf->conf_enablecores,
 		                  sizeof conf->conf_enablecores);
+
+		(void) config_get(data, "FinalReceiver",
+		                  &conf->conf_finalreceiver,
+						  sizeof conf->conf_finalreceiver);
 
 		(void) config_get(data, "TemporaryDirectory",
 		                  &conf->conf_tmpdir,
@@ -3452,7 +3456,7 @@ mlfi_eom(SMFICTX *ctx)
 		/* assemble authentication results */
 		for (c = 0; ; c++)
 		{
-			hdr = arcf_findheader(afc, AR_HEADER_NAME, c);
+			hdr = arcf_findheader(afc, AUTHRESULTSHDR, c);
 			if (hdr == NULL)
 				break;
 			status = ares_parse(hdr->hdr_val, &ar);
@@ -3462,7 +3466,7 @@ mlfi_eom(SMFICTX *ctx)
 				{
 					syslog(LOG_WARNING,
 					       "%s: can't parse %s; ignoring",
-					       afc->mctx_jobid, AR_HEADER_NAME);
+					       afc->mctx_jobid, AUTHRESULTSHDR);
 				}
 
 				continue;
@@ -3533,6 +3537,14 @@ mlfi_eom(SMFICTX *ctx)
 
 						arc_set_cv(afc->mctx_arcmsg,
 						           cv);
+
+						continue;
+					}
+
+					if (arcf_dstring_len(afc->mctx_tmpstr) > 0)
+					{
+						arcf_dstring_cat(afc->mctx_tmpstr,
+						                 "; ");
 					}
 
 					arcf_dstring_printf(afc->mctx_tmpstr,
@@ -3577,7 +3589,7 @@ mlfi_eom(SMFICTX *ctx)
 			if (arcf_dstring_len(afc->mctx_tmpstr) > 0)
 				arcf_dstring_cat(afc->mctx_tmpstr, "; ");
 			arcf_dstring_printf(afc->mctx_tmpstr, "arc=%s",
-			                    arc_chain_str(afc->mctx_arcmsg));
+			                    arc_chain_status_str(afc->mctx_arcmsg));
 		}
 
 		/*
@@ -3638,13 +3650,33 @@ mlfi_eom(SMFICTX *ctx)
 		/*
  		**  Authentication-Results
 		*/
+		u_char arcchainbuf[ARC_MAXHEADER + 1];
+		int arcchainlen = arc_chain_custody_str(afc->mctx_arcmsg,
+		                                        arcchainbuf,
+		                                        sizeof(arcchainbuf));
+
+		if (arcchainlen >= ARC_MAXHEADER + 1)
+		{
+			if (conf->conf_dolog)
+			{
+				syslog(LOG_ERR,
+				       "%s: arc.chain buffer overflow: %s",
+				       afc->mctx_jobid, "");
+			}
+
+			return SMFIS_TEMPFAIL;
+		}
 
 		arcf_dstring_blank(afc->mctx_tmpstr);
 		arcf_dstring_printf(afc->mctx_tmpstr,
 		                    "%s%s; arc=%s",
 		                    cc->cctx_noleadspc ? " " : "",
 		                    conf->conf_authservid,
-		                    arc_chain_str(afc->mctx_arcmsg));
+		                    arc_chain_status_str(afc->mctx_arcmsg));
+		if (conf->conf_finalreceiver && arcchainlen > 0)
+		{
+			arcf_dstring_printf(afc->mctx_tmpstr, " arc.chain=%s", arcchainbuf);
+		}
 		if (arcf_insheader(ctx, 1, AUTHRESULTSHDR,
 		                   arcf_dstring_get(afc->mctx_tmpstr)) != MI_SUCCESS)
 		{
