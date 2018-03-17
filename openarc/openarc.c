@@ -115,7 +115,7 @@ struct arcf_config
 	_Bool		conf_addswhdr;		/* add software header field */
 	_Bool		conf_safekeys;		/* require safe keys */
 	_Bool		conf_keeptmpfiles;	/* keep temp files */
-	_Bool		conf_finalreceiver; /* act as final receiver */
+	_Bool		conf_finalreceiver;	/* act as final receiver */
 	u_int		conf_refcnt;		/* reference count */
 	u_int		conf_mode;		/* mode flags */
 	arc_canon_t	conf_canonhdr;		/* canonicalization for header */
@@ -3651,7 +3651,21 @@ mlfi_eom(SMFICTX *ctx)
  		**  Authentication-Results
 		*/
 		u_char arcchainbuf[ARC_MAXHEADER + 1];
-		int arcchainlen = arc_chain_custody_str(afc->mctx_arcmsg, arcchainbuf, sizeof(arcchainbuf));
+		int arcchainlen = arc_chain_custody_str(afc->mctx_arcmsg,
+		                                        arcchainbuf,
+		                                        sizeof(arcchainbuf));
+
+		if (arcchainlen >= ARC_MAXHEADER + 1)
+		{
+			if (conf->conf_dolog)
+			{
+				syslog(LOG_ERR,
+				       "%s: arc.chain buffer overflow: %s",
+				       afc->mctx_jobid, "");
+			}
+
+			return SMFIS_TEMPFAIL;
+		}
 
 		arcf_dstring_blank(afc->mctx_tmpstr);
 		arcf_dstring_printf(afc->mctx_tmpstr,

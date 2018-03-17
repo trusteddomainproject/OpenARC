@@ -574,7 +574,8 @@ extern const char *arc_chain_status_str __P((ARC_MESSAGE *msg));
 **      buflen -- bytes at "buf"
 **
 **	Return value:
-**	    Number of bytes written
+**	    Number of bytes written. If value is greater than or equal to buflen
+**		argument, then buffer was too small and output was truncated.
 */
 extern int arc_chain_custody_str __P((ARC_MESSAGE *msg, u_char *buf, size_t buflen));
 
