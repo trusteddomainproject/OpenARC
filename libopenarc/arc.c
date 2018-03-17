@@ -3574,19 +3574,28 @@ arc_chain_status_str(ARC_MESSAGE *msg)
 **      buflen -- bytes at "buf"
 **
 **	Return value:
-**	    Number of bytes written
+**	    Number of bytes written. If value is greater than or equal to buflen
+**		argument, then buffer was too small and output was truncated.
 */
 int
 arc_chain_custody_str(ARC_MESSAGE *msg, u_char *buf, size_t buflen)
 {
 	u_int set;
-	u_char *inst;
+	u_char *instance;
 	ARC_KVSET *kvset;
 	char *str = NULL;
-	char *delim = "";
-	size_t bytecount = 0;
-	size_t appendlen = 0;
+	struct arc_dstring *tmpbuf;
+	int appendlen = 0;
 
+	tmpbuf = arc_dstring_new(msg, BUFRSZ, MAXBUFRSZ);
+	if (tmpbuf == NULL)
+	{
+		arc_dstring_free(tmpbuf);
+		arc_error(msg, "failed to allocate dynamic string");
+		return ARC_STAT_NORESOURCE;
+	}
+
+	assert(msg != NULL);
 	assert(buf != NULL);
 	assert(buflen > 0);
 
@@ -3598,19 +3607,24 @@ arc_chain_custody_str(ARC_MESSAGE *msg, u_char *buf, size_t buflen)
 				kvset != NULL;
 				kvset = arc_set_next(kvset, ARC_KVSETTYPE_SEAL))
 		{
-			inst = arc_param_get(kvset, "i");
-			if (atoi(inst) == set)
+			instance = arc_param_get(kvset, "i");
+			if (atoi(instance) == set)
 				break;
 		}
 
 		str = arc_param_get(kvset, "d");
 		if (str == NULL) continue;
-		if (set < msg->arc_nsets) delim = ":";
-		appendlen = strlen(str) + strlen(delim);
-		snprintf(buf + bytecount,
-		         buflen - bytecount - appendlen, "%s%s", delim, str);
-		bytecount += appendlen;
+
+		if (set < msg->arc_nsets)
+		{
+			(void) arc_dstring_printf(tmpbuf, ":%s", str);
+		} else {
+			(void) arc_dstring_printf(tmpbuf, "%s", str);
+		}
 	}
 
-	return bytecount;
+	appendlen = snprintf(buf, buflen, "%s", arc_dstring_get(tmpbuf));
+	arc_dstring_free(tmpbuf);
+
+	return appendlen;
 }
