@@ -3614,16 +3614,9 @@ arc_chain_custody_str(ARC_MESSAGE *msg, u_char *buf, size_t buflen)
 
 		str = arc_param_get(kvset, "d");
 		if (str == NULL)
-		{
 			continue;
-		}
 
-		if (set < msg->arc_nsets)
-		{
-			(void) arc_dstring_printf(tmpbuf, ":%s", str);
-		} else {
-			(void) arc_dstring_printf(tmpbuf, "%s", str);
-		}
+		(void) arc_dstring_printf(tmpbuf, "%s%s", (set < msg->arc_nsets ? ":" : ""), str);
 	}
 
 	appendlen = snprintf(buf, buflen, "%s", arc_dstring_get(tmpbuf));
