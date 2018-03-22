@@ -3655,7 +3655,7 @@ mlfi_eom(SMFICTX *ctx)
 		                                        arcchainbuf,
 		                                        sizeof(arcchainbuf));
 
-		if (arcchainlen >= ARC_MAXHEADER + 1)
+		if (arcchainlen >= sizeof(arcchainbuf))
 		{
 			if (conf->conf_dolog)
 			{
