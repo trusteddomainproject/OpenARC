@@ -2143,12 +2143,21 @@ arc_parse_canon_t(unsigned char *tag, arc_canon_t *hdr_canon,
 	*hdr_canon = (arc_canon_t) code;
 
 	token = strtok_r(NULL, "/", &last);
-	code = arc_name_to_code(canonicalizations, token);
 
-	if (code == -1)
-		return ARC_STAT_INVALID;
+	if (token == NULL)
+	{
+		/* Per RFC 6376, if no body canonicalization is provided the
+		 * default is simple. */
+		*body_canon = ARC_CANON_SIMPLE;
+	}
+	else
+	{
+		code = arc_name_to_code(canonicalizations, token);
 
-	*body_canon = (arc_canon_t) code;
+		if (code == -1)
+			return ARC_STAT_INVALID;
+		*body_canon = (arc_canon_t) code;
+	}
 
 	return ARC_STAT_OK;
 }
