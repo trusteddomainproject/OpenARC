@@ -1281,7 +1281,7 @@ arcf_addlist(struct conflist *list, char *str, char **err)
 		*err = strerror(errno);
 		return FALSE;
 	}
-	v->value = str;
+	v->value = strdup(str);
 
 	LIST_INSERT_HEAD(list, v, entries);
 	return TRUE;
