@@ -3571,11 +3571,11 @@ mlfi_eom(SMFICTX *ctx)
 						                    ar.ares_result[n].result_value[m]);
 					}
 
-					if (ar.ares_result[0].result_reason[0] != '\0')
+					if (ar.ares_result[n].result_reason[0] != '\0')
 					{
 						arcf_dstring_printf(afc->mctx_tmpstr,
 						                    " reason=\"%s\"",
-						                    ar.ares_result[0].result_reason);
+						                    ar.ares_result[n].result_reason);
 					}
 
 					if (n != ar.ares_count - 1)
