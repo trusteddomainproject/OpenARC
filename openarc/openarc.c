@@ -1281,7 +1281,7 @@ arcf_addlist(struct conflist *list, char *str, char **err)
 		*err = strerror(errno);
 		return FALSE;
 	}
-	v->value = str;
+	v->value = strdup(str);
 
 	LIST_INSERT_HEAD(list, v, entries);
 	return TRUE;
@@ -1581,11 +1581,11 @@ arcf_config_load(struct config *data, struct arcf_config *conf,
 		(void) config_get(data, "InternalHosts", &str, sizeof str);
 	if (str != NULL)
 	{
-		int status;
+		_Bool status;
 		char *dberr = NULL;
 
 		status = arcf_list_load(&conf->conf_internal, str, &dberr);
-		if (status != 0)
+		if (!status)
 		{
 			snprintf(err, errlen, "%s: arcf_list_load(): %s",
 			         str, dberr);
@@ -1597,8 +1597,17 @@ arcf_config_load(struct config *data, struct arcf_config *conf,
 		_Bool status;
 		char *dberr = NULL;
 
-		status = arcf_addlist(&conf->conf_internal, "127.0.0.1",
-		                      &dberr);
+		str = LOCALHOST;
+		status = arcf_addlist(&conf->conf_internal, str, &dberr);
+		if (!status)
+		{
+			snprintf(err, errlen, "%s: arcf_addlist(): %s",
+			         str, dberr);
+			return -1;
+		}
+
+		str = LOCALHOST6;
+		status = arcf_addlist(&conf->conf_internal, str, &dberr);
 		if (!status)
 		{
 			snprintf(err, errlen, "%s: arcf_addlist(): %s",
