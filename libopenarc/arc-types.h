@@ -61,16 +61,6 @@ struct arc_xtag
 	struct arc_xtag *	xt_next;
 };
 
-/* struct arc_dstring -- a dynamically-sized string */
-struct arc_dstring
-{
-	int			ds_alloc;
-	int			ds_max;
-	int			ds_len;
-	unsigned char *		ds_buf;
-	ARC_MESSAGE *		ds_msg;
-};
-
 /* struct arc_hdrfield -- a header field */
 struct arc_hdrfield
 {

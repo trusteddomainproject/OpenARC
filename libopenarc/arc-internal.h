@@ -126,9 +126,9 @@ typedef struct arc_canon ARC_CANON;
 **  memory allocation wrappers
 */
 
-#define ARC_malloc  malloc
-#define ARC_strdup  strdup
-#define ARC_realloc realloc
-#define ARC_free    free
+#define ARC_FREE	free
+#define ARC_MALLOC	malloc
+#define ARC_REALLOC	realloc
+#define ARC_STRDUP	strdup
 
 #endif /* ! _ARC_INTERNAL_H_ */

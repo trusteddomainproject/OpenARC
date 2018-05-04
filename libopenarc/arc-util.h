@@ -17,6 +17,16 @@
 /* libopenarc includes */
 #include "arc.h"
 
+/* struct arc_dstring -- a dynamically-sized string */
+struct arc_dstring
+{
+	int			ds_alloc;
+	int			ds_max;
+	int			ds_len;
+	unsigned char *		ds_buf;
+	ARC_MESSAGE *		ds_msg;
+};
+
 extern void arc_dstring_blank __P((struct arc_dstring *));
 extern _Bool arc_dstring_cat __P((struct arc_dstring *, u_char *));
 extern _Bool arc_dstring_cat1 __P((struct arc_dstring *, int));
