@@ -355,7 +355,6 @@ extern const char *arc_geterror __P((ARC_MESSAGE *));
 **
 **  Return value:
 **  	An ARC_STAT_* constant.
-**  	argument.
 */
 
 extern ARC_STAT arc_options __P((ARC_LIB *, int, int, void *, size_t));
