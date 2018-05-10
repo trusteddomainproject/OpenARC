@@ -465,7 +465,7 @@ extern ARC_STAT arc_eom __P((ARC_MESSAGE *));
 **      cv -- chain state
 */
 
-extern void arc_set_cv(ARC_MESSAGE *, ARC_CHAIN);
+extern void arc_set_cv __P((ARC_MESSAGE *, ARC_CHAIN));
 
 /*
 **  ARC_GETSEAL -- get the "seal" to apply to this message
