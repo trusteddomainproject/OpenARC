@@ -1601,9 +1601,11 @@ arc_process_set(ARC_MESSAGE *msg, arc_kvsettype_t type, u_char *str,
 				arc_error(msg, "ARC-Message-Signature signs %s",
 				          p);
 				set->set_bad = TRUE;
+				ARC_FREE(hcopy);
 				return ARC_STAT_INTERNAL;
 			}
 		}
+		ARC_FREE(hcopy);
 
 		/* test validity of "t", "x", and "i" */
 		p = arc_param_get(set, (u_char *) "t");
@@ -2253,6 +2255,11 @@ arc_free(ARC_MESSAGE *msg)
 	struct arc_hdrfield *h;
 	struct arc_hdrfield *tmp;
 
+	if (msg->arc_error != NULL)
+	{
+		ARC_FREE(msg->arc_error);
+	}
+
 	h = msg->arc_hhead;
 	while (h != NULL)
 	{
@@ -2281,7 +2288,39 @@ arc_free(ARC_MESSAGE *msg)
 		arc_dstring_free(msg->arc_hdrbuf);
 	}
 
+	while (msg->arc_kvsethead != NULL)
+	{
+		int i;
+		ARC_KVSET *set = msg->arc_kvsethead;
+
+		msg->arc_kvsethead = set->set_next;
+		ARC_FREE(set->set_data);
+
+#define NITEMS(array) ((int)(sizeof(array)/sizeof(array[0])))
+		for (i=0; i<NITEMS(set->set_plist); i++)
+		{
+			while (set->set_plist[i] != NULL)
+			{
+				ARC_PLIST *plist = set->set_plist[i];
+				set->set_plist[i] = plist->plist_next;
+				ARC_FREE(plist);
+			}
+		}
+
+		ARC_FREE(set);
+	}
+
 	arc_canon_cleanup(msg);
+
+	if (msg->arc_sealcanons != NULL)
+	{
+		ARC_FREE(msg->arc_sealcanons);
+	}
+
+	if (msg->arc_sets != NULL)
+	{
+		ARC_FREE(msg->arc_sets);
+	}
 
 	ARC_FREE(msg);
 }
