@@ -2059,6 +2059,7 @@ arc_validate_msg(ARC_MESSAGE *msg, u_int setnum)
 	elen = arc_base64_encode(bh, bhlen, b64bh, b64bhlen);
 	if (elen != strlen(b64bhtag) || strcmp(b64bh, b64bhtag) != 0)
 	{
+		ARC_FREE(b64bh);
 		arc_error(msg, "body hash mismatch");
 		return ARC_STAT_BADSIG;
 	}
