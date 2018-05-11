@@ -1924,7 +1924,6 @@ arc_validate_msg(ARC_MESSAGE *msg, u_int setnum)
 	void *hh;
 	void *bh;
 	void *sig;
-	BIO *key;
 	struct arc_set *set;
 	struct arc_hdrfield *h;
 	ARC_KVSET *kvset;
@@ -1994,17 +1993,20 @@ arc_validate_msg(ARC_MESSAGE *msg, u_int setnum)
 	}
 
 	/* verify the signature against the header hash and the key */
-	key = BIO_new_mem_buf(msg->arc_key, msg->arc_keylen);
-	if (key == NULL)
+	keydata = BIO_new_mem_buf(msg->arc_key, msg->arc_keylen);
+	if (keydata == NULL)
 	{
 		arc_error(msg, "BIO_new_mem_buf() failed");
+		ARC_FREE(sig);
 		return ARC_STAT_INTERNAL;
 	}
 
-	pkey = d2i_PUBKEY_bio(key, NULL);
+	pkey = d2i_PUBKEY_bio(keydata, NULL);
 	if (pkey == NULL)
 	{
 		arc_error(msg, "d2i_PUBKEY_bio() failed");
+		BIO_free(keydata);
+		ARC_FREE(sig);
 		return ARC_STAT_INTERNAL;
 	}
 
@@ -2012,6 +2014,9 @@ arc_validate_msg(ARC_MESSAGE *msg, u_int setnum)
 	if (rsa == NULL)
 	{
 		arc_error(msg, "EVP_PKEY_get1_RSA() failed");
+		EVP_PKEY_free(pkey);
+		BIO_free(keydata);
+		ARC_FREE(sig);
 		return ARC_STAT_INTERNAL;
 	}
 
@@ -2020,9 +2025,10 @@ arc_validate_msg(ARC_MESSAGE *msg, u_int setnum)
 	{
 		arc_error(msg, "key size (%u) below minimum (%u)",
 		          keysize, msg->arc_library->arcl_minkeysize);
-		EVP_PKEY_free(pkey);
 		RSA_free(rsa);
+		EVP_PKEY_free(pkey);
 		BIO_free(keydata);
+		ARC_FREE(sig);
 		return ARC_STAT_CANTVRFY;
 	}
 
@@ -2034,7 +2040,9 @@ arc_validate_msg(ARC_MESSAGE *msg, u_int setnum)
 	rsastat = RSA_verify(nid, hh, hhlen, sig, siglen, rsa);
 
 	RSA_free(rsa);
-	BIO_free(key);
+	EVP_PKEY_free(pkey);
+	BIO_free(keydata);
+	ARC_FREE(sig);
 
 	if (rsastat != 1)
 		return ARC_STAT_BADSIG;
@@ -2055,6 +2063,7 @@ arc_validate_msg(ARC_MESSAGE *msg, u_int setnum)
 		return ARC_STAT_BADSIG;
 	}
 
+	ARC_FREE(b64bh);
 	/* if we got this far, the signature was good */
 	return ARC_STAT_OK;
 }
@@ -2087,7 +2096,7 @@ arc_validate_seal(ARC_MESSAGE *msg, u_int setnum)
 	void *sig;
 	u_char *alg;
 	struct arc_set *set;
-	BIO *key;
+	BIO *keydata;
 	EVP_PKEY *pkey;
 	RSA *rsa;
 	ARC_KVSET *kvset;
@@ -2142,21 +2151,25 @@ arc_validate_seal(ARC_MESSAGE *msg, u_int setnum)
 	if (siglen < 0)
 	{
 		arc_error(msg, "unable to decode signature");
+		ARC_FREE(sig);
 		return ARC_STAT_SYNTAX;
 	}
 
 	/* verify the signature against the header hash and the key */
-	key = BIO_new_mem_buf(msg->arc_key, msg->arc_keylen);
-	if (key == NULL)
+	keydata = BIO_new_mem_buf(msg->arc_key, msg->arc_keylen);
+	if (keydata == NULL)
 	{
 		arc_error(msg, "BIO_new_mem_buf() failed");
+		ARC_FREE(sig);
 		return ARC_STAT_INTERNAL;
 	}
 
-	pkey = d2i_PUBKEY_bio(key, NULL);
+	pkey = d2i_PUBKEY_bio(keydata, NULL);
 	if (pkey == NULL)
 	{
 		arc_error(msg, "d2i_PUBKEY_bio() failed");
+		BIO_free(keydata);
+		ARC_FREE(sig);
 		return ARC_STAT_INTERNAL;
 	}
 
@@ -2164,6 +2177,9 @@ arc_validate_seal(ARC_MESSAGE *msg, u_int setnum)
 	if (rsa == NULL)
 	{
 		arc_error(msg, "EVP_PKEY_get1_RSA() failed");
+		EVP_PKEY_free(pkey);
+		BIO_free(keydata);
+		ARC_FREE(sig);
 		return ARC_STAT_INTERNAL;
 	}
 
@@ -2175,7 +2191,9 @@ arc_validate_seal(ARC_MESSAGE *msg, u_int setnum)
 	rsastat = RSA_verify(nid, sh, shlen, sig, siglen, rsa);
 
 	RSA_free(rsa);
-	BIO_free(key);
+	EVP_PKEY_free(pkey);
+	BIO_free(keydata);
+	ARC_FREE(sig);
 
 	if (rsastat != 1)
 	{
@@ -2320,6 +2338,11 @@ arc_free(ARC_MESSAGE *msg)
 	if (msg->arc_sets != NULL)
 	{
 		ARC_FREE(msg->arc_sets);
+	}
+
+	if (msg->arc_key != NULL)
+	{
+		ARC_FREE(msg->arc_key);
 	}
 
 	ARC_FREE(msg);
