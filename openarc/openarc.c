@@ -3654,9 +3654,14 @@ mlfi_eom(SMFICTX *ctx)
 
 	if (BITSET(ARC_MODE_VERIFY, cc->cctx_mode))
 	{
+		const char *ipout;
+		struct sockaddr *ip;
+		char ipbuf[ARC_MAXHOSTNAMELEN + 1];
+
 		/*
  		**  Authentication-Results
 		*/
+
 		int arcchainlen = arc_chain_custody_str(afc->mctx_arcmsg,
 		                                        arcchainbuf,
 		                                        sizeof(arcchainbuf));
@@ -3680,8 +3685,47 @@ mlfi_eom(SMFICTX *ctx)
 		                    conf->conf_authservid,
 		                    arc_chain_status_str(afc->mctx_arcmsg));
 
+		ip = (struct sockaddr *) &cc->cctx_ip;
+		memset(ipbuf, '\0', sizeof ipbuf);
+		ipout = NULL;
+
+		switch (ip->sa_family)
+		{
+		  case AF_INET:
+		  {
+			struct sockaddr_in sin;
+
+			memcpy(&sin, ip, sizeof sin);
+			ipout = inet_ntop(ip->sa_family, &sin.sin_addr,
+			                  ipbuf, sizeof ipbuf);
+			break;
+		  }
+		
+		  case AF_INET6:
+		  {
+			struct sockaddr_in6 sin6;
+
+			memcpy(&sin6, ip, sizeof sin6);
+			ipout = inet_ntop(ip->sa_family, &sin6.sin6_addr,
+			                  ipbuf, sizeof ipbuf);
+			break;
+		  }
+
+		  default:
+			break;
+		}
+		
+		if (ipout != NULL)
+		{
+			arcf_dstring_printf(afc->mctx_tmpstr,
+			                    " smtp.client-ip=%s", ipout);
+		}
+
 		if (conf->conf_finalreceiver && arcchainlen > 0)
-			arcf_dstring_printf(afc->mctx_tmpstr, " arc.chain=%s", arcchainbuf);
+		{
+			arcf_dstring_printf(afc->mctx_tmpstr,
+			                    " arc.chain=%s", arcchainbuf);
+		}
 
 		if (arcf_insheader(ctx, 1, AUTHRESULTSHDR,
 		                   arcf_dstring_get(afc->mctx_tmpstr)) != MI_SUCCESS)
