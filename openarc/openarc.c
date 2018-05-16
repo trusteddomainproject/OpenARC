@@ -3586,9 +3586,6 @@ mlfi_eom(SMFICTX *ctx)
 						                    " reason=\"%s\"",
 						                    ar.ares_result[n].result_reason);
 					}
-
-					if (n != ar.ares_count - 1)
-						arcf_dstring_cat(afc->mctx_tmpstr, "; ");
 				}
 			}
 		}
