@@ -131,6 +131,7 @@ struct arc_canon
 struct arc_msghandle
 {
 	_Bool			arc_partial;
+	_Bool			arc_infail;
 	int			arc_dnssec_key;
 	int			arc_signalg;
 	u_int			arc_mode;

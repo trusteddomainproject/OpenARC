@@ -463,9 +463,12 @@ extern ARC_STAT arc_eom __P((ARC_MESSAGE *));
 **  Parameters:
 **      msg -- ARC_MESSAGE object
 **      cv -- chain state
+**
+**  Return value:
+**  	None.
 */
 
-extern void arc_set_cv(ARC_MESSAGE *, ARC_CHAIN);
+extern void arc_set_cv __P((ARC_MESSAGE *, ARC_CHAIN));
 
 /*
 **  ARC_GETSEAL -- get the "seal" to apply to this message
@@ -578,7 +581,8 @@ extern const char *arc_chain_status_str __P((ARC_MESSAGE *msg));
 **	argument, then buffer was too small and output was truncated.
 */
 
-extern int arc_chain_custody_str __P((ARC_MESSAGE *msg, u_char *buf, size_t buflen));
+extern int arc_chain_custody_str __P((ARC_MESSAGE *msg, u_char *buf,
+                                      size_t buflen));
 
 #ifdef __cplusplus
 }

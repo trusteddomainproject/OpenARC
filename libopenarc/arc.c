@@ -2952,11 +2952,17 @@ arc_eom(ARC_MESSAGE *msg)
 				if (!((set == 1 && strcasecmp(cv, "none") == 0) ||
 				     (set != 1 && strcasecmp(cv, "pass") == 0)))
 				{
+					/* the chain has already failed */
 					msg->arc_cstate = ARC_CHAIN_FAIL;
+
+					/* note that it failed inbound */
+					msg->arc_infail = TRUE;
+
 					break;
 				}
 
-				if (arc_validate_seal(msg, set) != ARC_STAT_OK)
+				if (msg->arc_cstate != ARC_CHAIN_FAIL &&
+				    arc_validate_seal(msg, set) != ARC_STAT_OK)
 				{
 					msg->arc_cstate = ARC_CHAIN_FAIL;
 					break;
@@ -2974,6 +2980,9 @@ arc_eom(ARC_MESSAGE *msg)
 **  Parameters:
 **  	msg -- ARC_MESSAGE object
 **  	cv -- chain state
+**
+**  Return value:
+**  	None.
 */
 
 void
@@ -3037,6 +3046,13 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 	assert(domain != NULL);
 	assert(key != NULL);
 	assert(keylen > 0);
+
+	/* if the chain arrived already failed, don't add anything */
+	if (msg->arc_infail)
+	{
+		*seal = NULL;
+		return ARC_STAT_OK;
+	}
 
 	/* copy required stuff */
 	msg->arc_domain = domain;
