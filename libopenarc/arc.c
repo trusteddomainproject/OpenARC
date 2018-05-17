@@ -1015,7 +1015,6 @@ arc_options(ARC_LIB *lib, int op, int arg, void *val, size_t valsz)
 	}
 }
 
-
 /*
 **
 **  ARC_INIT_DNS -- override and initialize library DNS resolver
