@@ -81,6 +81,9 @@ void arc_error __P((ARC_MESSAGE *, const char *, ...));
 #define	DEFERRLEN		128
 #define	DEFTIMEOUT		10
 
+/* generic array size macro */
+#define NITEMS(array) ((int)(sizeof(array)/sizeof(array[0])))
+
 /* local definitions needed for DNS queries */
 #define MAXPACKET		8192
 #if defined(__RES) && (__RES >= 19940415)
@@ -1016,6 +1019,60 @@ arc_options(ARC_LIB *lib, int op, int arg, void *val, size_t valsz)
 }
 
 /*
+**
+**  ARC_INIT_DNS -- override and initialize library DNS resolver
+**
+**  Parameters:
+**  	lib			-- library to set DNS for
+**	srv			-- resolver handle to use
+**	arc_dns_close		-- terminates a resolver
+**	arc_dns_start		-- starts a DNS query
+**  	arc_dns_cancel		-- cancels a DNS query
+**  	arc_dns_waitreply	-- synchronously waits on a DNS response
+**
+**  Return value:
+**  	An ARC_STAT_* constant.
+*/
+
+ARC_STAT
+arc_init_dns(ARC_LIB *lib, void* srv,
+	     void (*arc_dns_close) (void *srv),
+	     int (*arc_dns_start) (void *srv, int type,
+				   unsigned char *query,
+				   unsigned char *buf,
+				   size_t buflen,
+				   void **qh),
+	     int (*arc_dns_cancel) (void *srv, void *qh),
+	     int (*arc_dns_waitreply) (void *srv,
+				       void *qh,
+				       struct timeval *to,
+				       size_t *bytes,
+				       int *error,
+				       int *dnssec))
+{
+	assert(lib != NULL);
+	assert(srv != 0);
+	assert(arc_dns_close != 0);
+	assert(arc_dns_start != 0);
+	assert(arc_dns_cancel != 0);
+	assert(arc_dns_waitreply != 0);
+
+	/* "illegal state" would be better */
+	if (lib->arcl_dnsinit_done)
+		return ARC_STAT_INTERNAL;
+
+	lib->arcl_dnsinit_done = TRUE;
+	lib->arcl_dns_service = srv;
+	lib->arcl_dns_init = 0;
+	lib->arcl_dns_close = arc_dns_close;
+	lib->arcl_dns_start = arc_dns_start;
+	lib->arcl_dns_cancel = arc_dns_cancel;
+	lib->arcl_dns_waitreply = arc_dns_waitreply;
+
+	return ARC_STAT_OK;
+}
+
+/*
 **  ARC_GETSSLBUF -- retrieve SSL error buffer
 **
 **  Parameters:
@@ -1601,9 +1658,11 @@ arc_process_set(ARC_MESSAGE *msg, arc_kvsettype_t type, u_char *str,
 				arc_error(msg, "ARC-Message-Signature signs %s",
 				          p);
 				set->set_bad = TRUE;
+				ARC_FREE(hcopy);
 				return ARC_STAT_INTERNAL;
 			}
 		}
+		ARC_FREE(hcopy);
 
 		/* test validity of "t", "x", and "i" */
 		p = arc_param_get(set, (u_char *) "t");
@@ -1922,7 +1981,6 @@ arc_validate_msg(ARC_MESSAGE *msg, u_int setnum)
 	void *hh;
 	void *bh;
 	void *sig;
-	BIO *key;
 	struct arc_set *set;
 	struct arc_hdrfield *h;
 	ARC_KVSET *kvset;
@@ -1992,17 +2050,20 @@ arc_validate_msg(ARC_MESSAGE *msg, u_int setnum)
 	}
 
 	/* verify the signature against the header hash and the key */
-	key = BIO_new_mem_buf(msg->arc_key, msg->arc_keylen);
-	if (key == NULL)
+	keydata = BIO_new_mem_buf(msg->arc_key, msg->arc_keylen);
+	if (keydata == NULL)
 	{
 		arc_error(msg, "BIO_new_mem_buf() failed");
+		ARC_FREE(sig);
 		return ARC_STAT_INTERNAL;
 	}
 
-	pkey = d2i_PUBKEY_bio(key, NULL);
+	pkey = d2i_PUBKEY_bio(keydata, NULL);
 	if (pkey == NULL)
 	{
 		arc_error(msg, "d2i_PUBKEY_bio() failed");
+		BIO_free(keydata);
+		ARC_FREE(sig);
 		return ARC_STAT_INTERNAL;
 	}
 
@@ -2010,6 +2071,9 @@ arc_validate_msg(ARC_MESSAGE *msg, u_int setnum)
 	if (rsa == NULL)
 	{
 		arc_error(msg, "EVP_PKEY_get1_RSA() failed");
+		EVP_PKEY_free(pkey);
+		BIO_free(keydata);
+		ARC_FREE(sig);
 		return ARC_STAT_INTERNAL;
 	}
 
@@ -2018,9 +2082,10 @@ arc_validate_msg(ARC_MESSAGE *msg, u_int setnum)
 	{
 		arc_error(msg, "key size (%u) below minimum (%u)",
 		          keysize, msg->arc_library->arcl_minkeysize);
-		EVP_PKEY_free(pkey);
 		RSA_free(rsa);
+		EVP_PKEY_free(pkey);
 		BIO_free(keydata);
+		ARC_FREE(sig);
 		return ARC_STAT_CANTVRFY;
 	}
 
@@ -2032,7 +2097,9 @@ arc_validate_msg(ARC_MESSAGE *msg, u_int setnum)
 	rsastat = RSA_verify(nid, hh, hhlen, sig, siglen, rsa);
 
 	RSA_free(rsa);
-	BIO_free(key);
+	EVP_PKEY_free(pkey);
+	BIO_free(keydata);
+	ARC_FREE(sig);
 
 	if (rsastat != 1)
 		return ARC_STAT_BADSIG;
@@ -2049,10 +2116,12 @@ arc_validate_msg(ARC_MESSAGE *msg, u_int setnum)
 	elen = arc_base64_encode(bh, bhlen, b64bh, b64bhlen);
 	if (elen != strlen(b64bhtag) || strcmp(b64bh, b64bhtag) != 0)
 	{
+		ARC_FREE(b64bh);
 		arc_error(msg, "body hash mismatch");
 		return ARC_STAT_BADSIG;
 	}
 
+	ARC_FREE(b64bh);
 	/* if we got this far, the signature was good */
 	return ARC_STAT_OK;
 }
@@ -2085,7 +2154,7 @@ arc_validate_seal(ARC_MESSAGE *msg, u_int setnum)
 	void *sig;
 	u_char *alg;
 	struct arc_set *set;
-	BIO *key;
+	BIO *keydata;
 	EVP_PKEY *pkey;
 	RSA *rsa;
 	ARC_KVSET *kvset;
@@ -2140,21 +2209,25 @@ arc_validate_seal(ARC_MESSAGE *msg, u_int setnum)
 	if (siglen < 0)
 	{
 		arc_error(msg, "unable to decode signature");
+		ARC_FREE(sig);
 		return ARC_STAT_SYNTAX;
 	}
 
 	/* verify the signature against the header hash and the key */
-	key = BIO_new_mem_buf(msg->arc_key, msg->arc_keylen);
-	if (key == NULL)
+	keydata = BIO_new_mem_buf(msg->arc_key, msg->arc_keylen);
+	if (keydata == NULL)
 	{
 		arc_error(msg, "BIO_new_mem_buf() failed");
+		ARC_FREE(sig);
 		return ARC_STAT_INTERNAL;
 	}
 
-	pkey = d2i_PUBKEY_bio(key, NULL);
+	pkey = d2i_PUBKEY_bio(keydata, NULL);
 	if (pkey == NULL)
 	{
 		arc_error(msg, "d2i_PUBKEY_bio() failed");
+		BIO_free(keydata);
+		ARC_FREE(sig);
 		return ARC_STAT_INTERNAL;
 	}
 
@@ -2162,6 +2235,9 @@ arc_validate_seal(ARC_MESSAGE *msg, u_int setnum)
 	if (rsa == NULL)
 	{
 		arc_error(msg, "EVP_PKEY_get1_RSA() failed");
+		EVP_PKEY_free(pkey);
+		BIO_free(keydata);
+		ARC_FREE(sig);
 		return ARC_STAT_INTERNAL;
 	}
 
@@ -2173,7 +2249,9 @@ arc_validate_seal(ARC_MESSAGE *msg, u_int setnum)
 	rsastat = RSA_verify(nid, sh, shlen, sig, siglen, rsa);
 
 	RSA_free(rsa);
-	BIO_free(key);
+	EVP_PKEY_free(pkey);
+	BIO_free(keydata);
+	ARC_FREE(sig);
 
 	if (rsastat != 1)
 	{
@@ -2253,6 +2331,9 @@ arc_free(ARC_MESSAGE *msg)
 	struct arc_hdrfield *h;
 	struct arc_hdrfield *tmp;
 
+	if (msg->arc_error != NULL)
+		ARC_FREE(msg->arc_error);
+
 	h = msg->arc_hhead;
 	while (h != NULL)
 	{
@@ -2281,7 +2362,37 @@ arc_free(ARC_MESSAGE *msg)
 		arc_dstring_free(msg->arc_hdrbuf);
 	}
 
+	while (msg->arc_kvsethead != NULL)
+	{
+		int i;
+		ARC_KVSET *set = msg->arc_kvsethead;
+
+		msg->arc_kvsethead = set->set_next;
+		ARC_FREE(set->set_data);
+
+		for (i = 0; i < NITEMS(set->set_plist); i++)
+		{
+			while (set->set_plist[i] != NULL)
+			{
+				ARC_PLIST *plist = set->set_plist[i];
+				set->set_plist[i] = plist->plist_next;
+				ARC_FREE(plist);
+			}
+		}
+
+		ARC_FREE(set);
+	}
+
 	arc_canon_cleanup(msg);
+
+	if (msg->arc_sealcanons != NULL)
+		ARC_FREE(msg->arc_sealcanons);
+
+	if (msg->arc_sets != NULL)
+		ARC_FREE(msg->arc_sets);
+
+	if (msg->arc_key != NULL)
+		ARC_FREE(msg->arc_key);
 
 	ARC_FREE(msg);
 }
