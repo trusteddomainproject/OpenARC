@@ -81,6 +81,9 @@ void arc_error __P((ARC_MESSAGE *, const char *, ...));
 #define	DEFERRLEN		128
 #define	DEFTIMEOUT		10
 
+/* generic array size macro */
+#define NITEMS(array) ((int)(sizeof(array)/sizeof(array[0])))
+
 /* local definitions needed for DNS queries */
 #define MAXPACKET		8192
 #if defined(__RES) && (__RES >= 19940415)
@@ -2275,9 +2278,7 @@ arc_free(ARC_MESSAGE *msg)
 	struct arc_hdrfield *tmp;
 
 	if (msg->arc_error != NULL)
-	{
 		ARC_FREE(msg->arc_error);
-	}
 
 	h = msg->arc_hhead;
 	while (h != NULL)
@@ -2315,8 +2316,7 @@ arc_free(ARC_MESSAGE *msg)
 		msg->arc_kvsethead = set->set_next;
 		ARC_FREE(set->set_data);
 
-#define NITEMS(array) ((int)(sizeof(array)/sizeof(array[0])))
-		for (i=0; i<NITEMS(set->set_plist); i++)
+		for (i = 0; i < NITEMS(set->set_plist); i++)
 		{
 			while (set->set_plist[i] != NULL)
 			{
@@ -2332,19 +2332,13 @@ arc_free(ARC_MESSAGE *msg)
 	arc_canon_cleanup(msg);
 
 	if (msg->arc_sealcanons != NULL)
-	{
 		ARC_FREE(msg->arc_sealcanons);
-	}
 
 	if (msg->arc_sets != NULL)
-	{
 		ARC_FREE(msg->arc_sets);
-	}
 
 	if (msg->arc_key != NULL)
-	{
 		ARC_FREE(msg->arc_key);
-	}
 
 	ARC_FREE(msg);
 }
