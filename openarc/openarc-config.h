@@ -31,6 +31,7 @@ struct configdef arcf_config[] =
 	{ "ChangeRootDirectory",	CONFIG_TYPE_STRING,	FALSE },
 	{ "Domain",			CONFIG_TYPE_STRING,	TRUE },
 	{ "EnableCoredumps",		CONFIG_TYPE_BOOLEAN,	FALSE },
+	{ "FinalReceiver",		CONFIG_TYPE_BOOLEAN,	FALSE },
 	{ "FixedTimestamp",		CONFIG_TYPE_STRING,	FALSE },
 	{ "Include",			CONFIG_TYPE_INCLUDE,	FALSE },
 	{ "InternalHosts",		CONFIG_TYPE_STRING,	FALSE },

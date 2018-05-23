@@ -3,7 +3,9 @@
 This listing shows the versions of the OpenARC package, the date of
 release, and a summary of the changes in that release.
 
-0.1.1		2017/12/11
+0.1.1		2018/??/??
+	Add FinalReceiver configuration option. When enabled, this filter will
+		append "arc.chain=dom(n)...dom(1)" custody chain data to the A-R field.
 	Fix issue #47: Fix syntax of ARC-Authentication-Results with respect
 		to semicolons.  Problem noted by Matt Domsch; based on a
 		patch from Ben Arblaster.

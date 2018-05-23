@@ -89,7 +89,6 @@
 
 /* macros */
 #define CMDLINEOPTS	"Ac:fhlnp:P:r:t:u:vV"
-#define AR_HEADER_NAME	"Authentication-Results"
 
 /*
 **  CONFIGVALUE -- a list of configuration values
@@ -116,6 +115,7 @@ struct arcf_config
 	_Bool		conf_addswhdr;		/* add software header field */
 	_Bool		conf_safekeys;		/* require safe keys */
 	_Bool		conf_keeptmpfiles;	/* keep temp files */
+	_Bool		conf_finalreceiver;	/* act as final receiver */
 	u_int		conf_refcnt;		/* reference count */
 	u_int		conf_mode;		/* mode flags */
 	arc_canon_t	conf_canonhdr;		/* canonicalization for header */
@@ -1281,7 +1281,7 @@ arcf_addlist(struct conflist *list, char *str, char **err)
 		*err = strerror(errno);
 		return FALSE;
 	}
-	v->value = str;
+	v->value = strdup(str);
 
 	LIST_INSERT_HEAD(list, v, entries);
 	return TRUE;
@@ -1481,6 +1481,10 @@ arcf_config_load(struct config *data, struct arcf_config *conf,
 		                  &conf->conf_enablecores,
 		                  sizeof conf->conf_enablecores);
 
+		(void) config_get(data, "FinalReceiver",
+		                  &conf->conf_finalreceiver,
+		                  sizeof conf->conf_finalreceiver);
+
 		(void) config_get(data, "TemporaryDirectory",
 		                  &conf->conf_tmpdir,
 		                  sizeof conf->conf_tmpdir);
@@ -1577,11 +1581,11 @@ arcf_config_load(struct config *data, struct arcf_config *conf,
 		(void) config_get(data, "InternalHosts", &str, sizeof str);
 	if (str != NULL)
 	{
-		int status;
+		_Bool status;
 		char *dberr = NULL;
 
 		status = arcf_list_load(&conf->conf_internal, str, &dberr);
-		if (status != 0)
+		if (!status)
 		{
 			snprintf(err, errlen, "%s: arcf_list_load(): %s",
 			         str, dberr);
@@ -1593,8 +1597,17 @@ arcf_config_load(struct config *data, struct arcf_config *conf,
 		_Bool status;
 		char *dberr = NULL;
 
-		status = arcf_addlist(&conf->conf_internal, "127.0.0.1",
-		                      &dberr);
+		str = LOCALHOST;
+		status = arcf_addlist(&conf->conf_internal, str, &dberr);
+		if (!status)
+		{
+			snprintf(err, errlen, "%s: arcf_addlist(): %s",
+			         str, dberr);
+			return -1;
+		}
+
+		str = LOCALHOST6;
+		status = arcf_addlist(&conf->conf_internal, str, &dberr);
 		if (!status)
 		{
 			snprintf(err, errlen, "%s: arcf_addlist(): %s",
@@ -3375,6 +3388,7 @@ mlfi_eom(SMFICTX *ctx)
 	Header hdr;
 	struct authres ar;
 	unsigned char header[ARC_MAXHEADER + 1];
+	u_char arcchainbuf[ARC_MAXHEADER + 1];
 
 	assert(ctx != NULL);
 
@@ -3452,7 +3466,7 @@ mlfi_eom(SMFICTX *ctx)
 		/* assemble authentication results */
 		for (c = 0; ; c++)
 		{
-			hdr = arcf_findheader(afc, AR_HEADER_NAME, c);
+			hdr = arcf_findheader(afc, AUTHRESULTSHDR, c);
 			if (hdr == NULL)
 				break;
 			status = ares_parse(hdr->hdr_val, &ar);
@@ -3462,7 +3476,7 @@ mlfi_eom(SMFICTX *ctx)
 				{
 					syslog(LOG_WARNING,
 					       "%s: can't parse %s; ignoring",
-					       afc->mctx_jobid, AR_HEADER_NAME);
+					       afc->mctx_jobid, AUTHRESULTSHDR);
 				}
 
 				continue;
@@ -3566,15 +3580,12 @@ mlfi_eom(SMFICTX *ctx)
 						                    ar.ares_result[n].result_value[m]);
 					}
 
-					if (ar.ares_result[0].result_reason[0] != '\0')
+					if (ar.ares_result[n].result_reason[0] != '\0')
 					{
 						arcf_dstring_printf(afc->mctx_tmpstr,
 						                    " reason=\"%s\"",
-						                    ar.ares_result[0].result_reason);
+						                    ar.ares_result[n].result_reason);
 					}
-
-					if (n != ar.ares_count - 1)
-						arcf_dstring_cat(afc->mctx_tmpstr, "; ");
 				}
 			}
 		}
@@ -3585,7 +3596,7 @@ mlfi_eom(SMFICTX *ctx)
 			if (arcf_dstring_len(afc->mctx_tmpstr) > 0)
 				arcf_dstring_cat(afc->mctx_tmpstr, "; ");
 			arcf_dstring_printf(afc->mctx_tmpstr, "arc=%s",
-			                    arc_chain_str(afc->mctx_arcmsg));
+			                    arc_chain_status_str(afc->mctx_arcmsg));
 		}
 
 		/*
@@ -3643,16 +3654,79 @@ mlfi_eom(SMFICTX *ctx)
 
 	if (BITSET(ARC_MODE_VERIFY, cc->cctx_mode))
 	{
+		const char *ipout;
+		struct sockaddr *ip;
+		char ipbuf[ARC_MAXHOSTNAMELEN + 1];
+
 		/*
  		**  Authentication-Results
 		*/
+
+		int arcchainlen = arc_chain_custody_str(afc->mctx_arcmsg,
+		                                        arcchainbuf,
+		                                        sizeof(arcchainbuf));
+
+		if (arcchainlen >= sizeof(arcchainbuf))
+		{
+			if (conf->conf_dolog)
+			{
+				syslog(LOG_ERR,
+				       "%s: arc.chain buffer overflow: %s",
+				       afc->mctx_jobid, "");
+			}
+
+			return SMFIS_TEMPFAIL;
+		}
 
 		arcf_dstring_blank(afc->mctx_tmpstr);
 		arcf_dstring_printf(afc->mctx_tmpstr,
 		                    "%s%s; arc=%s",
 		                    cc->cctx_noleadspc ? " " : "",
 		                    conf->conf_authservid,
-		                    arc_chain_str(afc->mctx_arcmsg));
+		                    arc_chain_status_str(afc->mctx_arcmsg));
+
+		ip = (struct sockaddr *) &cc->cctx_ip;
+		memset(ipbuf, '\0', sizeof ipbuf);
+		ipout = NULL;
+
+		switch (ip->sa_family)
+		{
+		  case AF_INET:
+		  {
+			struct sockaddr_in sin;
+
+			memcpy(&sin, ip, sizeof sin);
+			ipout = inet_ntop(ip->sa_family, &sin.sin_addr,
+			                  ipbuf, sizeof ipbuf);
+			break;
+		  }
+		
+		  case AF_INET6:
+		  {
+			struct sockaddr_in6 sin6;
+
+			memcpy(&sin6, ip, sizeof sin6);
+			ipout = inet_ntop(ip->sa_family, &sin6.sin6_addr,
+			                  ipbuf, sizeof ipbuf);
+			break;
+		  }
+
+		  default:
+			break;
+		}
+		
+		if (ipout != NULL)
+		{
+			arcf_dstring_printf(afc->mctx_tmpstr,
+			                    " smtp.client-ip=%s", ipout);
+		}
+
+		if (conf->conf_finalreceiver && arcchainlen > 0)
+		{
+			arcf_dstring_printf(afc->mctx_tmpstr,
+			                    " arc.chain=%s", arcchainbuf);
+		}
+
 		if (arcf_insheader(ctx, 1, AUTHRESULTSHDR,
 		                   arcf_dstring_get(afc->mctx_tmpstr)) != MI_SUCCESS)
 		{

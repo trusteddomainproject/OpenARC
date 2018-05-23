@@ -64,57 +64,57 @@ extern void arc_error __P((ARC_MESSAGE *, const char *, ...));
 static _Bool
 arc_dstring_resize(struct arc_dstring *dstr, int len)
 {
-  int newsz;
-  unsigned char *new;
+	int newsz;
+	unsigned char *new;
 
-  assert(dstr != NULL);
-  assert(len > 0);
+	assert(dstr != NULL);
+	assert(len > 0);
 
-  if (dstr->ds_alloc >= len)
-    return TRUE;
+	if (dstr->ds_alloc >= len)
+		return TRUE;
 
-  /* must resize */
-  for (newsz = dstr->ds_alloc * 2;
-       newsz < len;
-       newsz *= 2)
-  {
-    /* impose ds_max limit, if specified */
-    if (dstr->ds_max > 0 && newsz > dstr->ds_max)
-    {
-      if (len <= dstr->ds_max)
-      {
-        newsz = len;
-        break;
-      }
+	/* must resize */
+	for (newsz = dstr->ds_alloc * 2;
+	     newsz < len;
+	     newsz *= 2)
+	{
+		/* impose ds_max limit, if specified */
+		if (dstr->ds_max > 0 && newsz > dstr->ds_max)
+		{
+			if (len <= dstr->ds_max)
+			{
+				newsz = len;
+				break;
+			}
 
-      arc_error(dstr->ds_msg, "maximum string size exceeded");
-      return FALSE;
-    }
+			arc_error(dstr->ds_msg, "maximum string size exceeded");
+			return FALSE;
+		}
 
-    /* check for overflow */
-    if (newsz > INT_MAX / 2)
-    {
-      /* next iteration will overflow "newsz" */
-      arc_error(dstr->ds_msg,
-                "internal string limit reached");
-      return FALSE;
-    }
-  }
+		/* check for overflow */
+		if (newsz > INT_MAX / 2)
+		{
+			/* next iteration will overflow "newsz" */
+			arc_error(dstr->ds_msg,
+			          "internal string limit reached");
+			return FALSE;
+		}
+	}
 
-  new = malloc(newsz);
-  if (new == NULL)
-  {
-    arc_error(dstr->ds_msg, "unable to allocate %d byte(s)",
-                          newsz);
-    return FALSE;
-  }
+	new = ARC_MALLOC(newsz);
+	if (new == NULL)
+	{
+		arc_error(dstr->ds_msg, "unable to allocate %d byte(s)",
+		          newsz);
+		return FALSE;
+	}
 
-  memcpy(new, dstr->ds_buf, dstr->ds_alloc);
-  free(dstr->ds_buf);
-  dstr->ds_alloc = newsz;
-  dstr->ds_buf = new;
+	memcpy(new, dstr->ds_buf, dstr->ds_alloc);
+	ARC_FREE(dstr->ds_buf);
+	dstr->ds_alloc = newsz;
+	dstr->ds_buf = new;
 
-  return TRUE;
+	return TRUE;
 }
 
 /*
@@ -133,42 +133,42 @@ arc_dstring_resize(struct arc_dstring *dstr, int len)
 struct arc_dstring *
 arc_dstring_new(ARC_MESSAGE *msg, int len, int maxlen)
 {
-  struct arc_dstring *new;
+	struct arc_dstring *new;
 
-  assert(msg != NULL);
+	assert(msg != NULL);
 
-  /* fail on invalid parameters */
-  if ((maxlen > 0 && len > maxlen) || len < 0)
-    return NULL;
+	/* fail on invalid parameters */
+	if ((maxlen > 0 && len > maxlen) || len < 0)
+		return NULL;
 
-  if (len < BUFRSZ)
-    len = BUFRSZ;
+	if (len < BUFRSZ)
+		len = BUFRSZ;
 
-  new = (struct arc_dstring *) malloc(sizeof *new);
-  if (new == NULL)
-  {
-    arc_error(msg, "unable to allocate %d byte(s)",
-              sizeof(struct arc_dstring));
-    return NULL;
-  }
+	new = (struct arc_dstring *) ARC_MALLOC(sizeof *new);
+	if (new == NULL)
+	{
+		arc_error(msg, "unable to allocate %d byte(s)",
+		          sizeof(struct arc_dstring));
+		return NULL;
+	}
 
-  new->ds_msg = msg;
-  new->ds_buf = malloc(len);
-  if (new->ds_buf == NULL)
-  {
-    arc_error(msg, "unable to allocate %d byte(s)",
-              sizeof(struct arc_dstring));
-    free(new);
-    return NULL;
-  }
+	new->ds_msg = msg;
+	new->ds_buf = ARC_MALLOC(len);
+	if (new->ds_buf == NULL)
+	{
+		arc_error(msg, "unable to allocate %d byte(s)",
+		          sizeof(struct arc_dstring));
+		ARC_FREE(new);
+		return NULL;
+	}
 
-  memset(new->ds_buf, '\0', len);
-  new->ds_alloc = len;
-  new->ds_len = 0;
-  new->ds_max = maxlen;
-  new->ds_msg = msg;
+	memset(new->ds_buf, '\0', len);
+	new->ds_alloc = len;
+	new->ds_len = 0;
+	new->ds_max = maxlen;
+	new->ds_msg = msg;
 
-  return new;
+	return new;
 }
 
 /*
@@ -184,10 +184,10 @@ arc_dstring_new(ARC_MESSAGE *msg, int len, int maxlen)
 void
 arc_dstring_free(struct arc_dstring *dstr)
 {
-  assert(dstr != NULL);
+	assert(dstr != NULL);
 
-  free(dstr->ds_buf);
-  free(dstr);
+	ARC_FREE(dstr->ds_buf);
+	ARC_FREE(dstr);
 }
 
 /*
@@ -207,30 +207,30 @@ arc_dstring_free(struct arc_dstring *dstr)
 _Bool
 arc_dstring_copy(struct arc_dstring *dstr, unsigned char *str)
 {
-  int len;
+	int len;
 
-  assert(dstr != NULL);
-  assert(str != NULL);
+	assert(dstr != NULL);
+	assert(str != NULL);
 
-  len = strlen((char *) str);
+	len = strlen((char *) str);
 
-  /* too big? */
-  if (dstr->ds_max > 0 && len >= dstr->ds_max)
-    return FALSE;
+	/* too big? */
+	if (dstr->ds_max > 0 && len >= dstr->ds_max)
+		return FALSE;
 
-  /* fits now? */
-  if (dstr->ds_alloc <= len)
-  {
-    /* nope; try to resize */
-    if (!arc_dstring_resize(dstr, len + 1))
-      return FALSE;
-  }
+	/* fits now? */
+	if (dstr->ds_alloc <= len)
+	{
+		/* nope; try to resize */
+		if (!arc_dstring_resize(dstr, len + 1))
+			return FALSE;
+	}
 
-  /* copy */
-  memcpy(dstr->ds_buf, str, len + 1);
-  dstr->ds_len = len;
+	/* copy */
+	memcpy(dstr->ds_buf, str, len + 1);
+	dstr->ds_len = len;
 
-  return TRUE;
+	return TRUE;
 }
 
 /*
@@ -250,32 +250,32 @@ arc_dstring_copy(struct arc_dstring *dstr, unsigned char *str)
 _Bool
 arc_dstring_cat(struct arc_dstring *dstr, unsigned char *str)
 {
-  size_t len;
-  size_t needed;
+	size_t len;
+	size_t needed;
 
-  assert(dstr != NULL);
-  assert(str != NULL);
+	assert(dstr != NULL);
+	assert(str != NULL);
 
-  len = strlen((char *) str);
-  needed = dstr->ds_len + len;
+	len = strlen((char *) str);
+	needed = dstr->ds_len + len;
 
-  /* too big? */
-  if (dstr->ds_max > 0 && needed >= dstr->ds_max)
-    return FALSE;
+	/* too big? */
+	if (dstr->ds_max > 0 && needed >= dstr->ds_max)
+		return FALSE;
 
-  /* fits now? */
-  if (dstr->ds_alloc <= needed)
-  {
-    /* nope; try to resize */
-    if (!arc_dstring_resize(dstr, needed + 1))
-      return FALSE;
-  }
+	/* fits now? */
+	if (dstr->ds_alloc <= needed)
+	{
+		/* nope; try to resize */
+		if (!arc_dstring_resize(dstr, needed + 1))
+			return FALSE;
+	}
 
-  /* append */
-  memcpy(dstr->ds_buf + dstr->ds_len, str, len + 1);
-  dstr->ds_len += len;
+	/* append */
+	memcpy(dstr->ds_buf + dstr->ds_len, str, len + 1);
+	dstr->ds_len += len;
 
-  return TRUE;
+	return TRUE;
 }
 
 /*
@@ -295,29 +295,29 @@ arc_dstring_cat(struct arc_dstring *dstr, unsigned char *str)
 _Bool
 arc_dstring_cat1(struct arc_dstring *dstr, int c)
 {
-  int len;
+	int len;
 
-  assert(dstr != NULL);
+	assert(dstr != NULL);
 
-  len = dstr->ds_len + 1;
+	len = dstr->ds_len + 1;
 
-  /* too big? */
-  if (dstr->ds_max > 0 && len >= dstr->ds_max)
-    return FALSE;
+	/* too big? */
+	if (dstr->ds_max > 0 && len >= dstr->ds_max)
+		return FALSE;
 
-  /* fits now? */
-  if (dstr->ds_alloc <= len)
-  {
-    /* nope; try to resize */
-    if (!arc_dstring_resize(dstr, len + 1))
-      return FALSE;
-  }
+	/* fits now? */
+	if (dstr->ds_alloc <= len)
+	{
+		/* nope; try to resize */
+		if (!arc_dstring_resize(dstr, len + 1))
+			return FALSE;
+	}
 
-  /* append */
-  dstr->ds_buf[dstr->ds_len++] = c;
-  dstr->ds_buf[dstr->ds_len] = '\0';
+	/* append */
+	dstr->ds_buf[dstr->ds_len++] = c;
+	dstr->ds_buf[dstr->ds_len] = '\0';
 
-  return TRUE;
+	return TRUE;
 }
 
 /*
@@ -338,31 +338,31 @@ arc_dstring_cat1(struct arc_dstring *dstr, int c)
 _Bool
 arc_dstring_catn(struct arc_dstring *dstr, unsigned char *str, size_t nbytes)
 {
-  size_t needed;
+	size_t needed;
 
-  assert(dstr != NULL);
-  assert(str != NULL);
+	assert(dstr != NULL);
+	assert(str != NULL);
 
-  needed = dstr->ds_len + nbytes;
+	needed = dstr->ds_len + nbytes;
 
-  /* too big? */
-  if (dstr->ds_max > 0 && needed >= dstr->ds_max)
-    return FALSE;
+	/* too big? */
+	if (dstr->ds_max > 0 && needed >= dstr->ds_max)
+		return FALSE;
 
-  /* fits now? */
-  if (dstr->ds_alloc <= needed)
-  {
-    /* nope; try to resize */
-    if (!arc_dstring_resize(dstr, needed + 1))
-      return FALSE;
-  }
+	/* fits now? */
+	if (dstr->ds_alloc <= needed)
+	{
+		/* nope; try to resize */
+		if (!arc_dstring_resize(dstr, needed + 1))
+			return FALSE;
+	}
 
-  /* append */
-  memcpy(dstr->ds_buf + dstr->ds_len, str, nbytes);
-  dstr->ds_len += nbytes;
-  dstr->ds_buf[dstr->ds_len] = '\0';
+	/* append */
+	memcpy(dstr->ds_buf + dstr->ds_len, str, nbytes);
+	dstr->ds_len += nbytes;
+	dstr->ds_buf[dstr->ds_len] = '\0';
 
-  return TRUE;
+	return TRUE;
 }
 
 /*
@@ -378,9 +378,9 @@ arc_dstring_catn(struct arc_dstring *dstr, unsigned char *str, size_t nbytes)
 unsigned char *
 arc_dstring_get(struct arc_dstring *dstr)
 {
-  assert(dstr != NULL);
+	assert(dstr != NULL);
 
-  return dstr->ds_buf;
+	return dstr->ds_buf;
 }
 
 /*
@@ -396,9 +396,9 @@ arc_dstring_get(struct arc_dstring *dstr)
 int
 arc_dstring_len(struct arc_dstring *dstr)
 {
-  assert(dstr != NULL);
+	assert(dstr != NULL);
 
-  return dstr->ds_len;
+	return dstr->ds_len;
 }
 
 /*
@@ -414,10 +414,10 @@ arc_dstring_len(struct arc_dstring *dstr)
 void
 arc_dstring_blank(struct arc_dstring *dstr)
 {
-  assert(dstr != NULL);
+	assert(dstr != NULL);
 
-  dstr->ds_len = 0;
-  dstr->ds_buf[0] = '\0';
+	dstr->ds_len = 0;
+	dstr->ds_buf[0] = '\0';
 }
 
 /*
@@ -435,38 +435,38 @@ arc_dstring_blank(struct arc_dstring *dstr)
 size_t
 arc_dstring_printf(struct arc_dstring *dstr, char *fmt, ...)
 {
-  size_t len;
-  size_t rem;
-  va_list ap;
-  va_list ap2;
+	size_t len;
+	size_t rem;
+	va_list ap;
+	va_list ap2;
 
-  assert(dstr != NULL);
-  assert(fmt != NULL);
+	assert(dstr != NULL);
+	assert(fmt != NULL);
 
-  va_start(ap, fmt);
-  va_copy(ap2, ap);
-  rem = dstr->ds_alloc - dstr->ds_len;
-  len = vsnprintf((char *) dstr->ds_buf + dstr->ds_len, rem, fmt, ap);
-  va_end(ap);
+	va_start(ap, fmt);
+	va_copy(ap2, ap);
+	rem = dstr->ds_alloc - dstr->ds_len;
+	len = vsnprintf((char *) dstr->ds_buf + dstr->ds_len, rem, fmt, ap);
+	va_end(ap);
 
-  if (len > rem)
-  {
-    if (!arc_dstring_resize(dstr, dstr->ds_len + len + 1))
-    {
-      va_end(ap2);
-      return (size_t) -1;
-    }
+	if (len > rem)
+	{
+		if (!arc_dstring_resize(dstr, dstr->ds_len + len + 1))
+		{
+			va_end(ap2);
+			return (size_t) -1;
+		}
 
-    rem = dstr->ds_alloc - dstr->ds_len;
-    len = vsnprintf((char *) dstr->ds_buf + dstr->ds_len, rem,
-                    fmt, ap2);
-  }
+		rem = dstr->ds_alloc - dstr->ds_len;
+		len = vsnprintf((char *) dstr->ds_buf + dstr->ds_len, rem,
+			              fmt, ap2);
+	}
 
-  va_end(ap2);
+	va_end(ap2);
 
-  dstr->ds_len += len;
+	dstr->ds_len += len;
 
-  return dstr->ds_len;
+	return dstr->ds_len;
 }
 
 /*
@@ -483,16 +483,16 @@ arc_dstring_printf(struct arc_dstring *dstr, char *fmt, ...)
 u_char *
 arc_strndup(u_char *src, size_t len)
 {
-  u_char *ret;
+	u_char *ret;
 
-  ret = malloc(len + 1);
-  if (ret != NULL)
-  {
-    memset(ret, '\0', len + 1);
-    strncpy(ret, src, len);
-  }
+	ret = ARC_MALLOC(len + 1);
+	if (ret != NULL)
+	{
+		memset(ret, '\0', len + 1);
+		strncpy(ret, src, len);
+	}
 
-  return ret;
+	return ret;
 }
 
 /*
@@ -508,22 +508,22 @@ arc_strndup(u_char *src, size_t len)
 void
 arc_collapse(u_char *str)
 {
-  u_char *q;
-  u_char *r;
+	u_char *q;
+	u_char *r;
 
-  assert(str != NULL);
+	assert(str != NULL);
 
-  for (q = str, r = str; *q != '\0'; q++)
-  {
-    if (!isspace(*q))
-    {
-      if (q != r)
-        *r = *q;
-      r++;
-    }
-  }
+	for (q = str, r = str; *q != '\0'; q++)
+	{
+		if (!isspace(*q))
+		{
+			if (q != r)
+			  *r = *q;
+			r++;
+		}
+	}
 
-  *r = '\0';
+	*r = '\0';
 }
 
 /*
@@ -634,18 +634,18 @@ arc_hdrlist(u_char *buf, size_t buflen, u_char **hdrlist, _Bool first)
 void
 arc_lowerhdr(unsigned char *str)
 {
-  unsigned char *p;
+	unsigned char *p;
 
-  assert(str != NULL);
+	assert(str != NULL);
 
-  for (p = str; *p != '\0'; p++)
-  {
-    if (*p == ':')
-      return;
+	for (p = str; *p != '\0'; p++)
+	{
+		if (*p == ':')
+			return;
 
-    if (isascii(*p) && isupper(*p))
-      *p = tolower(*p);
-  }
+		if (isascii(*p) && isupper(*p))
+			*p = tolower(*p);
+	}
 }
 
 /*
@@ -663,38 +663,38 @@ arc_lowerhdr(unsigned char *str)
 ARC_STAT
 arc_tmpfile(ARC_MESSAGE *msg, int *fp, _Bool keep)
 {
-  int fd;
-  char *p;
-  char path[MAXPATHLEN + 1];
+	int fd;
+	char *p;
+	char path[MAXPATHLEN + 1];
 
-  assert(msg != NULL);
-  assert(fp != NULL);
+	assert(msg != NULL);
+	assert(fp != NULL);
 
-  snprintf(path, MAXPATHLEN, "%s/arc.XXXXXX",
-           msg->arc_library->arcl_tmpdir);
+	snprintf(path, MAXPATHLEN, "%s/arc.XXXXXX",
+			     msg->arc_library->arcl_tmpdir);
 
-  for (p = path + strlen((char *) msg->arc_library->arcl_tmpdir) + 1;
-       *p != '\0';
-       p++)
-  {
-    if (*p == '/')
-      *p = '.';
-  }
+	for (p = path + strlen((char *) msg->arc_library->arcl_tmpdir) + 1;
+	     *p != '\0';
+	     p++)
+	{
+		if (*p == '/')
+			*p = '.';
+	}
 
-  fd = mkstemp(path);
-  if (fd == -1)
-  {
-    arc_error(msg, "can't create temporary file at %s: %s",
-              path, strerror(errno));
-    return ARC_STAT_NORESOURCE;
-  }
+	fd = mkstemp(path);
+	if (fd == -1)
+	{
+		arc_error(msg, "can't create temporary file at %s: %s",
+			        path, strerror(errno));
+		return ARC_STAT_NORESOURCE;
+	}
 
-  *fp = fd;
+	*fp = fd;
 
-  if (!keep)
-    (void) unlink(path);
+	if (!keep)
+		(void) unlink(path);
 
-  return ARC_STAT_OK;
+	return ARC_STAT_OK;
 }
 
 /*
@@ -715,43 +715,43 @@ void
 arc_min_timeval(struct timeval *t1, struct timeval *t2, struct timeval *t,
                 struct timeval **which)
 {
-  struct timeval *next;
-  struct timeval now;
+	struct timeval *next;
+	struct timeval now;
 
-  assert(t1 != NULL);
-  assert(t != NULL);
+	assert(t1 != NULL);
+	assert(t != NULL);
 
-  if (t2 == NULL ||
-      t2->tv_sec > t1->tv_sec ||
-      (t2->tv_sec == t1->tv_sec && t2->tv_usec > t1->tv_usec))
-    next = t1;
-  else
-    next = t2;
+	if (t2 == NULL ||
+			t2->tv_sec > t1->tv_sec ||
+			(t2->tv_sec == t1->tv_sec && t2->tv_usec > t1->tv_usec))
+		next = t1;
+	else
+		next = t2;
 
-  (void) gettimeofday(&now, NULL);
+	(void) gettimeofday(&now, NULL);
 
-  if (next->tv_sec < now.tv_sec ||
-      (next->tv_sec == now.tv_sec && next->tv_usec < now.tv_usec))
-  {
-    t->tv_sec = 0;
-    t->tv_usec = 0;
-  }
-  else
-  {
-    t->tv_sec = next->tv_sec - now.tv_sec;
-    if (next->tv_usec < now.tv_usec)
-    {
-      t->tv_sec--;
-      t->tv_usec = next->tv_usec - now.tv_usec + 1000000;
-    }
-    else
-    {
-      t->tv_usec = next->tv_usec - now.tv_usec;
-    }
-  }
+	if (next->tv_sec < now.tv_sec ||
+			(next->tv_sec == now.tv_sec && next->tv_usec < now.tv_usec))
+	{
+		t->tv_sec = 0;
+		t->tv_usec = 0;
+	}
+	else
+	{
+		t->tv_sec = next->tv_sec - now.tv_sec;
+		if (next->tv_usec < now.tv_usec)
+		{
+			t->tv_sec--;
+			t->tv_usec = next->tv_usec - now.tv_usec + 1000000;
+		}
+		else
+		{
+			t->tv_usec = next->tv_usec - now.tv_usec;
+		}
+	}
 
-  if (which != NULL)
-    *which = next;
+	if (which != NULL)
+		*which = next;
 }
 
 /*
@@ -772,124 +772,124 @@ arc_min_timeval(struct timeval *t1, struct timeval *t2, struct timeval *t,
 
 int
 arc_check_dns_reply(unsigned char *ansbuf, size_t anslen,
-                    int xclass, int xtype)
+			              int xclass, int xtype)
 {
-  _Bool trunc = FALSE;
-  int qdcount;
-  int ancount;
-  int n;
-  uint16_t type = (uint16_t) -1;
-  uint16_t class = (uint16_t) -1;
-  unsigned char *cp;
-  unsigned char *eom;
-  HEADER hdr;
-  unsigned char name[ARC_MAXHOSTNAMELEN + 1];
+	_Bool trunc = FALSE;
+	int qdcount;
+	int ancount;
+	int n;
+	uint16_t type = (uint16_t) -1;
+	uint16_t class = (uint16_t) -1;
+	unsigned char *cp;
+	unsigned char *eom;
+	HEADER hdr;
+	unsigned char name[ARC_MAXHOSTNAMELEN + 1];
 
-  assert(ansbuf != NULL);
+	assert(ansbuf != NULL);
 
-  /* set up pointers */
-  memcpy(&hdr, ansbuf, sizeof hdr);
-  cp = ansbuf + HFIXEDSZ;
-  eom = ansbuf + anslen;
+	/* set up pointers */
+	memcpy(&hdr, ansbuf, sizeof hdr);
+	cp = ansbuf + HFIXEDSZ;
+	eom = ansbuf + anslen;
 
-  /* skip over the name at the front of the answer */
-  for (qdcount = ntohs((unsigned short) hdr.qdcount);
-       qdcount > 0;
-       qdcount--)
-  {
-    /* copy it first */
-    (void) dn_expand((unsigned char *) ansbuf, eom, cp,
-                     (RES_UNC_T) name, sizeof name);
+	/* skip over the name at the front of the answer */
+	for (qdcount = ntohs((unsigned short) hdr.qdcount);
+             qdcount > 0;
+             qdcount--)
+	{
+		/* copy it first */
+		(void) dn_expand((unsigned char *) ansbuf, eom, cp,
+		                 (RES_UNC_T) name, sizeof name);
 
-    if ((n = dn_skipname(cp, eom)) < 0)
-      return 2;
+		if ((n = dn_skipname(cp, eom)) < 0)
+			return 2;
 
-    cp += n;
+		cp += n;
 
-    /* extract the type and class */
-    if (cp + INT16SZ + INT16SZ > eom)
-      return 2;
+		/* extract the type and class */
+		if (cp + INT16SZ + INT16SZ > eom)
+			return 2;
 
-    GETSHORT(type, cp);
-    GETSHORT(class, cp);
-  }
+		GETSHORT(type, cp);
+		GETSHORT(class, cp);
+	}
 
-  if (type != xtype || class != xclass)
-    return 0;
+	if (type != xtype || class != xclass)
+		return 0;
 
-  /* if NXDOMAIN, return DKIM_STAT_NOKEY */
-  if (hdr.rcode == NXDOMAIN)
-    return 0;
+	/* if NXDOMAIN, return DKIM_STAT_NOKEY */
+	if (hdr.rcode == NXDOMAIN)
+		return 0;
 
-  /* if truncated, we can't do it */
-  if (hdr.tc)
-    trunc = TRUE;
+	/* if truncated, we can't do it */
+	if (hdr.tc)
+		trunc = TRUE;
 
-  /* get the answer count */
-  ancount = ntohs((unsigned short) hdr.ancount);
-  if (ancount == 0)
-    return (trunc ? 2 : 0);
+	/* get the answer count */
+	ancount = ntohs((unsigned short) hdr.ancount);
+	if (ancount == 0)
+		return (trunc ? 2 : 0);
 
-  /*
-  **  Extract the data from the first TXT answer.
-  */
+	/*
+	**  Extract the data from the first TXT answer.
+	*/
 
-  while (--ancount >= 0 && cp < eom)
-  {
-    /* grab the label, even though we know what we asked... */
-    if ((n = dn_expand((unsigned char *) ansbuf, eom, cp,
-                       (RES_UNC_T) name, sizeof name)) < 0)
-      return 2;
+	while (--ancount >= 0 && cp < eom)
+	{
+		/* grab the label, even though we know what we asked... */
+		if ((n = dn_expand((unsigned char *) ansbuf, eom, cp,
+		                   (RES_UNC_T) name, sizeof name)) < 0)
+			return 2;
 
-    /* ...and move past it */
-    cp += n;
+		/* ...and move past it */
+		cp += n;
 
-    /* extract the type and class */
-    if (cp + INT16SZ + INT16SZ + INT32SZ > eom)
-      return 2;
+		/* extract the type and class */
+		if (cp + INT16SZ + INT16SZ + INT32SZ > eom)
+			return 2;
 
-    GETSHORT(type, cp);
-    cp += INT16SZ; /* class */
-    cp += INT32SZ; /* ttl */
+		GETSHORT(type, cp);
+		cp += INT16SZ; /* class */
+		cp += INT32SZ; /* ttl */
 
-    /* skip CNAME if found; assume it was resolved */
-    if (type == T_CNAME)
-    {
-      if ((n = dn_expand((u_char *) ansbuf, eom, cp,
-                         (RES_UNC_T) name, sizeof name)) < 0)
-        return 2;
+		/* skip CNAME if found; assume it was resolved */
+		if (type == T_CNAME)
+		{
+			if ((n = dn_expand((u_char *) ansbuf, eom, cp,
+			                   (RES_UNC_T) name, sizeof name)) < 0)
+			  return 2;
 
-      cp += n;
-      continue;
-    }
-    else if (type != xtype)
-    {
-      return (trunc ? 1 : 0);
-    }
+			cp += n;
+			continue;
+		}
+		else if (type != xtype)
+		{
+			return (trunc ? 1 : 0);
+		}
 
-    /* found a record we can use; break */
-    break;
-  }
+		/* found a record we can use; break */
+		break;
+	}
 
-  /* if ancount went below 0, there were no good records */
-  if (ancount < 0)
-    return (trunc ? 1 : 0);
+	/* if ancount went below 0, there were no good records */
+	if (ancount < 0)
+		return (trunc ? 1 : 0);
 
-  /* get payload length */
-  if (cp + INT16SZ > eom)
-    return 2;
+	/* get payload length */
+	if (cp + INT16SZ > eom)
+		return 2;
 
-  GETSHORT(n, cp);
+	GETSHORT(n, cp);
 
-  /*
-  **  XXX -- maybe deal with a partial reply rather than require
-  **       it all
-  */
+	/*
+	**  XXX -- maybe deal with a partial reply rather than require
+	**       it all
+	*/
 
-  if (cp + n > eom)
-    return 2;
+	if (cp + n > eom)
+		return 2;
 
-  return (trunc ? 1 : 0);
+	return (trunc ? 1 : 0);
 }
 
 /*
@@ -914,18 +914,18 @@ arc_copy_array(char **in)
 	for (n = 0; in[n] != NULL; n++)
 		continue;
 
-	out = malloc(sizeof(char *) * (n + 1));
+	out = ARC_MALLOC(sizeof(char *) * (n + 1));
 	if (out == NULL)
 		return NULL;
 
 	for (c = 0; c < n; c++)
 	{
-		out[c] = strdup(in[c]);
+		out[c] = ARC_STRDUP(in[c]);
 		if (out[c] == NULL)
 		{
 			for (n = 0; n < c; n++)
-				free(out[n]);
-			free(out);
+				ARC_FREE(out[n]);
+			ARC_FREE(out);
 			return NULL;
 		}
 	}
@@ -953,9 +953,9 @@ arc_clobber_array(char **in)
 	assert(in != NULL);
 
 	for (n = 0; in[n] != NULL; n++)
-		free(in[n]);
+		ARC_FREE(in[n]);
 
-	free(in);
+	ARC_FREE(in);
 }
 
 /*
@@ -970,28 +970,28 @@ arc_clobber_array(char **in)
 
 int compare(const void* a, const void* b)
 {
-  char **ia = (char **)a;
-  char **ib = (char **)b;
-  return strncmp(*ia, *ib, 2);
+	char **ia = (char **)a;
+	char **ib = (char **)b;
+	return strncmp(*ia, *ib, 2);
 }
 
 void
 arc_std_header(struct arc_dstring *dstr)
 {
-  char *token;
-  char *tokens[20]; // TODO:GS - be smarter here
+	char *token;
+	char *tokens[20]; // TODO:GS - be smarter here
 
 	// strip out header name
-  int hofs;
-  char *input = (char *) arc_dstring_get(dstr);
-  for(hofs = 0; hofs < arc_dstring_len(dstr) - 1; hofs++)
-    if(input[hofs] == ':')
-      break;
-  char *str = input + hofs + 2;
+	int hofs;
+	char *input = (char *) arc_dstring_get(dstr);
+	for(hofs = 0; hofs < arc_dstring_len(dstr) - 1; hofs++)
+		if(input[hofs] == ':')
+			break;
+	char *str = input + hofs + 2;
 
-  // tokenize & lowercase
-  int ntok = 0;
-  while((token = strtok_r(str, "; ", &str)))
+	// tokenize & lowercase
+	int ntok = 0;
+	while((token = strtok_r(str, "; ", &str)))
 	{
 		tokens[ntok] = token;
 
@@ -1001,28 +1001,28 @@ arc_std_header(struct arc_dstring *dstr)
 
 		ntok++;
 	}
-  tokens[ntok] = '\0';
+	tokens[ntok] = '\0';
 
-  // sort tokens
-  size_t size = sizeof tokens[0];
-  size_t cnt = ntok;
-  qsort(tokens, cnt, size, compare);
+	// sort tokens
+	size_t size = sizeof tokens[0];
+	size_t cnt = ntok;
+	qsort(tokens, cnt, size, compare);
 
-  struct arc_dstring *dstr2;
-  dstr2 = arc_dstring_new(dstr->ds_msg, 500, 0); // TODO - be smarter here
-  arc_dstring_catn(dstr2, input, hofs + 2);
+	struct arc_dstring *dstr2;
+	dstr2 = arc_dstring_new(dstr->ds_msg, 500, 0); // TODO - be smarter here
+	arc_dstring_catn(dstr2, input, hofs + 2);
 
-  char *delim = "; ";
-  for(int i=0; i < ntok; i++)
+	char *delim = "; ";
+	for(int i=0; i < ntok; i++)
 	{
 		arc_dstring_cat(dstr2, tokens[i]);
 		if(i != ntok - 1)
 			arc_dstring_catn(dstr2, delim, (size_t) 2);
 	}
 
-  arc_dstring_copy(dstr, (char *) arc_dstring_get(dstr2));
-  arc_dstring_free(dstr2);
+	arc_dstring_copy(dstr, (char *) arc_dstring_get(dstr2));
+	arc_dstring_free(dstr2);
 
-  return;
+	return;
 }
 

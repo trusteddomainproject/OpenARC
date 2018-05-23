@@ -22,6 +22,7 @@
 
 /* libopenarc includes */
 #include "arc.h"
+#include "arc-internal.h"
 #include "arc-dns.h"
 
 /* OpenARC includes */
@@ -59,7 +60,7 @@ arc_res_init(void **srv)
 #ifdef HAVE_RES_NINIT
 	struct __res_state *res;
 
-	res = malloc(sizeof(struct __res_state));
+	res = ARC_MALLOC(sizeof(struct __res_state));
 	if (res == NULL)
 		return -1;
 
@@ -67,7 +68,7 @@ arc_res_init(void **srv)
 
 	if (res_ninit(res) != 0)
 	{
-		free(res);
+		ARC_FREE(res);
 		return -1;
 	}
 
@@ -108,7 +109,7 @@ arc_res_close(void *srv)
 	if (res != NULL)
 	{
 		res_nclose(res);
-		free(res);
+		ARC_FREE(res);
 	}
 #endif /* HAVE_RES_NINIT */
 }
@@ -133,7 +134,7 @@ int
 arc_res_cancel(void *srv, void *qh)
 {
 	if (qh != NULL)
-		free(qh);
+		ARC_FREE(qh);
 
 	return 0;
 }
@@ -190,7 +191,7 @@ arc_res_query(void *srv, int type, unsigned char *query, unsigned char *buf,
 	if (ret == -1)
 		return ARC_DNS_ERROR;
 
-	rq = (struct arc_res_qh *) malloc(sizeof *rq);
+	rq = (struct arc_res_qh *) ARC_MALLOC(sizeof *rq);
 	if (rq == NULL)
 		return ARC_DNS_ERROR;
 
@@ -281,7 +282,7 @@ arc_res_nslist(void *srv, const char *nslist)
 
 	memset(nses, '\0', sizeof nses);
 
-	tmp = strdup(nslist);
+	tmp = ARC_STRDUP(nslist);
 	if (tmp == NULL)
 		return ARC_DNS_ERROR;
 
@@ -317,7 +318,7 @@ arc_res_nslist(void *srv, const char *nslist)
 # endif /* AF_INET6 */
 		else
 		{
-			free(tmp);
+			ARC_FREE(tmp);
 			return ARC_DNS_ERROR;
 		}
 	}
@@ -325,7 +326,7 @@ arc_res_nslist(void *srv, const char *nslist)
 	res = srv;
 	res_setservers(res, nses, nscount);
 
-	free(tmp);
+	ARC_FREE(tmp);
 #endif /* HAVE_RES_SETSERVERS */
 
 	return ARC_DNS_SUCCESS;
