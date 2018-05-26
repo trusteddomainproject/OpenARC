@@ -3385,10 +3385,13 @@ mlfi_eom(SMFICTX *ctx)
 	struct arcf_config *conf;
 	ARC_HDRFIELD *seal = NULL;
 	ARC_HDRFIELD *sealhdr = NULL;
+	const char *ipout = NULL;
+	struct sockaddr *ip;
 	Header hdr;
 	struct authres ar;
 	unsigned char header[ARC_MAXHEADER + 1];
 	u_char arcchainbuf[ARC_MAXHEADER + 1];
+	char ipbuf[ARC_MAXHOSTNAMELEN + 1];
 
 	assert(ctx != NULL);
 
@@ -3423,6 +3426,35 @@ mlfi_eom(SMFICTX *ctx)
 	if (hostname == NULL)
 		hostname = HOSTUNKNOWN;
 
+	ip = (struct sockaddr *) &cc->cctx_ip;
+	memset(ipbuf, '\0', sizeof ipbuf);
+
+	switch (ip->sa_family)
+	{
+	  case AF_INET:
+	  {
+		struct sockaddr_in sin;
+
+		memcpy(&sin, ip, sizeof sin);
+		ipout = inet_ntop(ip->sa_family, &sin.sin_addr,
+		                  ipbuf, sizeof ipbuf);
+		break;
+	  }
+	
+	  case AF_INET6:
+	  {
+		struct sockaddr_in6 sin6;
+
+		memcpy(&sin6, ip, sizeof sin6);
+		ipout = inet_ntop(ip->sa_family, &sin6.sin6_addr,
+		                  ipbuf, sizeof ipbuf);
+		break;
+	  }
+
+	  default:
+		break;
+	}
+	
 	/*
 	**  Signal end-of-message to ARC.
 	*/
@@ -3597,6 +3629,12 @@ mlfi_eom(SMFICTX *ctx)
 				arcf_dstring_cat(afc->mctx_tmpstr, "; ");
 			arcf_dstring_printf(afc->mctx_tmpstr, "arc=%s",
 			                    arc_chain_status_str(afc->mctx_arcmsg));
+			if (ipout != NULL)
+			{
+				arcf_dstring_printf(afc->mctx_tmpstr,
+				                    " smtp.client-ip=%s",
+				                    ipbuf);
+			}
 		}
 
 		/*
@@ -3654,10 +3692,6 @@ mlfi_eom(SMFICTX *ctx)
 
 	if (BITSET(ARC_MODE_VERIFY, cc->cctx_mode))
 	{
-		const char *ipout;
-		struct sockaddr *ip;
-		char ipbuf[ARC_MAXHOSTNAMELEN + 1];
-
 		/*
  		**  Authentication-Results
 		*/
@@ -3685,36 +3719,6 @@ mlfi_eom(SMFICTX *ctx)
 		                    conf->conf_authservid,
 		                    arc_chain_status_str(afc->mctx_arcmsg));
 
-		ip = (struct sockaddr *) &cc->cctx_ip;
-		memset(ipbuf, '\0', sizeof ipbuf);
-		ipout = NULL;
-
-		switch (ip->sa_family)
-		{
-		  case AF_INET:
-		  {
-			struct sockaddr_in sin;
-
-			memcpy(&sin, ip, sizeof sin);
-			ipout = inet_ntop(ip->sa_family, &sin.sin_addr,
-			                  ipbuf, sizeof ipbuf);
-			break;
-		  }
-		
-		  case AF_INET6:
-		  {
-			struct sockaddr_in6 sin6;
-
-			memcpy(&sin6, ip, sizeof sin6);
-			ipout = inet_ntop(ip->sa_family, &sin6.sin6_addr,
-			                  ipbuf, sizeof ipbuf);
-			break;
-		  }
-
-		  default:
-			break;
-		}
-		
 		if (ipout != NULL)
 		{
 			arcf_dstring_printf(afc->mctx_tmpstr,
