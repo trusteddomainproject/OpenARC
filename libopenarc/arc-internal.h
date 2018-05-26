@@ -127,9 +127,13 @@ typedef struct arc_canon ARC_CANON;
 */
 
 #include <openssl/crypto.h>
-#define ARC_FREE       OPENSSL_free
-#define ARC_MALLOC     OPENSSL_malloc
-#define ARC_REALLOC    OPENSSL_realloc
-#define ARC_STRDUP     OPENSSL_strdup
+#define ARC_FREE	OPENSSL_free
+#define ARC_MALLOC	OPENSSL_malloc
+#define ARC_REALLOC	OPENSSL_realloc
+#if HAVE_OPENSSL_STRDUP
+# define ARC_STRDUP	OPENSSL_strdup
+#else /* HAVE_OPENSSL_STRDUP */
+# define ARC_STRDUP	strdup
+#endif /* HAVE_OPENSSL_STRDUP */
 
 #endif /* ! _ARC_INTERNAL_H_ */

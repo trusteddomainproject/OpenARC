@@ -666,6 +666,11 @@ then
 	CPPFLAGS="$saved_CPPFLAGS"
 	LDFLAGS="$saved_LDFLAGS"
 	LIBS="$saved_LIBS"
+
+	AC_SEARCH_LIBS([OPENSSL_strdup], [ssl],
+		AC_DEFINE([HAVE_OPENSSL_STRDUP], 1,
+ 	                  [Define if your openssl has a strdup wrapper]))
+
 fi
 
 AC_SUBST(LIBCRYPTO_CFLAGS)
