@@ -3659,26 +3659,31 @@ arc_chain_status_str(ARC_MESSAGE *msg)
 }
 
 /*
-**	ARC_CHAIN_CUSTODY_STR -- retrieve domain chain, as a string
+**  ARC_CHAIN_CUSTODY_STR -- retrieve domain chain, as a string
 **
-**	Parameters:
+**  Parameters:
 **      msg -- ARC_MESSAGE object
 **      buf -- where to write
 **      buflen -- bytes at "buf"
 **
-**	Return value:
-**	    Number of bytes written. If value is greater than or equal to buflen
-**		argument, then buffer was too small and output was truncated.
+**  Return value:
+**  	Number of bytes written. If value is greater than or equal to buflen
+**  	argument, then buffer was too small and output was truncated.
 */
+
 int
 arc_chain_custody_str(ARC_MESSAGE *msg, u_char *buf, size_t buflen)
 {
-	u_int set;
+	int set;
 	u_char *instance;
 	ARC_KVSET *kvset;
 	char *str = NULL;
 	struct arc_dstring *tmpbuf;
 	int appendlen = 0;
+
+	assert(msg != NULL);
+	assert(buf != NULL);
+	assert(buflen > 0);
 
 	tmpbuf = arc_dstring_new(msg, BUFRSZ, MAXBUFRSZ);
 	if (tmpbuf == NULL)
@@ -3688,28 +3693,15 @@ arc_chain_custody_str(ARC_MESSAGE *msg, u_char *buf, size_t buflen)
 		return ARC_STAT_NORESOURCE;
 	}
 
-	assert(msg != NULL);
-	assert(buf != NULL);
-	assert(buflen > 0);
-
 	memset(buf, '\0', buflen);
 
-	for (set = msg->arc_nsets; set > 0; set--)
+	for (set = msg->arc_nsets - 1; set >= 0; set--)
 	{
-		for (kvset = arc_set_first(msg, ARC_KVSETTYPE_SEAL);
-		     kvset != NULL;
-		     kvset = arc_set_next(kvset, ARC_KVSETTYPE_SEAL))
-		{
-			instance = arc_param_get(kvset, "i");
-			if (atoi(instance) == set)
-				break;
-		}
-
+		kvset = msg->arc_sets[set].arcset_ams->hdr_data;
 		str = arc_param_get(kvset, "d");
-		if (str == NULL)
-			continue;
-
-		(void) arc_dstring_printf(tmpbuf, "%s%s", (set < msg->arc_nsets ? ":" : ""), str);
+		(void) arc_dstring_printf(tmpbuf, "%s%s",
+		                          (set < msg->arc_nsets ? ":" : ""),
+		                          str);
 	}
 
 	appendlen = snprintf(buf, buflen, "%s", arc_dstring_get(tmpbuf));
