@@ -3553,15 +3553,12 @@ mlfi_eom(SMFICTX *ctx)
 						switch (ar.ares_result[n].result_result)
 						{
 						    case ARES_RESULT_PASS:
+						    case ARES_RESULT_NONE:
 							cv = ARC_CHAIN_PASS;
 							break;
 
 						    case ARES_RESULT_FAIL:
 							cv = ARC_CHAIN_FAIL;
-							break;
-
-						    case ARES_RESULT_NONE:
-							cv = ARC_CHAIN_NONE;
 							break;
 
 						    default:
