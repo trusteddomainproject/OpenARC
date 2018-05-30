@@ -3685,6 +3685,9 @@ arc_chain_custody_str(ARC_MESSAGE *msg, u_char *buf, size_t buflen)
 	assert(buf != NULL);
 	assert(buflen > 0);
 
+	if (msg->arc_cstate != ARC_CHAIN_PASS)
+		return 0;
+
 	tmpbuf = arc_dstring_new(msg, BUFRSZ, MAXBUFRSZ);
 	if (tmpbuf == NULL)
 	{
