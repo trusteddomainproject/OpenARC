@@ -3421,6 +3421,18 @@ mlfi_eom(SMFICTX *ctx)
 		}
 	}
 
+	if (afc->mctx_tmpstr == NULL)
+	{
+		afc->mctx_tmpstr = arcf_dstring_new(BUFRSZ, 0);
+		if (afc->mctx_tmpstr == NULL)
+		{
+			if (conf->conf_dolog)
+				syslog(LOG_ERR, "arcf_dstring_new() failed");
+
+			return SMFIS_TEMPFAIL;
+		}
+	}
+
 	/* get hostname; used in the X header and in new MIME boundaries */
 	hostname = arcf_getsymval(ctx, "j");
 	if (hostname == NULL)
@@ -3476,24 +3488,7 @@ mlfi_eom(SMFICTX *ctx)
 	{
 		int arfound = 0;
 
-		if (afc->mctx_tmpstr == NULL)
-		{
-			afc->mctx_tmpstr = arcf_dstring_new(BUFRSZ, 0);
-			if (afc->mctx_tmpstr == NULL)
-			{
-				if (conf->conf_dolog)
-				{
-					syslog(LOG_ERR,
-					       "arcf_dstring_new() failed");
-				}
-
-				return SMFIS_TEMPFAIL;
-			}
-		}
-		else
-		{
-			arcf_dstring_blank(afc->mctx_tmpstr);
-		}
+		arcf_dstring_blank(afc->mctx_tmpstr);
 
 		/* assemble authentication results */
 		for (c = 0; ; c++)
