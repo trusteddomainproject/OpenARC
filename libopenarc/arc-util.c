@@ -434,7 +434,8 @@ char *
 arc_strdup(const char *s1)
 {
 	char *s = ARC_MALLOC(strlen(s1)+1);
-	memcpy(s, s1, strlen(s1)+1);
+	if (s)
+	    memcpy(s, s1, strlen(s1)+1);
 	return s;
 }
 
