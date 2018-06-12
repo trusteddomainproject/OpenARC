@@ -39,6 +39,8 @@ extern struct arc_dstring *arc_dstring_new __P((ARC_MESSAGE *, int, int));
 extern size_t arc_dstring_printf __P((struct arc_dstring *dstr, char *fmt,
                                       ...));
 
+extern char *arc_strdup __P((const char *));
+
 extern int arc_check_dns_reply __P((unsigned char *ansbuf, size_t anslen,
                                     int xclass, int xtype));
 
