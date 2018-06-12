@@ -130,10 +130,10 @@ typedef struct arc_canon ARC_CANON;
 #define ARC_FREE	OPENSSL_free
 #define ARC_MALLOC	OPENSSL_malloc
 #define ARC_REALLOC	OPENSSL_realloc
-#if HAVE_OPENSSL_STRDUP
+#ifdef OPENSSL_strdup
 # define ARC_STRDUP	OPENSSL_strdup
-#else /* HAVE_OPENSSL_STRDUP */
-# define ARC_STRDUP	strdup
-#endif /* HAVE_OPENSSL_STRDUP */
+#else /* OPENSSL_strdup */
+# define ARC_STRDUP	arc_strdup
+#endif /* OPENSSL_strdup */
 
 #endif /* ! _ARC_INTERNAL_H_ */

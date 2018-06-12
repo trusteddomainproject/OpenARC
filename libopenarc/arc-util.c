@@ -420,6 +420,25 @@ arc_dstring_blank(struct arc_dstring *dstr)
 	dstr->ds_buf[0] = '\0';
 }
 
+
+/*
+**  ARC_STRDUP -- save a copy of a string
+**
+**  Parameters:
+**  	s1 -- string to copy
+**
+**  Return value:
+**  	a copy of s1.
+*/
+char *
+arc_strdup(const char *s1)
+{
+	char *s = ARC_MALLOC(strlen(s1)+1);
+	memcpy(s, s1, strlen(s1)+1);
+	return s;
+}
+
+
 /*
 **  ARC_DSTRING_PRINTF -- write variable length formatted output to a dstring
 **
