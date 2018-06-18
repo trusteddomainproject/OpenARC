@@ -1285,7 +1285,9 @@ arc_canon_runheaders(ARC_MESSAGE *msg)
 		arc_dstring_blank(msg->arc_hdrbuf);
 
 		/* skip done hashes and those which are of the wrong type */
-		if (cur->canon_done || cur->canon_type != ARC_CANONTYPE_HEADER)
+		if (cur->canon_done ||
+		    (cur->canon_type != ARC_CANONTYPE_HEADER &&
+                     cur->canon_type != ARC_CANONTYPE_AMS))
 			continue;
 
 		signing = (cur->canon_sigheader == NULL);
@@ -1483,7 +1485,7 @@ arc_canon_runheaders(ARC_MESSAGE *msg)
 **  Parameters:
 **  	msg -- ARC message handle
 **  	hdr -- header
-**  	seal -- TRUE iff this is for an ARC-Seal
+**  	type -- an ARC_CANONTYPE_*
 **
 **  Return value:
 **  	A ARC_STAT_* constant.
@@ -1493,7 +1495,7 @@ arc_canon_runheaders(ARC_MESSAGE *msg)
 */
 
 ARC_STAT
-arc_canon_signature(ARC_MESSAGE *msg, struct arc_hdrfield *hdr, _Bool seal)
+arc_canon_signature(ARC_MESSAGE *msg, struct arc_hdrfield *hdr, int type)
 {
 	ARC_STAT status;
 	ARC_CANON *cur;
@@ -1518,9 +1520,7 @@ arc_canon_signature(ARC_MESSAGE *msg, struct arc_hdrfield *hdr, _Bool seal)
 		/* skip done hashes and those which are of the wrong type */
 		if (cur->canon_done)
 			continue;
-		if (!seal && cur->canon_type != ARC_CANONTYPE_HEADER)
-			continue;
-		if (seal && cur->canon_type != ARC_CANONTYPE_SEAL)
+		if (type != cur->canon_type)
 			continue;
 
 		/* prepare the data */

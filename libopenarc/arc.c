@@ -2678,7 +2678,7 @@ arc_eoh_sign(ARC_MESSAGE *msg)
 	ARC_STAT status;
 
 	/* headers, signing */
-	status = arc_add_canon(msg, ARC_CANONTYPE_HEADER, msg->arc_canonhdr,
+	status = arc_add_canon(msg, ARC_CANONTYPE_AMS, msg->arc_canonhdr,
 	                       msg->arc_signalg, NULL, NULL, (ssize_t) -1,
 	                       &msg->arc_sign_hdrcanon);
 	if (status != ARC_STAT_OK)
@@ -3205,7 +3205,7 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 	**  Part 1: Construct a new AAR
 	*/
 
-	arc_dstring_printf(dstr, "ARC-Authentication-Results: i=%u; %s; %s",
+	arc_dstring_printf(dstr, "ARC-Authentication-Results:i=%u; %s; %s",
 	                   msg->arc_nsets + 1,
 	                   msg->arc_authservid,
 	                   ar == NULL ? "none" : (char *) ar);
@@ -3244,8 +3244,8 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 
 	/* construct the AMS */
 	arc_dstring_blank(dstr);
-	arc_dstring_catn(dstr, (u_char *) ARC_MSGSIG_HDRNAME ": ",
-	                 sizeof ARC_MSGSIG_HDRNAME + 1);
+	arc_dstring_catn(dstr, (u_char *) ARC_MSGSIG_HDRNAME ":",
+	                 sizeof ARC_MSGSIG_HDRNAME);
 
 	status = arc_getamshdr_d(msg, arc_dstring_len(dstr), &sighdr, &len,
 	                         FALSE);
@@ -3271,7 +3271,7 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 	hdr.hdr_next = NULL;
 
 	/* canonicalize */
-	status = arc_canon_signature(msg, &hdr, FALSE);
+	status = arc_canon_signature(msg, &hdr, ARC_CANONTYPE_AMS);
 	if (status != ARC_STAT_OK)
 	{
 		arc_error(msg, "arc_canon_signature() failed");
@@ -3388,8 +3388,8 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 	*/
 
 	arc_dstring_blank(dstr);
-	arc_dstring_catn(dstr, (u_char *) ARC_SEAL_HDRNAME ": ",
-	                 sizeof ARC_SEAL_HDRNAME + 1);
+	arc_dstring_catn(dstr, (u_char *) ARC_SEAL_HDRNAME ":",
+	                 sizeof ARC_SEAL_HDRNAME);
 
 	/* feed the seal we have so far */
 	status = arc_canon_add_to_seal(msg);
@@ -3427,7 +3427,7 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 	hdr.hdr_next = NULL;
 
 	/* canonicalize */
-	status = arc_canon_signature(msg, &hdr, TRUE);
+	status = arc_canon_signature(msg, &hdr, ARC_CANONTYPE_SEAL);
 	if (status != ARC_STAT_OK)
 	{
 		arc_error(msg, "arc_canon_signature() failed");

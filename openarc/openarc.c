@@ -3518,14 +3518,17 @@ mlfi_eom(SMFICTX *ctx)
 				for (n = 0; n < ar.ares_count; n++)
 				{
 					if (ar.ares_result[n].result_method == ARES_METHOD_ARC &&
-					    (BITSET(ARC_MODE_SIGN, cc->cctx_mode) &&
-					     BITSET(ARC_MODE_VERIFY, cc->cctx_mode)))
+					    BITSET(ARC_MODE_SIGN,
+					           cc->cctx_mode) &&
+					    !BITSET(ARC_MODE_VERIFY,
+					            cc->cctx_mode))
 					{
 						/*
 						**  If it's an ARC result under
 						**  our authserv-id and we're
-						**  not verifying, use that
-						**  value as the chain state.
+						**  not also verifying, use
+						**  that value as the chain
+						**  state.
 						*/
 
 						int cv;
@@ -3664,11 +3667,18 @@ mlfi_eom(SMFICTX *ctx)
 		{
 			size_t len;
 			u_char *hfptr;
+			u_char *hfdest;
 			u_char hfname[BUFRSZ + 1];
 
 			hfptr = arc_hdr_name(sealhdr, &len);
+			hfdest = hfname;
 			memset(hfname, '\0', sizeof hfname);
-			strncpy(hfname, hfptr, len);
+			if (cc->cctx_noleadspc)
+			{
+				hfname[0] = ' ';
+				hfdest++;
+			}
+			strncpy(hfdest, hfptr, len);
 
 			status = arcf_insheader(ctx, 1, hfname,
 			                        arc_hdr_value(sealhdr));
