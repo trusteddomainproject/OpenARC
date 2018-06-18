@@ -430,12 +430,15 @@ arc_dstring_blank(struct arc_dstring *dstr)
 **  Return value:
 **  	a copy of s1.
 */
+
 char *
 arc_strdup(const char *s1)
 {
-	char *s = ARC_MALLOC(strlen(s1)+1);
-	if (s)
-	    memcpy(s, s1, strlen(s1)+1);
+	char *s;
+	
+	s = ARC_MALLOC(strlen(s1) + 1);
+	if (s != NULL)
+	    memcpy(s, s1, strlen(s1) + 1);
 	return s;
 }
 
