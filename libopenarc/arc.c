@@ -2567,6 +2567,8 @@ arc_eoh_verify(ARC_MESSAGE *msg)
 	htag = NULL;
 	if (msg->arc_nsets > 0)
 	{
+		u_char *c;
+
 		/* headers, validation */
 		h = msg->arc_sets[msg->arc_nsets - 1].arcset_ams;
 		htag = arc_param_get(h->hdr_data, "h");
@@ -2575,13 +2577,10 @@ arc_eoh_verify(ARC_MESSAGE *msg)
 		else
 			hashtype = ARC_HASHTYPE_SHA256;
 
-		u_char *c = arc_param_get(h->hdr_data, "c");
+ 		c = arc_param_get(h->hdr_data, "c");
 		if (c != NULL)
 		{
-			status = arc_parse_canon_t(arc_param_get(h->hdr_data,
-			                                         "c"),
-						   &hdr_canon, &body_canon);
-
+			status = arc_parse_canon_t(c, &hdr_canon, &body_canon);
 			if (status != ARC_STAT_OK)
 			{
 				arc_error(msg,
@@ -2591,7 +2590,9 @@ arc_eoh_verify(ARC_MESSAGE *msg)
 				body_canon = ARC_CANON_SIMPLE;
 				msg->arc_cstate = ARC_CHAIN_FAIL;
 			}
-		} else {
+		}
+		else
+		{
 			hdr_canon = ARC_CANON_SIMPLE;
 			body_canon = ARC_CANON_SIMPLE;
 		}
