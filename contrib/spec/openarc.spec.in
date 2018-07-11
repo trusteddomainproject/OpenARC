@@ -34,7 +34,6 @@ Requires(postun): initscripts
 %endif
 
 Source0: openarc-%{version}.tar.gz
-Prefix: %{_prefix}
 
 %description
 The Trusted Domain Project is a community effort to develop and maintain a
@@ -61,8 +60,8 @@ required for developing applications against libopenarc.
 
 %build
 %configure --disable-static
-
 make %{?_smp_mflags}
+
 %install
 make install DESTDIR=%{buildroot}
 mkdir -p %{buildroot}%{_sysconfdir}
@@ -156,14 +155,11 @@ fi
 exit 0
 %endif
 
-%post -n libopenarc -p /sbin/ldconfig
-
-%postun -n libopenarc -p /sbin/ldconfig
-
+%ldconfig_scriptlets -n libopenarc
 
 %files
-%defattr(-,root,root)
-%doc LICENSE LICENSE.Sendmail README RELEASE_NOTES
+%license LICENSE LICENSE.Sendmail
+%doc README RELEASE_NOTES
 %config(noreplace) %{_sysconfdir}/openarc.conf
 
 %if %{tmpfiles}
@@ -182,13 +178,11 @@ exit 0
 
 
 %files -n libopenarc
-%doc LICENSE LICENSE.Sendmail
-%defattr(-,root,root)
+%license LICENSE LICENSE.Sendmail
 %{_libdir}/*.so.*
 
 %files -n libopenarc-devel
-%defattr(-,root,root)
-%doc LICENSE LICENSE.Sendmail
+%license LICENSE LICENSE.Sendmail
 %{_includedir}/*
 %{_libdir}/*.so
 %{_libdir}/pkgconfig/*.pc
