@@ -1,12 +1,16 @@
 %global systemd (0%{?fedora} >= 18) || (0%{?rhel} >= 7)
 %global tmpfiles (0%{?fedora} >= 15) || (0%{?rhel} >= 7)
 
+%global pre_rel Beta0
+
 Summary: An open source library and milter for providing ARC service
 Name: openarc
 Version: @VERSION@
-Release: 1%{?dist}
+Release: %{?pre_rel:0.}1%{?pre_rel:.%pre_rel}%{?dist}
 License: BSD and Sendmail
-URL: https://github.com/mskucherawy/OpenARC
+URL: https://github.com/trusteddomainproject/OpenARC
+
+Source0: https://github.com/trusteddomainproject/OpenARC/archive/v%{version}%{?pre_rel:.%pre_rel}/%{name}-%{version}%{?pre_rel:.%pre_rel}.tar.gz
 
 BuildRequires: libtool
 BuildRequires: pkgconfig(openssl)
@@ -18,6 +22,9 @@ BuildRequires: sendmail-milter-devel
 %else
 BuildRequires: sendmail-devel
 %endif
+
+BuildRequires: autoconf
+BuildRequires: automake
 
 Requires: lib%{name}%{?_isa} = %{version}-%{release}
 Requires: libopenarc = %{version}-%{release}
@@ -33,7 +40,6 @@ Requires(preun): chkconfig, initscripts
 Requires(postun): initscripts
 %endif
 
-Source0: openarc-%{version}.tar.gz
 
 %description
 The Trusted Domain Project is a community effort to develop and maintain a
@@ -56,9 +62,10 @@ This package contains the static libraries, headers, and other support files
 required for developing applications against libopenarc.
 
 %prep
-%autosetup -p1
+%autosetup -n OpenARC-%{version}%{?pre_rel:.%pre_rel} -p1
 
 %build
+autoreconf --install
 %configure --disable-static
 make %{?_smp_mflags}
 
@@ -188,5 +195,9 @@ exit 0
 %{_libdir}/pkgconfig/*.pc
 
 %changelog
+* Wed Jul 11 2018 Xavier Bachelot <xavier@bachelot.org> 1.0.0-0.1.Beta0
+- Specfile clean up.
+- Update to 1.0.0 beta 0.
+
 * Sun Jul 23 2017  Matt Domsch <matt@domsch.com> 0.1.0-1
 - update to Fedora Packaging Guidelines
