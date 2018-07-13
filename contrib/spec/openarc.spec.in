@@ -78,7 +78,7 @@ rm %{buildroot}/%{_libdir}/*.la
 
 
 cat > %{buildroot}%{_sysconfdir}/openarc.conf <<EOF
-## See openarc.conf(5) or %{_docdir}/%{name}-%{version}/openarc.conf.sample for more
+## See openarc.conf(5) or %{_docdir}/%{name}%{?rhel:-%{version}}/openarc.conf.sample for more
 PidFile %{_localstatedir}/run/openarc/openarc.pid
 Syslog  yes
 #Umask   002
@@ -166,7 +166,7 @@ exit 0
 
 %files
 %license LICENSE LICENSE.Sendmail
-%doc README RELEASE_NOTES
+%doc README RELEASE_NOTES openarc/openarc.conf.sample
 %config(noreplace) %{_sysconfdir}/openarc.conf
 
 %if %{tmpfiles}
