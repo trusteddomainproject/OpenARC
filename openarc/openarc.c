@@ -3673,11 +3673,11 @@ mlfi_eom(SMFICTX *ctx)
 			hfptr = arc_hdr_name(sealhdr, &len);
 			hfdest = hfname;
 			memset(hfname, '\0', sizeof hfname);
-			if (cc->cctx_noleadspc)
+/*			if (cc->cctx_noleadspc)
 			{
 				hfname[0] = ' ';
 				hfdest++;
-			}
+			} */
 			strncpy(hfdest, hfptr, len);
 
 			status = arcf_insheader(ctx, 1, hfname,
