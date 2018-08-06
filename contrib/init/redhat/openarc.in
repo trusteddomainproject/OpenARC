@@ -43,7 +43,8 @@ start() {
 		echo OpenARC already running as pid $PID
 	        exit 2;
 	else
-		daemon $DAEMON -c $CONF_FILE -P $PID_FILE
+		/usr/bin/install -d -m 0755 -o openarc -g openarc @localstatedir@/run/openarc
+		daemon $DAEMON -x $CONF_FILE -P $PID_FILE
 		RETVAL=$?
 		[ $RETVAL -eq 0 ] && touch /var/lock/subsys/openarc
 		echo
