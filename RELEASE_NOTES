@@ -1,5 +1,9 @@
 			OPENARC RELEASE NOTES
 
+1.0.0.beta0     2018/08/05
+        Make spec file for building on the Fedora COPR service
+
+
 This listing shows the versions of the OpenARC package, the date of
 release, and a summary of the changes in that release.
 
