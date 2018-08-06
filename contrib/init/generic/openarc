@@ -143,6 +143,7 @@ fi
 
 od_start() {
 	echo -n "Starting OpenARC Milter: "
+	install -d -m 0755 -o openarc -g openarc /var/run/openarc
 	od_daemon $DAEMON -c $CONFIG $ARGS
 	if [ $? -eq 0 ]; then
 		log_success_msg $NAME
