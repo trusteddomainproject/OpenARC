@@ -3666,22 +3666,26 @@ mlfi_eom(SMFICTX *ctx)
 		     sealhdr = arc_hdr_next(sealhdr))
 		{
 			size_t len;
-			u_char *hfptr;
-			u_char *hfdest;
+			u_char *hfvdest;
 			u_char hfname[BUFRSZ + 1];
+			u_char hfvalue[BUFRSZ + 1];
 
-			hfptr = arc_hdr_name(sealhdr, &len);
-			hfdest = hfname;
 			memset(hfname, '\0', sizeof hfname);
+			strlcpy(hfname, arc_hdr_name(sealhdr, &len),
+			        sizeof hfname);
+			hfname[len] = '\0';
+
+			hfvdest = hfvalue;
+			memset(hfvalue, '\0', sizeof hfvalue);
 			if (cc->cctx_noleadspc)
 			{
-				hfname[0] = ' ';
-				hfdest++;
+				hfvalue[0] = ' ';
+				hfvdest++;
 			}
-			strncpy(hfdest, hfptr, len);
+			strlcat(hfvalue, arc_hdr_value(sealhdr),
+			        sizeof hfvalue);
 
-			status = arcf_insheader(ctx, 1, hfname,
-			                        arc_hdr_value(sealhdr));
+			status = arcf_insheader(ctx, 1, hfname, hfvalue);
 			if (status == MI_FAILURE)
 			{
 				if (conf->conf_dolog)
