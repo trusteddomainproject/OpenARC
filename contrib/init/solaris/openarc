@@ -8,7 +8,7 @@ PATH=/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin; export PATH
 . /lib/svc/share/smf_include.sh
 
 echo "starting openarc"
-openarc -x /etc/mail/openarc.conf
+openarc -c /etc/mail/openarc.conf
 echo "started openarc"
 exit $SMF_EXIT_OK
 

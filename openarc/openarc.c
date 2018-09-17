@@ -3421,6 +3421,18 @@ mlfi_eom(SMFICTX *ctx)
 		}
 	}
 
+	if (afc->mctx_tmpstr == NULL)
+	{
+		afc->mctx_tmpstr = arcf_dstring_new(BUFRSZ, 0);
+		if (afc->mctx_tmpstr == NULL)
+		{
+			if (conf->conf_dolog)
+				syslog(LOG_ERR, "arcf_dstring_new() failed");
+
+			return SMFIS_TEMPFAIL;
+		}
+	}
+
 	/* get hostname; used in the X header and in new MIME boundaries */
 	hostname = arcf_getsymval(ctx, "j");
 	if (hostname == NULL)
@@ -3476,24 +3488,7 @@ mlfi_eom(SMFICTX *ctx)
 	{
 		int arfound = 0;
 
-		if (afc->mctx_tmpstr == NULL)
-		{
-			afc->mctx_tmpstr = arcf_dstring_new(BUFRSZ, 0);
-			if (afc->mctx_tmpstr == NULL)
-			{
-				if (conf->conf_dolog)
-				{
-					syslog(LOG_ERR,
-					       "arcf_dstring_new() failed");
-				}
-
-				return SMFIS_TEMPFAIL;
-			}
-		}
-		else
-		{
-			arcf_dstring_blank(afc->mctx_tmpstr);
-		}
+		arcf_dstring_blank(afc->mctx_tmpstr);
 
 		/* assemble authentication results */
 		for (c = 0; ; c++)
@@ -3523,13 +3518,17 @@ mlfi_eom(SMFICTX *ctx)
 				for (n = 0; n < ar.ares_count; n++)
 				{
 					if (ar.ares_result[n].result_method == ARES_METHOD_ARC &&
-					    BITSET(ARC_MODE_SIGN, cc->cctx_mode))
+					    BITSET(ARC_MODE_SIGN,
+					           cc->cctx_mode) &&
+					    !BITSET(ARC_MODE_VERIFY,
+					            cc->cctx_mode))
 					{
 						/*
 						**  If it's an ARC result under
 						**  our authserv-id and we're
-						**  not verifying, use that
-						**  value as the chain state.
+						**  not also verifying, use
+						**  that value as the chain
+						**  state.
 						*/
 
 						int cv;
@@ -3552,8 +3551,11 @@ mlfi_eom(SMFICTX *ctx)
 
 						switch (ar.ares_result[n].result_result)
 						{
-						    case ARES_RESULT_PASS:
 						    case ARES_RESULT_NONE:
+							cv = ARC_CHAIN_NONE;
+							break;
+
+						    case ARES_RESULT_PASS:
 							cv = ARC_CHAIN_PASS;
 							break;
 
@@ -3664,15 +3666,26 @@ mlfi_eom(SMFICTX *ctx)
 		     sealhdr = arc_hdr_next(sealhdr))
 		{
 			size_t len;
-			u_char *hfptr;
+			u_char *hfvdest;
 			u_char hfname[BUFRSZ + 1];
+			u_char hfvalue[BUFRSZ + 1];
 
-			hfptr = arc_hdr_name(sealhdr, &len);
 			memset(hfname, '\0', sizeof hfname);
-			strncpy(hfname, hfptr, len);
+			strlcpy(hfname, arc_hdr_name(sealhdr, &len),
+			        sizeof hfname);
+			hfname[len] = '\0';
 
-			status = arcf_insheader(ctx, 1, hfname,
-			                        arc_hdr_value(sealhdr));
+			hfvdest = hfvalue;
+			memset(hfvalue, '\0', sizeof hfvalue);
+			if (cc->cctx_noleadspc)
+			{
+				hfvalue[0] = ' ';
+				hfvdest++;
+			}
+			strlcat(hfvalue, arc_hdr_value(sealhdr),
+			        sizeof hfvalue);
+
+			status = arcf_insheader(ctx, 1, hfname, hfvalue);
 			if (status == MI_FAILURE)
 			{
 				if (conf->conf_dolog)

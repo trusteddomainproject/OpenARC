@@ -2567,6 +2567,8 @@ arc_eoh_verify(ARC_MESSAGE *msg)
 	htag = NULL;
 	if (msg->arc_nsets > 0)
 	{
+		u_char *c;
+
 		/* headers, validation */
 		h = msg->arc_sets[msg->arc_nsets - 1].arcset_ams;
 		htag = arc_param_get(h->hdr_data, "h");
@@ -2575,13 +2577,10 @@ arc_eoh_verify(ARC_MESSAGE *msg)
 		else
 			hashtype = ARC_HASHTYPE_SHA256;
 
-		u_char *c = arc_param_get(h->hdr_data, "c");
+ 		c = arc_param_get(h->hdr_data, "c");
 		if (c != NULL)
 		{
-			status = arc_parse_canon_t(arc_param_get(h->hdr_data,
-			                                         "c"),
-						   &hdr_canon, &body_canon);
-
+			status = arc_parse_canon_t(c, &hdr_canon, &body_canon);
 			if (status != ARC_STAT_OK)
 			{
 				arc_error(msg,
@@ -2591,7 +2590,9 @@ arc_eoh_verify(ARC_MESSAGE *msg)
 				body_canon = ARC_CANON_SIMPLE;
 				msg->arc_cstate = ARC_CHAIN_FAIL;
 			}
-		} else {
+		}
+		else
+		{
 			hdr_canon = ARC_CANON_SIMPLE;
 			body_canon = ARC_CANON_SIMPLE;
 		}
@@ -2677,7 +2678,7 @@ arc_eoh_sign(ARC_MESSAGE *msg)
 	ARC_STAT status;
 
 	/* headers, signing */
-	status = arc_add_canon(msg, ARC_CANONTYPE_HEADER, msg->arc_canonhdr,
+	status = arc_add_canon(msg, ARC_CANONTYPE_AMS, msg->arc_canonhdr,
 	                       msg->arc_signalg, NULL, NULL, (ssize_t) -1,
 	                       &msg->arc_sign_hdrcanon);
 	if (status != ARC_STAT_OK)
@@ -3194,6 +3195,7 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 			next = tmphdr->hdr_next;
 			ARC_FREE(tmphdr->hdr_text);
 			ARC_FREE(tmphdr);
+			tmphdr = next;
 		}
 
 		msg->arc_sealhead = NULL;
@@ -3243,8 +3245,8 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 
 	/* construct the AMS */
 	arc_dstring_blank(dstr);
-	arc_dstring_catn(dstr, (u_char *) ARC_MSGSIG_HDRNAME ": ",
-	                 sizeof ARC_MSGSIG_HDRNAME + 1);
+	arc_dstring_catn(dstr, (u_char *) ARC_MSGSIG_HDRNAME ":",
+	                 sizeof ARC_MSGSIG_HDRNAME);
 
 	status = arc_getamshdr_d(msg, arc_dstring_len(dstr), &sighdr, &len,
 	                         FALSE);
@@ -3270,7 +3272,7 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 	hdr.hdr_next = NULL;
 
 	/* canonicalize */
-	status = arc_canon_signature(msg, &hdr, FALSE);
+	status = arc_canon_signature(msg, &hdr, ARC_CANONTYPE_AMS);
 	if (status != ARC_STAT_OK)
 	{
 		arc_error(msg, "arc_canon_signature() failed");
@@ -3387,8 +3389,8 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 	*/
 
 	arc_dstring_blank(dstr);
-	arc_dstring_catn(dstr, (u_char *) ARC_SEAL_HDRNAME ": ",
-	                 sizeof ARC_SEAL_HDRNAME + 1);
+	arc_dstring_catn(dstr, (u_char *) ARC_SEAL_HDRNAME ":",
+	                 sizeof ARC_SEAL_HDRNAME);
 
 	/* feed the seal we have so far */
 	status = arc_canon_add_to_seal(msg);
@@ -3426,7 +3428,7 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 	hdr.hdr_next = NULL;
 
 	/* canonicalize */
-	status = arc_canon_signature(msg, &hdr, TRUE);
+	status = arc_canon_signature(msg, &hdr, ARC_CANONTYPE_SEAL);
 	if (status != ARC_STAT_OK)
 	{
 		arc_error(msg, "arc_canon_signature() failed");
@@ -3684,6 +3686,9 @@ arc_chain_custody_str(ARC_MESSAGE *msg, u_char *buf, size_t buflen)
 	assert(msg != NULL);
 	assert(buf != NULL);
 	assert(buflen > 0);
+
+	if (msg->arc_cstate != ARC_CHAIN_PASS)
+		return 0;
 
 	tmpbuf = arc_dstring_new(msg, BUFRSZ, MAXBUFRSZ);
 	if (tmpbuf == NULL)
