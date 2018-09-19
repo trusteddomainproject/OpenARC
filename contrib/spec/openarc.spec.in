@@ -12,7 +12,7 @@ URL: https://github.com/trusteddomainproject/OpenARC
 
 Source0: https://github.com/trusteddomainproject/OpenARC/archive/v%{version}%{?pre_rel:.%pre_rel}/%{name}-%{version}%{?pre_rel:.%pre_rel}.tar.gz
 
-BuildRequires: libtool
+BuildRequires: libtool gcc
 BuildRequires: pkgconfig(openssl)
 BuildRequires: pkgconfig(libbsd)
 
@@ -67,11 +67,11 @@ required for developing applications against libopenarc.
 %build
 autoreconf --install
 %configure --disable-static
-make %{?_smp_mflags}
+%make_build
 
 %install
-make install DESTDIR=%{buildroot}
-mkdir -p %{buildroot}%{_sysconfdir}
+%make_install
+mkdir -p -m 0700 %{buildroot}%{_sysconfdir}/%{name}
 mkdir -p -m 0700 %{buildroot}%{_localstatedir}/run/%{name}
 rm -r %{buildroot}%{_prefix}/share/doc/openarc
 rm %{buildroot}/%{_libdir}/*.la
@@ -79,15 +79,20 @@ rm %{buildroot}/%{_libdir}/*.la
 
 cat > %{buildroot}%{_sysconfdir}/openarc.conf <<EOF
 ## See openarc.conf(5) or %{_docdir}/%{name}%{?rhel:-%{version}}/openarc.conf.sample for more
-PidFile %{_localstatedir}/run/openarc/openarc.pid
+PidFile %{_localstatedir}/run/%{name}/%{name}.pid
 Syslog  yes
 #Umask   002
 UserID  openarc:openarc
-Socket  inet:8894@localhost
+Socket  local:%{_localstatedir}/run/%{name}/%{name}.sock
+SignHeaders to,subject,message-id,date,from,mime-version,dkim-signature
+PeerList %{_sysconfdir}/%{name}/PeerList
+MilterDebug 6
+EnableCoredumps yes
 
 ## After setting Mode to "sv", running
 ## opendkim-genkey -D %{_sysconfdir}/openarc -s key -d `hostname --domain`
 ## and putting %{_sysconfdir}/openarc
+#Mode                    sv
 #Canonicalization        relaxed/simple
 #Domain                  example.com # change to domain
 #Selector                key
@@ -95,6 +100,12 @@ Socket  inet:8894@localhost
 #SignatureAlgorithm rsa-sha256
 EOF
 
+# Don't sign or validate connections from localhost
+cat > %{buildroot}%{_sysconfdir}/%{name}/PeerList <<EOF
+127.0.0.1/32
+[::1]/128
+EOF
+chmod 0640 %{buildroot}%{_sysconfdir}/%{name}/PeerList
 
 %if %systemd
 install -d -m 0755 %{buildroot}%{_unitdir}
@@ -168,6 +179,8 @@ exit 0
 %license LICENSE LICENSE.Sendmail
 %doc README RELEASE_NOTES openarc/openarc.conf.sample
 %config(noreplace) %{_sysconfdir}/openarc.conf
+%dir %attr(-,%{name},%{name}) %{_sysconfdir}/%{name}
+%config(noreplace) %{_sysconfdir}/%{name}/PeerList
 
 %if %{tmpfiles}
 %{_tmpfilesdir}/%{name}.conf
@@ -186,10 +199,10 @@ exit 0
 
 %files -n libopenarc
 %license LICENSE LICENSE.Sendmail
-%{_libdir}/*.so.*
+%{_libdir}/*.so.0
+%{_libdir}/*.so.0.0.0
 
 %files -n libopenarc-devel
-%license LICENSE LICENSE.Sendmail
 %{_includedir}/*
 %{_libdir}/*.so
 %{_libdir}/pkgconfig/*.pc
