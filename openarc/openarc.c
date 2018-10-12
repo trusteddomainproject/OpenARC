@@ -3518,8 +3518,6 @@ mlfi_eom(SMFICTX *ctx)
 				for (n = 0; n < ar.ares_count; n++)
 				{
 					if (ar.ares_result[n].result_method == ARES_METHOD_ARC &&
-					    BITSET(ARC_MODE_SIGN,
-					           cc->cctx_mode) &&
 					    !BITSET(ARC_MODE_VERIFY,
 					            cc->cctx_mode))
 					{
