@@ -3487,8 +3487,11 @@ mlfi_eom(SMFICTX *ctx)
 	if (BITSET(ARC_MODE_SIGN, cc->cctx_mode))
 	{
 		int arfound = 0;
+		char remotebuf[BUFRSZ + 1];
 
 		arcf_dstring_blank(afc->mctx_tmpstr);
+		snprintf(remotebuf, sizeof remotebuf, "smtp.remote-ip=%s",
+		         ipbuf);
 
 		/* assemble authentication results */
 		for (c = 0; ; c++)
@@ -3646,7 +3649,9 @@ mlfi_eom(SMFICTX *ctx)
 		                     conf->conf_keylen,
 		                     arcf_dstring_len(afc->mctx_tmpstr) > 0
 		                     ? arcf_dstring_get(afc->mctx_tmpstr)
-		                     : NULL);
+		                     : NULL,
+		                     arcf_dstring_len(afc->mctx_tmpstr) > 0
+		                     ? remotebuf : NULL);
 		if (status != ARC_STAT_OK)
 		{
 			if (conf->conf_dolog)

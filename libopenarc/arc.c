@@ -3067,6 +3067,7 @@ arc_set_cv(ARC_MESSAGE *msg, ARC_CHAIN cv)
 **      key -- secret key, printable
 **      keylen -- key length
 **  	ar -- Authentication-Results to be enshrined
+**  	arc_params -- ARC parameters for the ARC-Authentication-Results
 **
 **  Return value:
 **  	An ARC_STAT_* constant.
@@ -3075,7 +3076,7 @@ arc_set_cv(ARC_MESSAGE *msg, ARC_CHAIN cv)
 ARC_STAT
 arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
             char *selector, char *domain, u_char *key, size_t keylen,
-            u_char *ar)
+            u_char *ar, u_char *arc_params)
 {
 	int rstatus;
 	int siglen;
@@ -3206,10 +3207,17 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 	**  Part 1: Construct a new AAR
 	*/
 
-	arc_dstring_printf(dstr, "ARC-Authentication-Results:i=%u; %s; %s",
+	arc_dstring_printf(dstr, "ARC-Authentication-Results:i=%u; %s",
 	                   msg->arc_nsets + 1,
-	                   msg->arc_authservid,
-	                   ar == NULL ? "arc=none" : (char *) ar);
+	                   msg->arc_authservid);
+
+	if (ar != NULL)
+		arc_dstring_printf(dstr, "; %s", (char *) ar);
+
+	arc_dstring_printf(dstr, "; arc=%s", arc_chain_status_str(msg));
+	if (arc_params != NULL)
+		arc_dstring_printf(dstr, " %s", (char *) arc_params);
+
 	status = arc_parse_header_field(msg, arc_dstring_get(dstr),
 	                                arc_dstring_len(dstr), &h);
 	if (status != ARC_STAT_OK)
