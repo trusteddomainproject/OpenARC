@@ -3629,7 +3629,7 @@ mlfi_eom(SMFICTX *ctx)
 			if (ipout != NULL)
 			{
 				arcf_dstring_printf(afc->mctx_tmpstr,
-				                    " smtp.client-ip=%s",
+				                    " smtp.remote-ip=%s",
 				                    ipbuf);
 			}
 		}
@@ -3730,7 +3730,7 @@ mlfi_eom(SMFICTX *ctx)
 		if (ipout != NULL)
 		{
 			arcf_dstring_printf(afc->mctx_tmpstr,
-			                    " smtp.client-ip=%s", ipout);
+			                    " smtp.remote-ip=%s", ipout);
 		}
 
 		if (conf->conf_finalreceiver && arcchainlen > 0)
