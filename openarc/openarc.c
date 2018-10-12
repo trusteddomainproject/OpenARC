@@ -3487,11 +3487,8 @@ mlfi_eom(SMFICTX *ctx)
 	if (BITSET(ARC_MODE_SIGN, cc->cctx_mode))
 	{
 		int arfound = 0;
-		char remotebuf[BUFRSZ + 1];
 
 		arcf_dstring_blank(afc->mctx_tmpstr);
-		snprintf(remotebuf, sizeof remotebuf, "smtp.remote-ip=%s",
-		         ipbuf);
 
 		/* assemble authentication results */
 		for (c = 0; ; c++)
@@ -3520,16 +3517,12 @@ mlfi_eom(SMFICTX *ctx)
 
 				for (n = 0; n < ar.ares_count; n++)
 				{
-					if (ar.ares_result[n].result_method == ARES_METHOD_ARC &&
-					    !BITSET(ARC_MODE_VERIFY,
-					            cc->cctx_mode))
+					if (ar.ares_result[n].result_method == ARES_METHOD_ARC)
 					{
 						/*
 						**  If it's an ARC result under
-						**  our authserv-id and we're
-						**  not also verifying, use
-						**  that value as the chain
-						**  state.
+						**  our authserv-id, use that
+						**  value as the chain state.
 						*/
 
 						int cv;
@@ -3579,8 +3572,6 @@ mlfi_eom(SMFICTX *ctx)
 
 						arc_set_cv(afc->mctx_arcmsg,
 						           cv);
-
-						continue;
 					}
 
 					if (arcf_dstring_len(afc->mctx_tmpstr) > 0)
@@ -3622,21 +3613,6 @@ mlfi_eom(SMFICTX *ctx)
 			}
 		}
 
-		/* append our chain status if verifying */
-		if (BITSET(ARC_MODE_VERIFY, cc->cctx_mode))
-		{
-			if (arcf_dstring_len(afc->mctx_tmpstr) > 0)
-				arcf_dstring_cat(afc->mctx_tmpstr, "; ");
-			arcf_dstring_printf(afc->mctx_tmpstr, "arc=%s",
-			                    arc_chain_status_str(afc->mctx_arcmsg));
-			if (ipout != NULL)
-			{
-				arcf_dstring_printf(afc->mctx_tmpstr,
-				                    " smtp.remote-ip=%s",
-				                    ipbuf);
-			}
-		}
-
 		/*
 		**  Get the seal fields to apply.
 		*/
@@ -3649,9 +3625,7 @@ mlfi_eom(SMFICTX *ctx)
 		                     conf->conf_keylen,
 		                     arcf_dstring_len(afc->mctx_tmpstr) > 0
 		                     ? arcf_dstring_get(afc->mctx_tmpstr)
-		                     : NULL,
-		                     arcf_dstring_len(afc->mctx_tmpstr) > 0
-		                     ? remotebuf : NULL);
+		                     : NULL);
 		if (status != ARC_STAT_OK)
 		{
 			if (conf->conf_dolog)

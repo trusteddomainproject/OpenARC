@@ -481,7 +481,6 @@ extern void arc_set_cv __P((ARC_MESSAGE *, ARC_CHAIN));
 **  	key -- secret key
 **  	keylen -- key length
 **  	ar -- Authentication-Results to be enshrined
-**  	arc_params -- ARC parameters for the ARC-Authentication-Results
 **
 **  Return value:
 **  	An ARC_STAT_* constant.
@@ -492,8 +491,7 @@ extern void arc_set_cv __P((ARC_MESSAGE *, ARC_CHAIN));
 */
 
 extern ARC_STAT arc_getseal __P((ARC_MESSAGE *, ARC_HDRFIELD **, char *,
-                                 char *, char *, u_char *, size_t, u_char *,
-                                 u_char *));
+                                 char *, char *, u_char *, size_t, u_char *));
 
 /*
 **  ARC_HDR_NAME -- extract name from an ARC_HDRFIELD
