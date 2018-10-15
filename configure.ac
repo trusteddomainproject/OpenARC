@@ -15,7 +15,7 @@ AC_PREREQ(2.61)
 m4_define([VERSION_RELEASE], 1)
 m4_define([VERSION_MAJOR_REV], 0)
 m4_define([VERSION_MINOR_REV], 0)
-m4_define([VERSION_PATCH], 0)
+m4_define([VERSION_PATCH], 'beta0')
 
 #
 # Library version
