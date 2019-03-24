@@ -106,6 +106,13 @@ user ID has changed during the lifetime of the process.  Currently only
 supported on Linux.
 
 .TP
+.I FromDomains (string)
+Names a file from which a list of domains will be read.  The domain in
+the From field must be in this list or the message will be ignored by
+the filter.  Provided to enable limited experiments against live mail
+streams.
+
+.TP
 .I Include (string)
 Names a file to be opened and read as an additional configuration file.
 Nesting is allowed to a maximum of five levels.

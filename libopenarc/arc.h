@@ -583,6 +583,21 @@ extern const char *arc_chain_status_str __P((ARC_MESSAGE *msg));
 extern int arc_chain_custody_str __P((ARC_MESSAGE *msg, u_char *buf,
                                       size_t buflen));
 
+/*
+**  ARC_MAIL_PARSE -- extract the local-part and domain-name from a structured
+**                    header field
+**
+**  Parameters:
+**  	addr -- the header to parse; see RFC2822 for format
+**  	user -- local-part of the parsed header (returned)
+**  	domain -- domain part of the parsed header (returned)
+**
+**  Return value:
+**  	0 on success; other on error (see source)
+*/
+
+extern int arc_mail_parse __P((u_char *addr, u_char **user, u_char **domain));
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

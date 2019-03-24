@@ -139,6 +139,7 @@ struct arcf_config
 	ARC_LIB *	conf_libopenarc;	/* shared library instance */
 	struct conflist conf_peers;		/* peers hosts */
 	struct conflist conf_internal;		/* internal hosts */
+	struct conflist conf_fromdomains;	/* From: domains that matter */
 };
 
 /*
@@ -1192,6 +1193,7 @@ arcf_config_new(void)
 
 	LIST_INIT(&new->conf_peers);
 	LIST_INIT(&new->conf_internal);
+	LIST_INIT(&new->conf_fromdomains);
 
 	return new;
 }
@@ -1338,6 +1340,9 @@ arcf_config_free(struct arcf_config *conf)
 
 	if (!LIST_EMPTY(&conf->conf_internal))
 		arcf_list_destroy(&conf->conf_internal);
+
+	if (!LIST_EMPTY(&conf->conf_fromdomains))
+		arcf_list_destroy(&conf->conf_fromdomains);
 
 	if (conf->conf_data != NULL)
 		config_free(conf->conf_data);
@@ -1611,6 +1616,23 @@ arcf_config_load(struct config *data, struct arcf_config *conf,
 		if (!status)
 		{
 			snprintf(err, errlen, "%s: arcf_addlist(): %s",
+			         str, dberr);
+			return -1;
+		}
+	}
+
+	str = NULL;
+	if (data != NULL)
+		(void) config_get(data, "FromDomains", &str, sizeof str);
+	if (str != NULL)
+	{
+		_Bool status;
+		char *dberr = NULL;
+
+		status = arcf_list_load(&conf->conf_fromdomains, str, &dberr);
+		if (!status)
+		{
+			snprintf(err, errlen, "%s: arcf_list_load(): %s",
 			         str, dberr);
 			return -1;
 		}
@@ -3197,6 +3219,57 @@ mlfi_eoh(SMFICTX *ctx)
 				syslog(LOG_INFO,
 				       "%s: RFC5322 header requirement error",
 				       afc->mctx_jobid);
+			}
+
+			return SMFIS_ACCEPT;
+		}
+	}
+
+	/*
+	**  If we only care about a specific set of From: domains, make sure
+	**  this is one of those.
+	*/
+
+	if (!LIST_EMPTY(&conf->conf_fromdomains))
+	{
+		unsigned char *user;
+		unsigned char *domain;
+		unsigned char fromhdr[ARC_MAXHEADER + 1];
+
+		hdr = arcf_findheader(afc, "From", c);
+		if (hdr == NULL)
+		{
+			if (conf->conf_dolog)
+			{
+				syslog(LOG_INFO,
+				       "%s: From field not found",
+				       afc->mctx_jobid);
+			}
+
+			return SMFIS_ACCEPT;
+		}
+
+		strlcpy(fromhdr, hdr->hdr_val, sizeof fromhdr);
+		if (arc_mail_parse(fromhdr, &user, &domain) != 0)
+		{
+			if (conf->conf_dolog)
+			{
+				syslog(LOG_INFO,
+				       "%s: unable to parse From field \"%s\"",
+				       afc->mctx_jobid, fromhdr);
+			}
+
+			return SMFIS_ACCEPT;
+		}
+
+		if (!arcf_checkhost(&conf->conf_fromdomains, domain))
+		{
+			/* not from a domain in our whitelist */
+			if (conf->conf_dolog)
+			{
+				syslog(LOG_INFO,
+				       "%s: ignoring mail from %s",
+				       afc->mctx_jobid, domain);
 			}
 
 			return SMFIS_ACCEPT;
