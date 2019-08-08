@@ -139,7 +139,7 @@ struct arcf_config
 	ARC_LIB *	conf_libopenarc;	/* shared library instance */
 	struct conflist conf_peers;		/* peers hosts */
 	struct conflist conf_internal;		/* internal hosts */
-	struct conflist conf_fromdomains;	/* From: domains that matter */
+	struct conflist conf_sealheaderchecks;	/* header checks for sealing */
 };
 
 /*
@@ -1193,7 +1193,6 @@ arcf_config_new(void)
 
 	LIST_INIT(&new->conf_peers);
 	LIST_INIT(&new->conf_internal);
-	LIST_INIT(&new->conf_fromdomains);
 
 	return new;
 }
@@ -1341,9 +1340,6 @@ arcf_config_free(struct arcf_config *conf)
 	if (!LIST_EMPTY(&conf->conf_internal))
 		arcf_list_destroy(&conf->conf_internal);
 
-	if (!LIST_EMPTY(&conf->conf_fromdomains))
-		arcf_list_destroy(&conf->conf_fromdomains);
-
 	if (conf->conf_data != NULL)
 		config_free(conf->conf_data);
 
@@ -1352,6 +1348,9 @@ arcf_config_free(struct arcf_config *conf)
 
 	if (conf->conf_oversignhdrs != NULL)
 		free(conf->conf_oversignhdrs);
+
+	if (!LIST_EMPTY(&conf->conf_sealheaderchecks))
+		arcf_list_destroy(&conf->conf_sealheaderchecks);
 
 	free(conf);
 }
@@ -1511,6 +1510,24 @@ arcf_config_load(struct config *data, struct arcf_config *conf,
 		                  sizeof conf->conf_oversignhdrs_raw);
 
 		str = NULL;
+		(void) config_get(data, "SealHeaderChecks", &str, sizeof str);
+		if (str != NULL)
+		{
+			_Bool status;
+			char *dberr = NULL;
+
+			status = arcf_list_load(&conf->conf_sealheaderchecks,
+			                        str, &dberr);
+			if (!status)
+			{
+				snprintf(err, errlen,
+				        "%s: arcf_list_load(): %s",
+			         	str, dberr);
+				return -1;
+			}
+		}
+
+		str = NULL;
 		(void) config_get(data, "FixedTimestamp", &str, sizeof str);
 		if (str != NULL)
 		{
@@ -1616,23 +1633,6 @@ arcf_config_load(struct config *data, struct arcf_config *conf,
 		if (!status)
 		{
 			snprintf(err, errlen, "%s: arcf_addlist(): %s",
-			         str, dberr);
-			return -1;
-		}
-	}
-
-	str = NULL;
-	if (data != NULL)
-		(void) config_get(data, "FromDomains", &str, sizeof str);
-	if (str != NULL)
-	{
-		_Bool status;
-		char *dberr = NULL;
-
-		status = arcf_list_load(&conf->conf_fromdomains, str, &dberr);
-		if (!status)
-		{
-			snprintf(err, errlen, "%s: arcf_list_load(): %s",
 			         str, dberr);
 			return -1;
 		}
@@ -3225,56 +3225,126 @@ mlfi_eoh(SMFICTX *ctx)
 		}
 	}
 
+#ifdef USE_JANSSON
 	/*
-	**  If we only care about a specific set of From: domains, make sure
-	**  this is one of those.
+	**  If we only care about messages with specific header properties,
+	**  see if this is one of those.
 	*/
 
-	if (!LIST_EMPTY(&conf->conf_fromdomains))
+	if (!LIST_EMPTY(&conf->conf_sealheaderchecks))
 	{
-		unsigned char *user;
-		unsigned char *domain;
-		unsigned char fromhdr[ARC_MAXHEADER + 1];
+		_Bool found = FALSE;
+		int restatus;
+		struct configvalue *node;
+		char buf[BUFRSZ];
 
-		hdr = arcf_findheader(afc, "From", c);
-		if (hdr == NULL)
+		LIST_FOREACH(node, &conf->conf_sealheaderchecks, entries)
+		{
+			int hfnum = 0;
+			char *hfname = NULL;
+			char *hfmatch;
+			regex_t re;
+			json_t *json;
+			const char *str;
+			json_error_t json_err;
+
+			strlcpy(buf, node->value, sizeof buf);
+			hfmatch = strchr(buf, ':');
+			if (hfmatch != NULL)
+			{
+				hfname = buf;
+				*hfmatch++ = '\0';
+			}
+
+			if (hfmatch != NULL)
+				restatus = regcomp(&re, hfmatch, 0);
+
+			if (hfname == NULL || hfmatch == NULL || restatus != 0)
+			{
+				if (conf->conf_dolog)
+				{
+					syslog(LOG_ERR,
+					       "%s: invalid seal header check \"%s\"",
+					       afc->mctx_jobid,
+					       node->value);
+				}
+			}
+
+			for (hfnum = 0; !found; hfnum++)
+			{
+				hdr = arcf_findheader(afc, hfname, hfnum);
+				if (hdr == NULL)
+					break;
+
+				json = json_loads(hdr->hdr_val, 0, &json_err);
+				if (json != NULL)
+				{
+					if (json_is_string(json))
+					{
+						str = json_string_value(json);
+						if (regexec(&re, str,
+					                    0, NULL, 0) == 0)
+						{
+							found = TRUE;
+							break;
+						}
+					}
+					else if (json_is_array(json))
+					{
+						size_t jn;
+						json_t *entry;
+
+						for (jn = 0;
+						     !found && jn < json_array_size(json);
+						     jn++)
+						{
+							entry = json_array_get(json,
+							                       jn);
+
+							if (json_is_string(entry))
+							{
+								str = json_string_value(entry);
+
+								if (regexec(&re,
+								            str,
+								            0,
+								            NULL,
+								            0) == 0)
+								{
+									found = TRUE;
+									break;
+								}
+							}
+	
+						}
+					}
+
+					json_decref(json);
+				}
+				else if (regexec(&re, hdr->hdr_val,
+				                 0, NULL, 0) == 0)
+				{
+					found = TRUE;
+					break;
+				}
+			}
+
+			regfree(&re);
+		}
+
+		if (!found)
 		{
 			if (conf->conf_dolog)
 			{
 				syslog(LOG_INFO,
-				       "%s: From field not found",
+				       "%s: no seal header check matched; continuing",
 				       afc->mctx_jobid);
 			}
 
 			return SMFIS_ACCEPT;
 		}
-
-		strlcpy(fromhdr, hdr->hdr_val, sizeof fromhdr);
-		if (arc_mail_parse(fromhdr, &user, &domain) != 0)
-		{
-			if (conf->conf_dolog)
-			{
-				syslog(LOG_INFO,
-				       "%s: unable to parse From field \"%s\"",
-				       afc->mctx_jobid, fromhdr);
-			}
-
-			return SMFIS_ACCEPT;
-		}
-
-		if (!arcf_checkhost(&conf->conf_fromdomains, domain))
-		{
-			/* not from a domain in our whitelist */
-			if (conf->conf_dolog)
-			{
-				syslog(LOG_INFO,
-				       "%s: ignoring mail from %s",
-				       afc->mctx_jobid, domain);
-			}
-
-			return SMFIS_ACCEPT;
-		}
 	}
+#endif /* USE_JANSSON */
 
 	/* run the header fields */
 	mode = conf->conf_mode;

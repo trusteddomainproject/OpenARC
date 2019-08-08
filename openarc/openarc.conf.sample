@@ -185,6 +185,23 @@ FinalReceiver { yes | no }
 
 # PidFile		filename
 
+##  SealHeaderChecks filename
+##  	default (none)
+##
+##  Name of a file containing header field checks that should be done before
+##  sealing a message or processing its seals.  When not set, all messages
+##  are processed.
+##
+##  Entries are of the form "hname:regexp" where "hname" is the name of a
+##  header field against which to match and "regexp" is a regular expression
+##  to be applied to all instances of the named header field.  If the
+##  value of any instance of the named header field matches the regular
+##  expression, the message is selected for processing.  If the value
+##  of the header field appears to be a JSON-formatted list, the regular
+##  expression is applied to all strings found in the list.
+
+# SealHeaderChecks	filename
+
 ##  Selector name
 ##
 ##  The name of the selector to use when signing.  No default; must be

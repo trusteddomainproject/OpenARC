@@ -28,6 +28,11 @@
 /* libopenarc */
 #include "arc.h"
 
+/* libjansson */
+#ifdef USE_JANSSON
+# include <jansson.h>
+#endif /* USE_JANSSON */
+
 /* make sure we have TRUE and FALSE */
 #ifndef FALSE
 # define FALSE		0

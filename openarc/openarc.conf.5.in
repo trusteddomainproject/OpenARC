@@ -106,13 +106,6 @@ user ID has changed during the lifetime of the process.  Currently only
 supported on Linux.
 
 .TP
-.I FromDomains (string)
-Names a file from which a list of domains will be read.  The domain in
-the From field must be in this list or the message will be ignored by
-the filter.  Provided to enable limited experiments against live mail
-streams.
-
-.TP
 .I Include (string)
 Names a file to be opened and read as an additional configuration file.
 Nesting is allowed to a maximum of five levels.
@@ -181,6 +174,16 @@ will be checked.
 .I PidFile (string)
 Specifies the path to a file that should be created at process start
 containing the process ID.
+
+.TP
+.I SealHeaderChecks (string)
+Identifies a file containing header checks that should be done to determine
+whether to seal a message.  Each entry in this file must be of the form
+"name:regexp".  When this feature is set, messages will only be processed
+by the filter if any instance of the named header field exists and has a
+value matching the provided regular expression.  If the value of an
+instance appears to be a JSON list, then the regular expression is applied
+to all strings in the list.
 
 .TP
 .I SignatureAlgorithm (string)

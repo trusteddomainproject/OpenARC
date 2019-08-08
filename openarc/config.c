@@ -263,6 +263,12 @@ config_load_level(char *file, struct configdef *def,
 					break;
 			}
 
+			if (s == NULL)
+			{
+				conf_error = CONF_MISSING;
+				err = 1;
+			}
+
 			if (!err)
 			{
 				char *q;
@@ -279,6 +285,7 @@ config_load_level(char *file, struct configdef *def,
 
 			if (*p == '\0' && !err)
 			{
+				/* TODO: not reached? */
 				conf_error = CONF_MISSING;
 				err = 1;
 			}
