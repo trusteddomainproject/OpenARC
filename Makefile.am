@@ -43,4 +43,12 @@ dist-hook:
 rpm: dist-gzip
 	rpmbuild -ta $(distdir).tar.gz
 
+docker:
+	@if [[ ! -f /var/run/docker.pid ]]; then echo "Error: Docker is not installed or not running!" ; exit 1 ; fi
+	@if [[ ! -f $(keyfile) ]]; then echo "Error: $(keyfile) does not exist!" ; exit 1 ; fi
+	docker -v \
+	&& docker rm -f openarc \
+	; docker build . -t openarc --build-arg KEYFILE=$(keyfile) --build-arg SELECTOR=$(selector) --build-arg DOMAIN=$(domain) \
+	&& docker run --name openarc -p 22:22 -p 8894:8894 -dit openarc
+
 .PHONY: push
