@@ -834,6 +834,11 @@ arc_init(void)
 void
 arc_close(ARC_LIB *lib)
 {
+	if (lib->arcl_signre)
+	{
+		(void) regfree(&lib->arcl_hdrre);
+		lib->arcl_signre = FALSE;
+	}
 	ARC_FREE(lib->arcl_flist);
 	ARC_FREE(lib);
 }
