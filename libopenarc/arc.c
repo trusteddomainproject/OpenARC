@@ -1023,6 +1023,60 @@ arc_options(ARC_LIB *lib, int op, int arg, void *val, size_t valsz)
 }
 
 /*
+**
+**  ARC_INIT_DNS -- override and initialize library DNS resolver
+**
+**  Parameters:
+**  	lib			-- library to set DNS for
+**	srv			-- resolver handle to use
+**	arc_dns_close		-- terminates a resolver
+**	arc_dns_start		-- starts a DNS query
+**  	arc_dns_cancel		-- cancels a DNS query
+**  	arc_dns_waitreply	-- synchronously waits on a DNS response
+**
+**  Return value:
+**  	An ARC_STAT_* constant.
+*/
+
+ARC_STAT
+arc_init_dns(ARC_LIB *lib, void* srv,
+	     void (*arc_dns_close) (void *srv),
+	     int (*arc_dns_start) (void *srv, int type,
+				   unsigned char *query,
+				   unsigned char *buf,
+				   size_t buflen,
+				   void **qh),
+	     int (*arc_dns_cancel) (void *srv, void *qh),
+	     int (*arc_dns_waitreply) (void *srv,
+				       void *qh,
+				       struct timeval *to,
+				       size_t *bytes,
+				       int *error,
+				       int *dnssec))
+{
+	assert(lib != NULL);
+	assert(srv != 0);
+	assert(arc_dns_close != 0);
+	assert(arc_dns_start != 0);
+	assert(arc_dns_cancel != 0);
+	assert(arc_dns_waitreply != 0);
+
+	/* "illegal state" would be better */
+	if (lib->arcl_dnsinit_done)
+		return ARC_STAT_INTERNAL;
+
+	lib->arcl_dnsinit_done = TRUE;
+	lib->arcl_dns_service = srv;
+	lib->arcl_dns_init = 0;
+	lib->arcl_dns_close = arc_dns_close;
+	lib->arcl_dns_start = arc_dns_start;
+	lib->arcl_dns_cancel = arc_dns_cancel;
+	lib->arcl_dns_waitreply = arc_dns_waitreply;
+
+	return ARC_STAT_OK;
+}
+
+/*
 **  ARC_GETSSLBUF -- retrieve SSL error buffer
 **
 **  Parameters:
