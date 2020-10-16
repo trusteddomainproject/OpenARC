@@ -834,6 +834,10 @@ arc_init(void)
 void
 arc_close(ARC_LIB *lib)
 {
+	arc_options(lib, ARC_OP_SETOPT, ARC_OPTS_SIGNHDRS,
+                    NULL, sizeof(char**));
+	arc_options(lib, ARC_OP_SETOPT, ARC_OPTS_OVERSIGNHDRS,
+                    NULL, sizeof(char**));
 	ARC_FREE(lib->arcl_flist);
 	ARC_FREE(lib);
 }
