@@ -3660,6 +3660,8 @@ mlfi_eom(SMFICTX *ctx)
 
 				for (n = 0; n < ar.ares_count; n++)
 				{
+					if (ar.ares_result[n].result_method == ARES_METHOD_UNKNOWN)
+						continue;
 					if (ar.ares_result[n].result_method == ARES_METHOD_ARC)
 					{
 						/*
