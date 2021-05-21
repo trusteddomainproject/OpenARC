@@ -3805,7 +3805,7 @@ mlfi_eom(SMFICTX *ctx)
 			strlcat(hfvalue, arc_hdr_value(sealhdr),
 			        sizeof hfvalue);
 
-			status = arcf_insheader(ctx, 1, hfname, hfvalue);
+			status = arcf_insheader(ctx, 0, hfname, hfvalue);
 			if (status == MI_FAILURE)
 			{
 				if (conf->conf_dolog)
@@ -3861,7 +3861,7 @@ mlfi_eom(SMFICTX *ctx)
 			                    " arc.chain=%s", arcchainbuf);
 		}
 
-		if (arcf_insheader(ctx, 1, AUTHRESULTSHDR,
+		if (arcf_insheader(ctx, 0, AUTHRESULTSHDR,
 		                   arcf_dstring_get(afc->mctx_tmpstr)) != MI_SUCCESS)
 		{
 			if (conf->conf_dolog)
@@ -3890,7 +3890,7 @@ mlfi_eom(SMFICTX *ctx)
 		         afc->mctx_jobid != NULL ? afc->mctx_jobid
 		                                 : (u_char *) JOBIDUNKNOWN);
 
-		if (arcf_insheader(ctx, 1, SWHEADERNAME, xfhdr) != MI_SUCCESS)
+		if (arcf_insheader(ctx, 0, SWHEADERNAME, xfhdr) != MI_SUCCESS)
 		{
 			if (conf->conf_dolog)
 			{
