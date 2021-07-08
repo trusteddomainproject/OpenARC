@@ -52,6 +52,7 @@ struct configdef arcf_config[] =
 	{ "Syslog",			CONFIG_TYPE_BOOLEAN,	FALSE },
 	{ "SyslogFacility",		CONFIG_TYPE_STRING,	FALSE },
 	{ "TemporaryDirectory",		CONFIG_TYPE_STRING,	FALSE },
+	{ "UMask",			CONFIG_TYPE_INTEGER,	FALSE },
 	{ "UserID",			CONFIG_TYPE_STRING,	FALSE },
 	{ NULL,				(u_int) -1,		FALSE }
 };
