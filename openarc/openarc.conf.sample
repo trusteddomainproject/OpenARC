@@ -271,6 +271,15 @@ Syslog			Yes
 
 # TemporaryDirectory	/tmp
 
+##  UMask mask
+##  	default (none)
+##
+##  Change the process umask for file creation to the specified value.
+##  The system has its own default which will be used (usually 022).
+##  See the umask(2) man page for more information.
+
+# UMask			022
+
 ##  Userid userid
 ##  	default (none)
 ##

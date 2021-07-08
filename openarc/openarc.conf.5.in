@@ -241,6 +241,17 @@ allowed in
 The default is "mail".
 
 .TP
+.I UMask (integer)
+Requests a specific permissions mask to be used for file creation.
+This only applies to creation of the socket when
+.I Socket
+specifies a UNIX domain socket, and to the
+.I PidFile
+(if any).  See
+.I umask(2)
+for more information.
+
+.TP
 .I UserID (string)
 Attempts to become the specified userid before starting operations.
 The value is of the form
