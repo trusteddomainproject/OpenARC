@@ -3851,14 +3851,24 @@ mlfi_eom(SMFICTX *ctx)
 
 		if (ipout != NULL)
 		{
+			_Bool quote = strchr(ipout, ':') != NULL;
+
 			arcf_dstring_printf(afc->mctx_tmpstr,
-			                    " smtp.remote-ip=%s", ipout);
+			                    " smtp.remote-ip=%s%s%s",
+			                    quote ? "\"" : "",
+			                    ipout,
+			                    quote ? "\"" : "");
 		}
 
 		if (conf->conf_finalreceiver && arcchainlen > 0)
 		{
+			_Bool quote = strchr(arcchainbuf, ':') != NULL;
+
 			arcf_dstring_printf(afc->mctx_tmpstr,
-			                    " arc.chain=%s", arcchainbuf);
+			                    " arc.chain=%s%s%s",
+			                    quote ? "\"" : "",
+			                    arcchainbuf,
+			                    quote ? "\"" : "");
 		}
 
 		if (arcf_insheader(ctx, 1, AUTHRESULTSHDR,
