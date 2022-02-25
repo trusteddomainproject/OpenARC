@@ -10,6 +10,7 @@ Type=simple
 EnvironmentFile=-@sysconfdir@/sysconfig/openarc
 ExecStart=@sbindir@/openarc -f $OPTIONS
 ExecReload=/bin/kill -USR1 $MAINPID
+Restart=on-abnormal
 User=openarc
 Group=openarc
 PermissionsStartOnly=true
