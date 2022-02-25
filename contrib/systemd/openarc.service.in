@@ -6,11 +6,11 @@ Documentation=man:openarc(8) man:openarc.conf(5) http://www.trusteddomain.org/op
 After=network.target nss-lookup.target syslog.target
 
 [Service]
-Type=forking
-PIDFile=@localstatedir@/run/openarc/openarc.pid
+Type=simple
 EnvironmentFile=-@sysconfdir@/sysconfig/openarc
-ExecStart=@sbindir@/openarc $OPTIONS
+ExecStart=@sbindir@/openarc -f $OPTIONS
 ExecReload=/bin/kill -USR1 $MAINPID
+Restart=on-abnormal
 User=openarc
 Group=openarc
 PermissionsStartOnly=true
