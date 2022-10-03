@@ -3705,16 +3705,15 @@ mlfi_eom(SMFICTX *ctx)
 							break;
 						}
 
+						arc_set_cv(afc->mctx_arcmsg,
+							   cv);
+
 						if (conf->conf_dolog)
 						{
 							syslog(LOG_INFO,
-							       "%s: chain state forced to %d due to prior result found",
-							       afc->mctx_jobid,
-							       cv);
+							       "%s: chain state forced to \"%s\" due to prior result found",
+							       afc->mctx_jobid, arc_chain_status_str(afc->mctx_arcmsg));
 						}
-
-						arc_set_cv(afc->mctx_arcmsg,
-						           cv);
 					}
 
 					if (arcf_dstring_len(afc->mctx_tmpstr) > 0)
