@@ -1469,17 +1469,32 @@ arcf_config_load(struct config *data, struct arcf_config *conf,
 			conf->conf_signalg = ARC_SIGN_RSASHA256;
 		}
 
-		(void) config_get(data, "Domain",
-		                  &conf->conf_domain,
-		                  sizeof conf->conf_domain);
+		if ((conf->conf_mode & ARC_MODE_SIGN))
+		{
+			if (config_get(data, "Domain",
+			                  &conf->conf_domain,
+			                  sizeof conf->conf_domain) < 1)
+			{
+				strlcpy(err, "parameter \"Domain\" required when signing", errlen);
+				return -1;
+			}
 
-		(void) config_get(data, "Selector",
-		                  &conf->conf_selector,
-		                  sizeof conf->conf_selector);
+			if (config_get(data, "Selector",
+			                  &conf->conf_selector,
+			                  sizeof conf->conf_selector) < 1)
+			{
+				strlcpy(err, "parameter \"Selector\" required when signing", errlen);
+				return -1;
+			}
 
-		(void) config_get(data, "KeyFile",
-		                  &conf->conf_keyfile,
-		                  sizeof conf->conf_keyfile);
+			if (config_get(data, "KeyFile",
+			                  &conf->conf_keyfile,
+			                  sizeof conf->conf_keyfile) < 1)
+			{
+				strlcpy(err, "parameter \"KeyFile\" required when signing", errlen);
+				return -1;
+			}
+		}
 
 		(void) config_get(data, "EnableCoredumps",
 		                  &conf->conf_enablecores,
@@ -4429,13 +4444,6 @@ main(int argc, char **argv)
 		        progname);
 		if (argc == 1)
 			fprintf(stderr, "\t(use \"-?\" for help)\n");
-		return EX_CONFIG;
-	}
-
-	if (curconf->conf_selector == NULL || curconf->conf_domain == FALSE)
-	{
-		fprintf(stderr, "%s: selector and domain must be specified\n",
-		        progname);
 		return EX_CONFIG;
 	}
 
