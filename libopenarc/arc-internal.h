@@ -48,7 +48,7 @@
 #endif /* __STDC__ */
 
 /* limits, macros, etc. */
-#define	BUFRSZ			1024	/* base temp buffer size */
+#define	BUFRSZ			2048	/* base temp buffer size */
 #define	BASE64SIZE(x)		(((x + 2) / 3) * 4)
 					/* base64 encoding growth ratio */
 #define MAXADDRESS		256	/* biggest user@host we accept */

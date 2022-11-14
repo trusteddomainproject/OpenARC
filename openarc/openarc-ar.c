@@ -761,7 +761,7 @@ main(int argc, char **argv)
 	char *p;
 	char *progname;
 	struct authres ar;
-	u_char buf[1024];
+	u_char buf[2048];
 	u_char *toks[NTOKENS];
 
 	progname = (p = strrchr(argv[0], '/')) == NULL ? argv[0] : p + 1;
