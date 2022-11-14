@@ -42,7 +42,7 @@
 #endif /* !TRUE */
 
 /* defaults, limits, etc. */
-#define	BUFRSZ		1024
+#define	BUFRSZ		2048
 #define CONFIGOPTS	"Ac:flnp:P:rt:u:vV"
 #define	DEFCONFFILE	CONFIG_BASE "/openarc.conf"
 #define	DEFINTERNAL	"csl:127.0.0.1,::1"

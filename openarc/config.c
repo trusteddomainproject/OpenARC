@@ -37,7 +37,7 @@
 #include "config.h"
 
 /* limits */
-#define	BUFRSZ		1024		/* generic buffer size */
+#define	BUFRSZ		2048		/* generic buffer size */
 #define	MAXLEVEL	5		/* max. include recursion */
 
 #ifndef FALSE
