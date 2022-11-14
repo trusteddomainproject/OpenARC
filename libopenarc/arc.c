@@ -671,9 +671,9 @@ arc_getamshdr_d(ARC_MESSAGE *msg, size_t initial, u_char **buf, size_t *buflen,
 							                 ':');
 							len += 1;
 							arc_dstring_catn(msg->arc_hdrbuf,
-							                 (u_char *) "\n\t ",
-							                 3);
-							len = 9;
+							                 (u_char *) "\n ",
+							                 2);
+							len = 8;
 							arc_dstring_catn(msg->arc_hdrbuf,
 							                 (u_char *) tmp,
 							                 tmplen);
@@ -719,9 +719,9 @@ arc_getamshdr_d(ARC_MESSAGE *msg, size_t initial, u_char **buf, size_t *buflen,
 						if (msg->arc_margin - len == 0)
 						{
 							arc_dstring_catn(msg->arc_hdrbuf,
-							                  (u_char *) "\n\t ",
-							                  3);
-							len = 9;
+							                  (u_char *) "\n ",
+							                  2);
+							len = 8;
 						}
 
 						n = MIN(msg->arc_margin - len,
