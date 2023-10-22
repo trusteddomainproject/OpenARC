@@ -2011,6 +2011,7 @@ arc_validate_msg(ARC_MESSAGE *msg, u_int setnum)
 		arc_error(msg, "EVP_PKEY_get1_RSA() failed");
 		return ARC_STAT_INTERNAL;
 	}
+	msg->arc_keytype = ARC_KEYTYPE_RSA;
 
 	keysize = RSA_size(rsa);
 	if (keysize * 8 < msg->arc_library->arcl_minkeysize)
@@ -2022,6 +2023,7 @@ arc_validate_msg(ARC_MESSAGE *msg, u_int setnum)
 		BIO_free(keydata);
 		return ARC_STAT_CANTVRFY;
 	}
+	msg->arc_keybits = keysize * 8;
 
 	alg = arc_param_get(kvset, "a");
 	nid = NID_sha1;
@@ -2211,21 +2213,21 @@ arc_message(ARC_LIB *lib, arc_canon_t canonhdr, arc_canon_t canonbody,
 		return NULL;
 	}
 
-	msg = (ARC_MESSAGE *) malloc(sizeof *msg);
+	msg = malloc(sizeof *msg);
 	if (msg == NULL)
 	{
-		*err = strerror(errno);
+		if (err != NULL)
+			*err = strerror(errno);
+		return NULL;
 	}
-	else
-	{
-		memset(msg, '\0', sizeof *msg);
 
-		msg->arc_library = lib;
-		if (lib->arcl_fixedtime != 0)
-			msg->arc_timestamp = lib->arcl_fixedtime;
-		else
-			(void) time(&msg->arc_timestamp);
-	}
+	memset(msg, '\0', sizeof *msg);
+
+	msg->arc_library = lib;
+	if (lib->arcl_fixedtime != 0)
+		msg->arc_timestamp = lib->arcl_fixedtime;
+	else
+		(void) time(&msg->arc_timestamp);
 
 	msg->arc_canonhdr = canonhdr;
 	msg->arc_canonbody = canonbody;
@@ -2969,6 +2971,24 @@ arc_set_cv(ARC_MESSAGE *msg, ARC_CHAIN cv)
 }
 
 /*
+**  ARC_GET_CV -- get the chain state
+**
+**  Parameters:
+**      msg -- ARC_MESSAGE object
+**
+**  Return value:
+**      An ARC_CHAIN_* constant.
+*/
+
+ARC_CHAIN
+arc_get_cv(ARC_MESSAGE *msg)
+{
+	assert(msg != NULL);
+
+	return msg->arc_cstate;
+}
+
+/*
 **  ARC_GETSEAL -- get the "seal" to apply to this message
 **
 **  Parameters:
@@ -3009,6 +3029,9 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 	BIO *keydata;
 	EVP_PKEY *pkey;
 	RSA *rsa;
+	int n;
+	char *x;
+	char *y;
 
 	assert(msg != NULL);
 	assert(seal != NULL);
@@ -3060,6 +3083,7 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 		BIO_free(keydata);
 		return ARC_STAT_NORESOURCE;
 	}
+	msg->arc_keytype = ARC_KEYTYPE_RSA;
 
 	keysize = RSA_size(rsa);
 	if (keysize * 8 < msg->arc_library->arcl_minkeysize)
@@ -3071,6 +3095,7 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 		BIO_free(keydata);
 		return ARC_STAT_CANTVRFY;
 	}
+	msg->arc_keybits = keysize * 8;
 
 	sigout = malloc(keysize);
 	if (sigout == NULL)
@@ -3111,9 +3136,10 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 	**  Part 1: Construct a new AAR
 	*/
 
-	arc_dstring_printf(dstr, "ARC-Authentication-Results: i=%u; %s; %s",
+	arc_dstring_printf(dstr, "ARC-Authentication-Results: i=%u; %s;%s%s",
 	                   msg->arc_nsets + 1,
 	                   msg->arc_authservid,
+	                   ar != NULL && isspace(ar[0]) ? "" : " ",
 	                   ar == NULL ? "none" : (char *) ar);
 	status = arc_parse_header_field(msg, arc_dstring_get(dstr),
 	                                arc_dstring_len(dstr), &h);
@@ -3247,10 +3273,28 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 		return ARC_STAT_INTERNAL;
 	}
 
-	/* append it to the stub */
-	arc_dstring_cat(dstr, b64sig);
+	/* wrap and append it to the stub */
 
-	/* XXX -- wrapping needs to happen here */
+	len = 10; // "\tb="
+
+	x = b64sig;
+	y = b64sig + b64siglen;
+
+	while (x < y)
+	{               /* break at margins */
+		if (msg->arc_margin - len == 0)
+		{
+			arc_dstring_catn(dstr, (u_char *) "\n\t ", 3);
+			len = 9; // "\t "
+		}
+
+		n = MIN(msg->arc_margin - len, y - x);
+
+		arc_dstring_catn(dstr, (u_char *) x, n);
+
+		x += n;
+		len += n;
+	}
 
 	/* add it to the seal */
 	h = malloc(sizeof hdr);
@@ -3388,10 +3432,28 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 		return ARC_STAT_INTERNAL;
 	}
 
-	/* append it to the stub */
-	arc_dstring_cat(dstr, b64sig);
+	/* wrap and append it to the stub */
 
-	/* XXX -- wrapping needs to happen here */
+	len = 10; // "\tb="
+
+	x = b64sig;
+	y = b64sig + b64siglen;
+
+	while (x < y)
+	{               /* break at margins */
+		if (msg->arc_margin - len == 0)
+		{
+			arc_dstring_catn(dstr, (u_char *) "\n\t ", 3);
+			len = 9; // "\t "
+		}
+
+		n = MIN(msg->arc_margin - len, y - x);
+
+		arc_dstring_catn(dstr, (u_char *) x, n);
+
+		x += n;
+		len += n;
+	}
 
 	/* add it to the seal */
 	h = malloc(sizeof hdr);
@@ -3420,7 +3482,7 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 	}
 	h->hdr_colon = h->hdr_text + ARC_SEAL_HDRNAMELEN;
 	h->hdr_namelen = ARC_SEAL_HDRNAMELEN;
-	h->hdr_textlen = len;
+	h->hdr_textlen = arc_dstring_len(dstr);
 	h->hdr_flags = 0;
 	h->hdr_next = NULL;
 
