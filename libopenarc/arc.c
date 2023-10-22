@@ -2011,6 +2011,7 @@ arc_validate_msg(ARC_MESSAGE *msg, u_int setnum)
 		arc_error(msg, "EVP_PKEY_get1_RSA() failed");
 		return ARC_STAT_INTERNAL;
 	}
+	msg->arc_keytype = ARC_KEYTYPE_RSA;
 
 	keysize = RSA_size(rsa);
 	if (keysize * 8 < msg->arc_library->arcl_minkeysize)
@@ -2022,6 +2023,7 @@ arc_validate_msg(ARC_MESSAGE *msg, u_int setnum)
 		BIO_free(keydata);
 		return ARC_STAT_CANTVRFY;
 	}
+	msg->arc_keybits = keysize * 8;
 
 	alg = arc_param_get(kvset, "a");
 	nid = NID_sha1;
@@ -3060,6 +3062,7 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 		BIO_free(keydata);
 		return ARC_STAT_NORESOURCE;
 	}
+	msg->arc_keytype = ARC_KEYTYPE_RSA;
 
 	keysize = RSA_size(rsa);
 	if (keysize * 8 < msg->arc_library->arcl_minkeysize)
@@ -3071,6 +3074,7 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 		BIO_free(keydata);
 		return ARC_STAT_CANTVRFY;
 	}
+	msg->arc_keybits = keysize * 8;
 
 	sigout = malloc(keysize);
 	if (sigout == NULL)
