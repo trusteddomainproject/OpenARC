@@ -2211,21 +2211,21 @@ arc_message(ARC_LIB *lib, arc_canon_t canonhdr, arc_canon_t canonbody,
 		return NULL;
 	}
 
-	msg = (ARC_MESSAGE *) malloc(sizeof *msg);
+	msg = malloc(sizeof *msg);
 	if (msg == NULL)
 	{
-		*err = strerror(errno);
+		if (err != NULL)
+			*err = strerror(errno);
+		return NULL;
 	}
-	else
-	{
-		memset(msg, '\0', sizeof *msg);
 
-		msg->arc_library = lib;
-		if (lib->arcl_fixedtime != 0)
-			msg->arc_timestamp = lib->arcl_fixedtime;
-		else
-			(void) time(&msg->arc_timestamp);
-	}
+	memset(msg, '\0', sizeof *msg);
+
+	msg->arc_library = lib;
+	if (lib->arcl_fixedtime != 0)
+		msg->arc_timestamp = lib->arcl_fixedtime;
+	else
+		(void) time(&msg->arc_timestamp);
 
 	msg->arc_canonhdr = canonhdr;
 	msg->arc_canonbody = canonbody;
