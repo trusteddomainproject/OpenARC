@@ -2971,6 +2971,24 @@ arc_set_cv(ARC_MESSAGE *msg, ARC_CHAIN cv)
 }
 
 /*
+**  ARC_GET_CV -- get the chain state
+**
+**  Parameters:
+**      msg -- ARC_MESSAGE object
+**
+**  Return value:
+**      An ARC_CHAIN_* constant.
+*/
+
+ARC_CHAIN
+arc_get_cv(ARC_MESSAGE *msg)
+{
+	assert(msg != NULL);
+
+	return msg->arc_cstate;
+}
+
+/*
 **  ARC_GETSEAL -- get the "seal" to apply to this message
 **
 **  Parameters:

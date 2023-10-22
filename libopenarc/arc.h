@@ -468,6 +468,18 @@ extern ARC_STAT arc_eom __P((ARC_MESSAGE *));
 extern void arc_set_cv(ARC_MESSAGE *, ARC_CHAIN);
 
 /*
+**  ARC_GET_CV -- get the chain state
+**
+**  Parameters:
+**      msg -- ARC_MESSAGE object
+**
+**  Return value:
+**      An ARC_CHAIN_* constant.
+*/
+
+extern ARC_CHAIN arc_get_cv(ARC_MESSAGE *);
+
+/*
 **  ARC_GETSEAL -- get the "seal" to apply to this message
 **
 **  Parameters:
