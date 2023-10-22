@@ -3011,6 +3011,9 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 	BIO *keydata;
 	EVP_PKEY *pkey;
 	RSA *rsa;
+	int n;
+	char *x;
+	char *y;
 
 	assert(msg != NULL);
 	assert(seal != NULL);
@@ -3251,10 +3254,28 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 		return ARC_STAT_INTERNAL;
 	}
 
-	/* append it to the stub */
-	arc_dstring_cat(dstr, b64sig);
+	/* wrap and append it to the stub */
 
-	/* XXX -- wrapping needs to happen here */
+	len = 10; // "\tb="
+
+	x = b64sig;
+	y = b64sig + b64siglen;
+
+	while (x < y)
+	{               /* break at margins */
+		if (msg->arc_margin - len == 0)
+		{
+			arc_dstring_catn(dstr, (u_char *) "\n\t ", 3);
+			len = 9; // "\t "
+		}
+
+		n = MIN(msg->arc_margin - len, y - x);
+
+		arc_dstring_catn(dstr, (u_char *) x, n);
+
+		x += n;
+		len += n;
+	}
 
 	/* add it to the seal */
 	h = malloc(sizeof hdr);
@@ -3392,10 +3413,28 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 		return ARC_STAT_INTERNAL;
 	}
 
-	/* append it to the stub */
-	arc_dstring_cat(dstr, b64sig);
+	/* wrap and append it to the stub */
 
-	/* XXX -- wrapping needs to happen here */
+	len = 10; // "\tb="
+
+	x = b64sig;
+	y = b64sig + b64siglen;
+
+	while (x < y)
+	{               /* break at margins */
+		if (msg->arc_margin - len == 0)
+		{
+			arc_dstring_catn(dstr, (u_char *) "\n\t ", 3);
+			len = 9; // "\t "
+		}
+
+		n = MIN(msg->arc_margin - len, y - x);
+
+		arc_dstring_catn(dstr, (u_char *) x, n);
+
+		x += n;
+		len += n;
+	}
 
 	/* add it to the seal */
 	h = malloc(sizeof hdr);
@@ -3424,7 +3463,7 @@ arc_getseal(ARC_MESSAGE *msg, ARC_HDRFIELD **seal, char *authservid,
 	}
 	h->hdr_colon = h->hdr_text + ARC_SEAL_HDRNAMELEN;
 	h->hdr_namelen = ARC_SEAL_HDRNAMELEN;
-	h->hdr_textlen = len;
+	h->hdr_textlen = arc_dstring_len(dstr);
 	h->hdr_flags = 0;
 	h->hdr_next = NULL;
 
