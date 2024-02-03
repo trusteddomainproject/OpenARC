@@ -2912,8 +2912,8 @@ arc_eoh(ARC_MESSAGE *msg)
 		return ARC_STAT_SYNTAX;
 	}
 
-	if ((msg->arc_mode & ARC_MODE_VERIFY) != 0 &&
-	    msg->arc_cstate != ARC_CHAIN_FAIL)
+	/* need to verify previous sets even if running in sign mode */
+	if (msg->arc_cstate != ARC_CHAIN_FAIL)
 	{
 		status = arc_canon_runheaders_seal(msg);
 		if (status != ARC_STAT_OK)
