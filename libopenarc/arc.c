@@ -309,7 +309,12 @@ arc_parse_algorithm(ARC_MESSAGE *msg, u_char *alg, int *nid)
 	arc_alg_t algtype;
 
 	assert(msg != NULL);
-	assert(alg != NULL);
+
+	if (alg == NULL)
+	{
+		arc_error(msg, "missing algorithm passed to arc_parse_algorithm");
+		return ARC_STAT_BADALG;
+	}
 
 	algtype = arc_name_to_code(algorithms, alg);
 
