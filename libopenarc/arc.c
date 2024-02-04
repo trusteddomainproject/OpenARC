@@ -2017,8 +2017,8 @@ arc_validate_msg(ARC_MESSAGE *msg, u_int setnum)
 
 	/* store algorithm in msg, needed for arc_get_key() */
 	alg = arc_param_get(kvset, "a");
-	arc_parse_algorithm(msg, alg, &nid);
-	if (nid == NULL)
+	status = arc_parse_algorithm(msg, alg, &nid);
+	if (status != ARC_STAT_OK)
 	{
 		arc_error(msg, "hash algorithm not correctly retrieved for algorithm %s", alg);
 		return ARC_STAT_BADALG;
@@ -2175,8 +2175,8 @@ arc_validate_seal(ARC_MESSAGE *msg, u_int setnum)
 
 	/* store algorithm in msg, needed for arc_get_key() */
 	alg = arc_param_get(kvset, "a");
-	arc_parse_algorithm(msg, alg, &nid);
-	if (nid == NULL)
+	status = arc_parse_algorithm(msg, alg, &nid);
+	if (status != ARC_STAT_OK)
 	{
 		arc_error(msg, "hash algorithm not correctly retrieved for algorithm %s", alg);
 		return ARC_STAT_BADALG;
