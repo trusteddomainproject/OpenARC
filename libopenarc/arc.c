@@ -308,6 +308,9 @@ arc_parse_algorithm(ARC_MESSAGE *msg, u_char *alg, int *nid)
 {
 	arc_alg_t algtype;
 
+	assert(msg != NULL);
+	assert(alg != NULL);
+
 	algtype = arc_name_to_code(algorithms, alg);
 
 	if (algtype == ARC_SIGN_RSASHA1)
