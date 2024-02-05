@@ -81,6 +81,7 @@ typedef int ARC_STAT;
 #define	ARC_STAT_KEYFAIL	11	/* key retrieval failed */
 #define	ARC_STAT_MULTIDNSREPLY	12	/* multiple DNS replies */
 #define	ARC_STAT_SIGGEN		13	/* seal generation failed */
+#define	ARC_STAT_BADALG		14	/* unknown or invalid algorithm */
 
 /*
 **  ARC_CHAIN -- chain state

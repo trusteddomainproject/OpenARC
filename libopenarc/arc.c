@@ -290,6 +290,57 @@ arc_key_hashesok(ARC_LIB *lib, u_char *hashlist)
 }
 
 /*
+**  ARC_PARSE_ALGORITHM -- parse an algorithm and set the msg hash and key,
+**				  as well as set the message digest algorithm for
+**				  RSA_verify in the variable nid
+**
+**  Parameters:
+**  	msg -- ARC_MESSAGE handle
+**  	alg -- string containing the algorithm to parse
+**  	nid -- variable to write the message digest algorithm
+**
+**  Return value:
+**  	An ARC_STAT_* constant.
+*/
+
+ARC_STAT
+arc_parse_algorithm(ARC_MESSAGE *msg, u_char *alg, int *nid)
+{
+	arc_alg_t algtype;
+
+	assert(msg != NULL);
+	assert(nid != NULL);
+
+	if (alg == NULL)
+	{
+		arc_error(msg, "missing algorithm passed to arc_parse_algorithm");
+		return ARC_STAT_BADALG;
+	}
+
+	algtype = arc_name_to_code(algorithms, alg);
+
+	if (algtype == ARC_SIGN_RSASHA1)
+	{
+		msg->arc_hashtype = ARC_HASHTYPE_SHA1;
+		msg->arc_keytype = ARC_KEYTYPE_RSA;
+		*nid = NID_sha1;
+	}
+	else if (algtype == ARC_SIGN_RSASHA256)
+	{
+		msg->arc_hashtype = ARC_HASHTYPE_SHA256;
+		msg->arc_keytype = ARC_KEYTYPE_RSA;
+		*nid = NID_sha256;
+	}
+	else
+	{
+		arc_error(msg, "unknown or invalid algorithm: %s", alg);
+		return ARC_STAT_BADALG;
+	}
+
+	return ARC_STAT_OK;
+}
+
+/*
 **  ARC_GENAMSHDR -- generate a signature or seal header field
 **
 **  Parameters:
@@ -1965,6 +2016,13 @@ arc_validate_msg(ARC_MESSAGE *msg, u_int setnum)
 	msg->arc_selector = arc_param_get(kvset, "s");
 	msg->arc_domain = arc_param_get(kvset, "d");
 
+	/* store algorithm in msg, needed for arc_get_key() */
+	alg = arc_param_get(kvset, "a");
+	status = arc_parse_algorithm(msg, alg, &nid);
+	if (status != ARC_STAT_OK)
+            // arc_error already set by arc_parse_algorithm()
+            return status;
+
 	/* get the key from DNS (or wherever) */
 	status = arc_get_key(msg, FALSE);
 	if (status != ARC_STAT_OK)
@@ -2038,11 +2096,6 @@ arc_validate_msg(ARC_MESSAGE *msg, u_int setnum)
 		ARC_FREE(sig);
 		return ARC_STAT_CANTVRFY;
 	}
-
-	alg = arc_param_get(kvset, "a");
-	nid = NID_sha1;
-	if (alg != NULL && strcmp(alg, "rsa-sha256") == 0)
-		nid = NID_sha256;
 
 	rsastat = RSA_verify(nid, hh, hhlen, sig, siglen, rsa);
 
@@ -2119,6 +2172,13 @@ arc_validate_seal(ARC_MESSAGE *msg, u_int setnum)
 	msg->arc_selector = arc_param_get(kvset, "s");
 	msg->arc_domain = arc_param_get(kvset, "d");
 
+	/* store algorithm in msg, needed for arc_get_key() */
+	alg = arc_param_get(kvset, "a");
+	status = arc_parse_algorithm(msg, alg, &nid);
+	if (status != ARC_STAT_OK)
+            // arc_error already set by arc_parse_algorithm()
+            return status;
+
 	if (msg->arc_selector == NULL)
 	{
 		arc_error(msg, "seal at i=%u has no selector", setnum);
@@ -2190,11 +2250,6 @@ arc_validate_seal(ARC_MESSAGE *msg, u_int setnum)
 		ARC_FREE(sig);
 		return ARC_STAT_INTERNAL;
 	}
-
-	alg = arc_param_get(kvset, "a");
-	nid = NID_sha1;
-	if (alg != NULL && strcmp(alg, "rsa-sha256") == 0)
-		nid = NID_sha256;
 
 	rsastat = RSA_verify(nid, sh, shlen, sig, siglen, rsa);
 
