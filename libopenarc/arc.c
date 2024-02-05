@@ -309,6 +309,7 @@ arc_parse_algorithm(ARC_MESSAGE *msg, u_char *alg, int *nid)
 	arc_alg_t algtype;
 
 	assert(msg != NULL);
+	assert(nid != NULL);
 
 	if (alg == NULL)
 	{
