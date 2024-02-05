@@ -332,7 +332,7 @@ arc_parse_algorithm(ARC_MESSAGE *msg, u_char *alg, int *nid)
 	}
 	else
 	{
-		arc_error(msg, "unknown or invalid algorithm");
+		arc_error(msg, "unknown or invalid algorithm: %s", alg);
 		return ARC_STAT_BADALG;
 	}
 
@@ -2019,10 +2019,8 @@ arc_validate_msg(ARC_MESSAGE *msg, u_int setnum)
 	alg = arc_param_get(kvset, "a");
 	status = arc_parse_algorithm(msg, alg, &nid);
 	if (status != ARC_STAT_OK)
-	{
-		arc_error(msg, "hash algorithm not correctly retrieved for algorithm %s", alg);
-		return ARC_STAT_BADALG;
-	}
+            // arc_error already set by arc_parse_algorithm()
+            return status;
 
 	/* get the key from DNS (or wherever) */
 	status = arc_get_key(msg, FALSE);
@@ -2177,10 +2175,8 @@ arc_validate_seal(ARC_MESSAGE *msg, u_int setnum)
 	alg = arc_param_get(kvset, "a");
 	status = arc_parse_algorithm(msg, alg, &nid);
 	if (status != ARC_STAT_OK)
-	{
-		arc_error(msg, "hash algorithm not correctly retrieved for algorithm %s", alg);
-		return ARC_STAT_BADALG;
-	}
+            // arc_error already set by arc_parse_algorithm()
+            return status;
 
 	if (msg->arc_selector == NULL)
 	{
