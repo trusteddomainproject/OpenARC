@@ -3056,6 +3056,14 @@ arc_set_cv(ARC_MESSAGE *msg, ARC_CHAIN cv)
 	       cv == ARC_CHAIN_FAIL ||
 	       cv == ARC_CHAIN_PASS);
 
+	/* If the chain was none (i.e. the verified email had now chain), but
+	 * it now has a chain, then assume that we added the valid chain and
+	 * that therefore the chain state should now be pass instead. Otherwise
+	 * the newly-signed chain will have a status of none, even though it
+	 * should be the valid chain that we added. */
+	if ((cv == ARC_CHAIN_NONE) && (msg->arc_nsets != 0))
+	       cv = ARC_CHAIN_PASS;
+
 	msg->arc_cstate = cv;
 }
 
